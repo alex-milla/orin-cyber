@@ -56,9 +56,32 @@ class Updater {
     /**
      * Obtiene información de la última release en GitHub
      */
-    public function getRemoteVersion(): array {
+    private function fetchUrl(string $url): ?string {
+        // Intentar con curl primero (más compatible con hosting compartido)
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'OrinSec-Updater');
+            if ($this->githubPat) {
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $this->githubPat]);
+            }
+            $raw = curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            if ($raw !== false && $code >= 200 && $code < 300) {
+                return $raw;
+            }
+        }
+        // Fallback a file_get_contents
         $ctx = stream_context_create($this->httpContext(['timeout' => 10]));
-        $raw = @file_get_contents($this->apiUrl, false, $ctx);
+        $raw = @file_get_contents($url, false, $ctx);
+        return $raw ?: null;
+    }
+
+    public function getRemoteVersion(): array {
+        $raw = $this->fetchUrl($this->apiUrl);
         if (!$raw) {
             return ['error' => 'No se pudo contactar con GitHub o no hay releases disponibles'];
         }
@@ -120,6 +143,27 @@ class Updater {
             mkdir($this->tempDir, 0755, true);
         }
         $zipFile = $this->tempDir . '/update.zip';
+
+        if (function_exists('curl_init')) {
+            $fp = fopen($zipFile, 'w+');
+            $ch = curl_init($zipUrl);
+            curl_setopt($ch, CURLOPT_FILE, $fp);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'OrinSec-Updater');
+            if ($this->githubPat) {
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $this->githubPat]);
+            }
+            curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            fclose($fp);
+            if ($code < 200 || $code >= 300) {
+                throw new RuntimeException('No se pudo descargar la release desde GitHub (HTTP ' . $code . ')');
+            }
+            return $zipFile;
+        }
+
         $ctx = stream_context_create($this->httpContext(['timeout' => 60]));
         $data = @file_get_contents($zipUrl, false, $ctx);
         if ($data === false) {

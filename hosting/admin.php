@@ -71,20 +71,24 @@ require __DIR__ . '/templates/header.php';
     <div id="update-panel">
         <h3>🔐 GitHub PAT (repo privado)</h3>
         <p class="small">Si este repositorio es privado, introduce aquí un <strong>Personal Access Token</strong> de GitHub con permiso <code>repo</code> para que el updater pueda descargar releases.</p>
-        <form method="POST" action="ajax_admin.php?action=save_github_pat" onsubmit="return savePat(this);" style="display:flex; gap:.5rem; align-items:flex-end;">
+        <form method="POST" action="ajax_admin.php?action=save_github_pat" onsubmit="return savePat(this);" style="display:flex; gap:.75rem; align-items:flex-end; margin-bottom:1.5rem;">
             <?php echo csrfInput(); ?>
-            <input type="password" name="pat" value="<?php echo htmlspecialchars($githubPat); ?>" placeholder="ghp_xxxxxxxxxxxx" style="flex:1; font-family:monospace;">
-            <button type="submit">💾 Guardar</button>
+            <input type="password" name="pat" value="<?php echo htmlspecialchars($githubPat); ?>" placeholder="ghp_xxxxxxxxxxxx" style="flex:1; font-family:monospace; padding:.6rem; border:1px solid #ddd; border-radius:4px;">
+            <button type="submit" style="padding:.6rem 1.2rem; white-space:nowrap;">💾 Guardar</button>
         </form>
-        <p id="pat-msg" class="small" style="margin-top:.5rem;"></p>
+        <p id="pat-msg" class="small" style="margin-bottom:2rem;"></p>
 
-        <h3 style="margin-top:2rem;">Estado del sistema</h3>
-        <p>Versión instalada: <code id="current-version"><?php echo htmlspecialchars($currentVersion); ?></code></p>
-        <p>Versión remota: <code id="remote-version">Consultando...</code></p>
-        <p id="remote-message" class="small"></p>
-        <button id="btn-check" onclick="checkUpdate()">🔄 Buscar actualizaciones</button>
-        <button id="btn-update" onclick="doUpdate()" style="display:none;">⬇️ Actualizar ahora</button>
-        <div id="update-log" style="margin-top:1rem; font-family:monospace; background:#f5f5f5; padding:1rem; border-radius:4px; min-height:60px; display:none;"></div>
+        <div style="border-top:1px solid #eee; padding-top:1.5rem;">
+            <h3 style="margin-top:0;">Estado del sistema</h3>
+            <p>Versión instalada: <code id="current-version"><?php echo htmlspecialchars($currentVersion); ?></code></p>
+            <p>Versión remota: <code id="remote-version">Consultando...</code></p>
+            <p id="remote-message" class="small"></p>
+            <div style="display:flex; gap:.75rem; margin:1rem 0;">
+                <button id="btn-check" onclick="checkUpdate()">🔄 Buscar actualizaciones</button>
+                <button id="btn-update" onclick="doUpdate()" style="display:none;">⬇️ Actualizar ahora</button>
+            </div>
+            <div id="update-log" style="font-family:monospace; background:#f5f5f5; padding:1rem; border-radius:4px; min-height:60px; display:none;"></div>
+        </div>
 
         <h3 style="margin-top:2rem;">Backups disponibles</h3>
         <?php if (empty($backups)): ?>
@@ -175,13 +179,15 @@ require __DIR__ . '/templates/header.php';
             <td style="padding:.5rem;"><?php echo $k['is_active'] ? '<span style="color:#388e3c;">Activa</span>' : '<span style="color:#c62828;">Revocada</span>'; ?></td>
             <td style="padding:.5rem;" class="small"><?php echo $k['last_used'] ? htmlspecialchars($k['last_used']) : 'Nunca'; ?></td>
             <td style="padding:.5rem;">
+                <div style="display:flex; gap:.4rem; flex-wrap:wrap;">
                 <?php if ($k['is_active']): ?>
                     <button class="secondary" onclick="revokeKey(<?php echo $k['id']; ?>)">🚫 Revocar</button>
                 <?php else: ?>
                     <button class="secondary" onclick="activateKey(<?php echo $k['id']; ?>)">✅ Activar</button>
                 <?php endif; ?>
-                <button class="secondary" onclick="regenKey(<?php echo $k['id']; ?>)">🔄 Regenerar</button>
-                <button class="secondary" onclick="deleteKey(<?php echo $k['id']; ?>)">🗑️ Eliminar</button>
+                    <button class="secondary" onclick="regenKey(<?php echo $k['id']; ?>)">🔄 Regenerar</button>
+                    <button class="secondary" onclick="deleteKey(<?php echo $k['id']; ?>)">🗑️ Eliminar</button>
+                </div>
             </td>
         </tr>
         <?php endforeach; ?>
