@@ -35,10 +35,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $pageTitle = 'Login — OrinSec';
 require __DIR__ . '/templates/header.php';
 ?>
-<div class="card" style="max-width:400px; margin:3rem auto;">
+<div class="card login-card">
     <h2>Iniciar sesión</h2>
     <?php if ($error): ?>
-        <p style="color:#c62828;"><?php echo htmlspecialchars($error); ?></p>
+        <p class="alert alert-error"><?php echo htmlspecialchars($error); ?></p>
     <?php endif; ?>
     <form method="POST">
         <?php echo csrfInput(); ?>
@@ -46,7 +46,7 @@ require __DIR__ . '/templates/header.php';
         <input type="text" name="username" required autofocus maxlength="64" autocomplete="username">
         <label>Contraseña</label>
         <input type="password" name="password" required maxlength="128" autocomplete="current-password">
-        <button type="submit" style="margin-top:1rem; width:100%;">Entrar</button>
+        <button type="submit" class="mt-2 w-full">Entrar</button>
     </form>
 </div>
 <?php require __DIR__ . '/templates/footer.php'; ?>

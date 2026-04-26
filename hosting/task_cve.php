@@ -54,8 +54,8 @@ require __DIR__ . '/templates/header.php';
         <div id="polling-area" data-task-id="<?php echo $taskId; ?>">
             <p>Tarea <strong>#<?php echo $taskId; ?></strong> creada. Esperando al worker...</p>
             <div class="spinner"></div>
-            <div id="status-message" class="small" style="margin-top:.5rem;">Estado: <span class="status-pending">pendiente</span></div>
-            <div id="result-area" style="margin-top:1rem; display:none;">
+            <div id="status-message" class="small mt-1">Estado: <span class="status-pending">pendiente</span></div>
+            <div id="result-area" class="mt-2 hidden">
                 <div id="result-content"></div>
                 <div class="actions">
                     <button onclick="copyText()">📋 Copiar texto plano</button>
@@ -66,7 +66,7 @@ require __DIR__ . '/templates/header.php';
         <script src="assets/js/polling.js"></script>
     <?php else: ?>
         <?php if ($error): ?>
-            <p style="color:#c62828;"><?php echo htmlspecialchars($error); ?></p>
+            <p class="alert alert-error"><?php echo htmlspecialchars($error); ?></p>
         <?php endif; ?>
         <form method="POST">
             <?php echo csrfInput(); ?>
@@ -102,7 +102,7 @@ require __DIR__ . '/templates/header.php';
                 <option value="20">20</option>
             </select>
             
-            <button type="submit" style="margin-top:1rem;">Generar informe</button>
+            <button type="submit" class="mt-2">Generar informe</button>
         </form>
     <?php endif; ?>
 </div>

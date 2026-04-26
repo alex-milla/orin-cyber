@@ -42,7 +42,7 @@ require __DIR__ . '/templates/header.php';
         <div id="polling-area" data-task-id="<?php echo $taskId; ?>">
             <p>Esperando al worker... <span class="spinner"></span></p>
             <div id="status-message" class="small">Estado: <span class="status-<?php echo $task['status']; ?>"><?php echo $task['status']; ?></span></div>
-            <div id="result-area" style="display:none;">
+            <div id="result-area" class="hidden">
                 <div id="result-content"></div>
                 <div class="actions">
                     <button onclick="copyText()">📋 Copiar texto plano</button>
@@ -51,7 +51,7 @@ require __DIR__ . '/templates/header.php';
         </div>
         <script src="assets/js/polling.js"></script>
     <?php elseif ($task['status'] === 'error'): ?>
-        <div style="background:#ffebee; padding:1rem; border-radius:4px;">
+        <div class="alert alert-error">
             <p><strong>Error:</strong> <?php echo nl2br(htmlspecialchars($task['error_message'] ?? 'Error desconocido')); ?></p>
         </div>
     <?php else: ?>
@@ -61,7 +61,7 @@ require __DIR__ . '/templates/header.php';
         <div class="actions">
             <button onclick="copyText()">📋 Copiar texto plano</button>
         </div>
-        <textarea id="plain-text" style="position:absolute; left:-9999px;"><?php echo htmlspecialchars($task['result_text'] ?? ''); ?></textarea>
+        <textarea id="plain-text" class="visually-hidden"><?php echo htmlspecialchars($task['result_text'] ?? ''); ?></textarea>
     <?php endif; ?>
 </div>
 <script>

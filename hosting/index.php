@@ -31,26 +31,26 @@ require __DIR__ . '/templates/header.php';
     <?php if (empty($tasks)): ?>
         <p class="small">No hay tareas todavía.</p>
     <?php else: ?>
-        <table style="width:100%; border-collapse:collapse;">
+        <table>
             <thead>
-                <tr style="border-bottom:2px solid #ddd;">
-                    <th style="text-align:left; padding:.5rem;">ID</th>
-                    <th style="text-align:left; padding:.5rem;">Tipo</th>
-                    <th style="text-align:left; padding:.5rem;">Estado</th>
-                    <th style="text-align:left; padding:.5rem;">Creada</th>
-                    <th style="text-align:left; padding:.5rem;">Acción</th>
+                <tr>
+                    <th>ID</th>
+                    <th>Tipo</th>
+                    <th>Estado</th>
+                    <th>Creada</th>
+                    <th>Acción</th>
                 </tr>
             </thead>
             <tbody>
             <?php foreach ($tasks as $t): ?>
-                <tr style="border-bottom:1px solid #eee;">
-                    <td style="padding:.5rem;">#<?php echo $t['id']; ?></td>
-                    <td style="padding:.5rem;"><?php echo htmlspecialchars($t['task_type']); ?></td>
-                    <td style="padding:.5rem;" class="status-<?php echo $t['status']; ?>">
+                <tr>
+                    <td>#<?php echo $t['id']; ?></td>
+                    <td><?php echo htmlspecialchars($t['task_type']); ?></td>
+                    <td class="status-<?php echo $t['status']; ?>">
                         <?php echo ucfirst(htmlspecialchars($t['status'])); ?>
                     </td>
-                    <td style="padding:.5rem;" class="small"><?php echo htmlspecialchars($t['created_at']); ?></td>
-                    <td style="padding:.5rem;">
+                    <td class="small"><?php echo htmlspecialchars($t['created_at']); ?></td>
+                    <td>
                         <?php if ($t['status'] === 'completed' || $t['status'] === 'error'): ?>
                             <a href="task_result.php?id=<?php echo $t['id']; ?>">Ver</a>
                         <?php else: ?>

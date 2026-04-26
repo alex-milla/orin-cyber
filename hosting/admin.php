@@ -59,55 +59,55 @@ require __DIR__ . '/templates/header.php';
 <div class="card">
     <h2>⚙️ Panel de administración</h2>
     <?php if ($renderError): ?>
-        <p style="color:#c62828; background:#ffebee; padding:1rem; border-radius:4px;"><?php echo htmlspecialchars($renderError); ?></p>
+        <div class="alert alert-error"><?php echo htmlspecialchars($renderError); ?></div>
     <?php endif; ?>
-    <div style="display:flex; gap:1rem; margin-bottom:1rem; border-bottom:2px solid #ddd;">
-        <a href="?tab=updates" style="padding:.5rem 0; text-decoration:none; font-weight:600; color:<?php echo $tab==='updates'?'var(--primary)':'#666'; ?>; border-bottom:3px solid <?php echo $tab==='updates'?'var(--primary)':'transparent'; ?>;">Actualizaciones</a>
-        <a href="?tab=users" style="padding:.5rem 0; text-decoration:none; font-weight:600; color:<?php echo $tab==='users'?'var(--primary)':'#666'; ?>; border-bottom:3px solid <?php echo $tab==='users'?'var(--primary)':'transparent'; ?>;">Usuarios</a>
-        <a href="?tab=config" style="padding:.5rem 0; text-decoration:none; font-weight:600; color:<?php echo $tab==='config'?'var(--primary)':'#666'; ?>; border-bottom:3px solid <?php echo $tab==='config'?'var(--primary)':'transparent'; ?>;">Configuración</a>
+    <div class="tabs">
+        <a href="?tab=updates" class="<?php echo $tab==='updates'?'active':''; ?>">Actualizaciones</a>
+        <a href="?tab=users" class="<?php echo $tab==='users'?'active':''; ?>">Usuarios</a>
+        <a href="?tab=config" class="<?php echo $tab==='config'?'active':''; ?>">Configuración</a>
     </div>
 
     <?php if ($tab === 'updates'): ?>
     <div id="update-panel">
         <h3>🔐 GitHub PAT (repo privado)</h3>
         <p class="small">Si este repositorio es privado, introduce aquí un <strong>Personal Access Token</strong> de GitHub con permiso <code>repo</code> para que el updater pueda descargar releases.</p>
-        <form method="POST" action="ajax_admin.php?action=save_github_pat" onsubmit="return savePat(this);" style="display:flex; gap:.75rem; align-items:flex-end; margin-bottom:1.5rem;">
+        <form method="POST" action="ajax_admin.php?action=save_github_pat" onsubmit="return savePat(this);" class="flex gap-2 items-end mb-3">
             <?php echo csrfInput(); ?>
-            <input type="password" name="pat" value="<?php echo htmlspecialchars($githubPat); ?>" placeholder="ghp_xxxxxxxxxxxx" style="flex:1; font-family:monospace; padding:.6rem; border:1px solid #ddd; border-radius:4px;">
-            <button type="submit" style="padding:.6rem 1.2rem; white-space:nowrap;">💾 Guardar</button>
+            <input type="password" name="pat" value="<?php echo htmlspecialchars($githubPat); ?>" placeholder="ghp_xxxxxxxxxxxx" class="w-full font-mono">
+            <button type="submit">💾 Guardar</button>
         </form>
-        <p id="pat-msg" class="small" style="margin-bottom:2rem;"></p>
+        <p id="pat-msg" class="small mb-3"></p>
 
-        <div style="border-top:1px solid #eee; padding-top:1.5rem;">
-            <h3 style="margin-top:0;">Estado del sistema</h3>
+        <div class="mt-4 divider-top">
+            <h3>Estado del sistema</h3>
             <p>Versión instalada: <code id="current-version"><?php echo htmlspecialchars($currentVersion); ?></code></p>
             <p>Versión remota: <code id="remote-version">Consultando...</code></p>
             <p id="remote-message" class="small"></p>
-            <div style="display:flex; gap:.75rem; margin:1rem 0;">
+            <div class="flex gap-2 mt-2 mb-2">
                 <button id="btn-check" onclick="checkUpdate()">🔄 Buscar actualizaciones</button>
-                <button id="btn-update" onclick="doUpdate()" style="display:none;">⬇️ Actualizar ahora</button>
+                <button id="btn-update" onclick="doUpdate()" class="hidden">⬇️ Actualizar ahora</button>
             </div>
-            <div id="update-log" style="font-family:monospace; background:#f5f5f5; padding:1rem; border-radius:4px; min-height:60px; display:none; white-space:pre-wrap; line-height:1.6;"></div>
+            <div id="update-log" class="update-log"></div>
         </div>
 
-        <h3 style="margin-top:2rem;">Backups disponibles</h3>
+        <h3 class="mt-4">Backups disponibles</h3>
         <?php if (empty($backups)): ?>
             <p class="small">No hay backups.</p>
         <?php else: ?>
-            <table style="width:100%; border-collapse:collapse;">
-                <thead><tr style="border-bottom:2px solid #ddd;">
-                    <th style="text-align:left; padding:.5rem;">Archivo</th>
-                    <th style="text-align:left; padding:.5rem;">Tamaño</th>
-                    <th style="text-align:left; padding:.5rem;">Fecha</th>
-                    <th style="text-align:left; padding:.5rem;">Acción</th>
+            <table>
+                <thead><tr>
+                    <th>Archivo</th>
+                    <th>Tamaño</th>
+                    <th>Fecha</th>
+                    <th>Acción</th>
                 </tr></thead>
                 <tbody>
                 <?php foreach ($backups as $b): ?>
-                <tr style="border-bottom:1px solid #eee;">
-                    <td style="padding:.5rem;"><?php echo htmlspecialchars($b['file']); ?></td>
-                    <td style="padding:.5rem;"><?php echo htmlspecialchars($b['size']); ?></td>
-                    <td style="padding:.5rem;"><?php echo htmlspecialchars($b['date']); ?></td>
-                    <td style="padding:.5rem;"><button class="secondary" onclick="doRollback('<?php echo htmlspecialchars($b['file'], ENT_QUOTES); ?>')">↩️ Restaurar</button></td>
+                <tr>
+                    <td><?php echo htmlspecialchars($b['file']); ?></td>
+                    <td><?php echo htmlspecialchars($b['size']); ?></td>
+                    <td><?php echo htmlspecialchars($b['date']); ?></td>
+                    <td><button class="secondary" onclick="doRollback('<?php echo htmlspecialchars($b['file'], ENT_QUOTES); ?>')">↩️ Restaurar</button></td>
                 </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -120,27 +120,27 @@ require __DIR__ . '/templates/header.php';
     <?php if (empty($users)): ?>
         <p class="small">No hay usuarios registrados.</p>
     <?php else: ?>
-    <table style="width:100%; border-collapse:collapse;">
-        <thead><tr style="border-bottom:2px solid #ddd;">
-            <th style="text-align:left; padding:.5rem;">ID</th>
-            <th style="text-align:left; padding:.5rem;">Usuario</th>
-            <th style="text-align:left; padding:.5rem;">Admin</th>
-            <th style="text-align:left; padding:.5rem;">Registro</th>
+    <table>
+        <thead><tr>
+            <th>ID</th>
+            <th>Usuario</th>
+            <th>Admin</th>
+            <th>Registro</th>
         </tr></thead>
         <tbody>
         <?php foreach ($users as $u): ?>
-        <tr style="border-bottom:1px solid #eee;">
-            <td style="padding:.5rem;"><?php echo $u['id']; ?></td>
-            <td style="padding:.5rem;"><?php echo htmlspecialchars($u['username']); ?></td>
-            <td style="padding:.5rem;"><?php echo $u['is_admin'] ? 'Sí' : 'No'; ?></td>
-            <td style="padding:.5rem;"><?php echo htmlspecialchars($u['created_at']); ?></td>
+        <tr>
+            <td><?php echo $u['id']; ?></td>
+            <td><?php echo htmlspecialchars($u['username']); ?></td>
+            <td><?php echo $u['is_admin'] ? 'Sí' : 'No'; ?></td>
+            <td><?php echo htmlspecialchars($u['created_at']); ?></td>
         </tr>
         <?php endforeach; ?>
         </tbody>
     </table>
     <?php endif; ?>
 
-    <h3 style="margin-top:2rem;">Crear usuario</h3>
+    <h3 class="mt-4">Crear usuario</h3>
     <form method="POST" action="ajax_admin.php?action=add_user" onsubmit="return addUser(this);">
         <?php echo csrfInput(); ?>
         <label>Usuario</label>
@@ -148,8 +148,8 @@ require __DIR__ . '/templates/header.php';
         <label>Contraseña</label>
         <input type="password" name="password" required minlength="8" maxlength="128">
         <label><input type="checkbox" name="is_admin" value="1"> Administrador</label>
-        <button type="submit" style="margin-top:1rem;">Crear usuario</button>
-        <p id="user-msg" style="margin-top:.5rem;"></p>
+        <button type="submit" class="mt-2">Crear usuario</button>
+        <p id="user-msg" class="mt-1"></p>
     </form>
 
     <?php else: ?>
@@ -161,25 +161,25 @@ require __DIR__ . '/templates/header.php';
     <?php if (empty($apiKeys)): ?>
         <p class="small">No hay API keys.</p>
     <?php else: ?>
-    <table style="width:100%; border-collapse:collapse; margin-bottom:1rem;">
-        <thead><tr style="border-bottom:2px solid #ddd;">
-            <th style="text-align:left; padding:.5rem;">Nombre</th>
-            <th style="text-align:left; padding:.5rem;">Key</th>
-            <th style="text-align:left; padding:.5rem;">Estado</th>
-            <th style="text-align:left; padding:.5rem;">Último uso</th>
-            <th style="text-align:left; padding:.5rem;">Acciones</th>
+    <table>
+        <thead><tr>
+            <th>Nombre</th>
+            <th>Key</th>
+            <th>Estado</th>
+            <th>Último uso</th>
+            <th>Acciones</th>
         </tr></thead>
         <tbody>
         <?php foreach ($apiKeys as $k): ?>
-        <tr style="border-bottom:1px solid #eee;">
-            <td style="padding:.5rem;"><?php echo htmlspecialchars($k['name']); ?></td>
-            <td style="padding:.5rem; font-family:monospace; font-size:.85rem;">
-                <span id="key-<?php echo $k['id']; ?>" style="filter:blur(4px); cursor:pointer;" onclick="this.style.filter='none'" title="Clic para revelar"><?php echo htmlspecialchars(substr($k['api_key'], 0, 8) . '...' . substr($k['api_key'], -8)); ?></span>
+        <tr>
+            <td><?php echo htmlspecialchars($k['name']); ?></td>
+            <td class="mono">
+                <span id="key-<?php echo $k['id']; ?>" class="blur-reveal" title="Clic para revelar"><?php echo htmlspecialchars(substr($k['api_key'], 0, 8) . '...' . substr($k['api_key'], -8)); ?></span>
             </td>
-            <td style="padding:.5rem;"><?php echo $k['is_active'] ? '<span style="color:#388e3c;">Activa</span>' : '<span style="color:#c62828;">Revocada</span>'; ?></td>
-            <td style="padding:.5rem;" class="small"><?php echo $k['last_used'] ? htmlspecialchars($k['last_used']) : 'Nunca'; ?></td>
-            <td style="padding:.5rem;">
-                <div style="display:flex; gap:.4rem; flex-wrap:wrap;">
+            <td><?php echo $k['is_active'] ? '<span class="status-completed">Activa</span>' : '<span class="status-error">Revocada</span>'; ?></td>
+            <td class="small"><?php echo $k['last_used'] ? htmlspecialchars($k['last_used']) : 'Nunca'; ?></td>
+            <td>
+                <div class="flex gap-1 flex-wrap">
                 <?php if ($k['is_active']): ?>
                     <button class="secondary" onclick="revokeKey(<?php echo $k['id']; ?>)">🚫 Revocar</button>
                 <?php else: ?>
@@ -196,22 +196,22 @@ require __DIR__ . '/templates/header.php';
     <?php endif; ?>
 
     <h4>Añadir nuevo worker</h4>
-    <form method="POST" action="ajax_admin.php?action=add_api_key" onsubmit="return addKey(this);" style="display:flex; gap:.5rem; align-items:flex-end;">
+    <form method="POST" action="ajax_admin.php?action=add_api_key" onsubmit="return addKey(this);" class="flex gap-1 items-end">
         <?php echo csrfInput(); ?>
-        <div style="flex:1;">
+        <div class="w-full">
             <label class="small">Nombre del worker</label>
-            <input type="text" name="name" placeholder="Ej: Orin Nano 2, VPS Frankfurt..." required maxlength="100" style="width:100%;">
+            <input type="text" name="name" placeholder="Ej: Orin Nano 2, VPS Frankfurt..." required maxlength="100">
         </div>
         <button type="submit">➕ Añadir key</button>
     </form>
-    <p id="key-msg" class="small" style="margin-top:.5rem;"></p>
+    <p id="key-msg" class="small mt-1"></p>
     
-    <h3 style="margin-top:2rem;">Registro de usuarios</h3>
+    <h3 class="mt-4">Registro de usuarios</h3>
     <p>Estado: <strong><?php echo $regEnabled ? 'Abierto' : 'Cerrado'; ?></strong></p>
     <form method="POST" action="ajax_admin.php?action=toggle_registration" onsubmit="return toggleReg(this);">
         <?php echo csrfInput(); ?>
         <button type="submit"><?php echo $regEnabled ? '🔒 Cerrar registro' : '🔓 Abrir registro'; ?></button>
-        <p id="reg-msg" style="margin-top:.5rem;"></p>
+        <p id="reg-msg" class="mt-1"></p>
     </form>
     <p class="small">Si el registro está cerrado, solo los administradores pueden crear cuentas.</p>
     <?php endif; ?>
@@ -223,7 +223,7 @@ const csrfToken = <?php echo json_encode(csrfToken()); ?>;
 
 function log(msg, type = 'info') {
     const el = document.getElementById('update-log');
-    el.style.display = 'block';
+    el.classList.add('visible');
     const div = document.createElement('div');
     div.style.margin = '0.25rem 0';
     if (type === 'error') div.style.color = '#c62828';
@@ -261,7 +261,7 @@ async function checkUpdate() {
 
         const current = document.getElementById('current-version').textContent;
         if (current !== data.tag) {
-            document.getElementById('btn-update').style.display = 'inline-block';
+            document.getElementById('btn-update').classList.remove('hidden');
         } else {
             document.getElementById('remote-message').textContent += ' — ✅ Estás en la última versión.';
         }
@@ -277,6 +277,7 @@ async function doUpdate() {
     if (!confirm('Se creará un backup antes de actualizar. ¿Continuar?')) return;
     document.getElementById('btn-update').disabled = true;
     document.getElementById('update-log').innerHTML = '';
+    document.getElementById('update-log').classList.remove('visible');
 
     async function ajax(action, params = '') {
         const resp = await fetch('ajax_update.php?action=' + action + (params ? '&' + params : ''));
