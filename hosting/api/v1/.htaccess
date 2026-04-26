@@ -1,9 +1,5 @@
-Order allow,deny
-Deny from all
+Require all denied
 
-# Excepción: permitir acceso a tasks.php y auth.php solo si se accede correctamente
-# (el .htaccess raíz ya gestiona el rewrite; este evita acceso directo a includes)
 <Files "tasks.php">
-    Order allow,deny
-    Allow from all
+    Require all granted
 </Files>
