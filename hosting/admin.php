@@ -40,6 +40,20 @@ try {
 }
 
 try {
+    $workers = Database::fetchAll(
+        "SELECT h.*, k.name as worker_name, k.api_key
+         FROM worker_heartbeats h
+         INNER JOIN api_keys k ON k.id = h.api_key_id
+         WHERE h.created_at = (
+             SELECT MAX(created_at) FROM worker_heartbeats WHERE api_key_id = h.api_key_id
+         )
+         ORDER BY h.created_at DESC"
+    );
+} catch (Throwable $e) {
+    $workers = [];
+}
+
+try {
     $regRow = Database::fetchOne("SELECT value FROM config WHERE key = 'allow_registration'");
     $regEnabled = !$regRow || $regRow['value'] === '1';
 } catch (Throwable $e) {
@@ -63,6 +77,7 @@ require __DIR__ . '/templates/header.php';
     <?php endif; ?>
     <div class="tabs">
         <a href="?tab=updates" class="<?php echo $tab==='updates'?'active':''; ?>">Actualizaciones</a>
+        <a href="?tab=workers" class="<?php echo $tab==='workers'?'active':''; ?>">Workers</a>
         <a href="?tab=users" class="<?php echo $tab==='users'?'active':''; ?>">Usuarios</a>
         <a href="?tab=config" class="<?php echo $tab==='config'?'active':''; ?>">Configuración</a>
     </div>
@@ -120,6 +135,70 @@ require __DIR__ . '/templates/header.php';
             </table>
         <?php endif; ?>
     </div>
+
+    <?php elseif ($tab === 'workers'): ?>
+    <h3>🖥️ Workers conectados</h3>
+    <?php if (empty($workers)): ?>
+        <p class="small">No hay workers reportando todavía. Asegúrate de que el worker está ejecutándose y tiene conexión al hosting.</p>
+    <?php else: ?>
+    <table>
+        <thead><tr>
+            <th>Nombre</th>
+            <th>Estado</th>
+            <th>CPU</th>
+            <th>RAM</th>
+            <th>GPU</th>
+            <th>Temp</th>
+            <th>Disco</th>
+            <th>Modelo</th>
+            <th>Uptime</th>
+            <th>Último heartbeat</th>
+        </tr></thead>
+        <tbody>
+        <?php foreach ($workers as $w):
+            $isOnline = (time() - strtotime($w['created_at'])) < 120;
+            $gpuInfo = $w['gpu_info'] ? json_decode($w['gpu_info'], true) : null;
+            $gpuText = $gpuInfo ? ($gpuInfo['name'] ?? 'GPU') . ' ' . ($gpuInfo['load_percent'] ?? '?') . '%' : '—';
+            $uptime = $w['uptime_seconds'] ? gmdate('H:i:s', $w['uptime_seconds']) : '—';
+        ?>
+        <tr>
+            <td><strong><?php echo htmlspecialchars($w['worker_name']); ?></strong><br><span class="small"><?php echo htmlspecialchars($w['hostname'] ?? '—'); ?></span></td>
+            <td><?php echo $isOnline ? '<span class="status-completed">● Online</span>' : '<span class="status-error">● Offline</span>'; ?></td>
+            <td><?php echo $w['cpu_percent'] !== null ? round($w['cpu_percent'], 1) . '%' : '—'; ?></td>
+            <td><?php echo $w['memory_percent'] !== null ? round($w['memory_percent'], 1) . '%' : '—'; ?><br><span class="small"><?php echo $w['memory_used_mb'] ? round($w['memory_used_mb']/1024, 1) . '/' . round($w['memory_total_mb']/1024, 1) . ' GB' : ''; ?></span></td>
+            <td><?php echo htmlspecialchars($gpuText); ?></td>
+            <td><?php echo $w['temperature_c'] !== null ? round($w['temperature_c'], 1) . '°C' : '—'; ?></td>
+            <td><?php echo $w['disk_percent'] !== null ? round($w['disk_percent'], 1) . '%' : '—'; ?></td>
+            <td><code><?php echo htmlspecialchars($w['model_loaded'] ?? '—'); ?></code></td>
+            <td><?php echo htmlspecialchars($uptime); ?></td>
+            <td class="small"><?php echo htmlspecialchars($w['created_at']); ?></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    <?php endif; ?>
+
+    <h3 class="mt-4">📡 Enviar comando a worker</h3>
+    <p class="small">Los comandos se ejecutan en el próximo ciclo de polling del worker.</p>
+    <form method="POST" action="ajax_admin.php?action=send_worker_command" onsubmit="return sendWorkerCmd(this);">
+        <?php echo csrfInput(); ?>
+        <label>Worker</label>
+        <select name="api_key_id" required>
+            <option value="">Selecciona un worker...</option>
+            <?php foreach ($apiKeys as $k): ?>
+            <option value="<?php echo $k['id']; ?>"><?php echo htmlspecialchars($k['name']); ?></option>
+            <?php endforeach; ?>
+        </select>
+        <label>Comando</label>
+        <select name="command" required>
+            <option value="change_model">Cambiar modelo</option>
+            <option value="restart">Reiniciar worker</option>
+        </select>
+        <label>Payload (JSON opcional)</label>
+        <input type="text" name="payload" placeholder='{"model":"qwen3-4b.gguf"}'>
+        <button type="submit" class="mt-2">📤 Enviar comando</button>
+    </form>
+    <p id="cmd-msg" class="mt-1"></p>
 
     <?php elseif ($tab === 'users'): ?>
     <h3>Usuarios registrados</h3>
@@ -451,6 +530,22 @@ async function addUser(form) {
     } else {
         msg.style.color = '#c62828';
         msg.textContent = data.error || 'Error al crear usuario';
+    }
+}
+
+async function sendWorkerCmd(form) {
+    event.preventDefault();
+    const fd = new FormData(form);
+    const resp = await fetch(form.action, { method: 'POST', body: fd });
+    const data = await resp.json();
+    const msg = document.getElementById('cmd-msg');
+    if (data.success) {
+        msg.className = 'alert alert-success mt-1';
+        msg.textContent = 'Comando enviado. El worker lo ejecutará en su próximo ciclo.';
+        form.reset();
+    } else {
+        msg.className = 'alert alert-error mt-1';
+        msg.textContent = data.error || 'Error';
     }
 }
 

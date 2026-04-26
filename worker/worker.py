@@ -6,6 +6,7 @@ y devuelve los resultados. Todo el tráfico es saliente (Orin → Hosting).
 """
 
 import configparser
+import json
 import logging
 import os
 import sys
@@ -13,6 +14,7 @@ import time
 from typing import Optional
 
 from utils.api_client import ApiClient
+from utils.monitoring import get_metrics
 from tasks.cve_search import CveSearchTask
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -40,75 +42,143 @@ def setup_logging(config: configparser.ConfigParser) -> None:
     )
 
 
+def apply_command(config_path: str, command: dict, logger: logging.Logger) -> bool:
+    """Procesa un comando recibido del hosting. Retorna True si requiere reinicio."""
+    cmd = command.get("command")
+    payload = command.get("payload") or {}
+
+    if cmd == "restart":
+        logger.info("Comando recibido: restart. Saliendo para reinicio por systemd.")
+        return True
+
+    if cmd == "change_model":
+        model = payload.get("model") if payload else None
+        if not model:
+            logger.warning("Comando change_model sin payload válido")
+            return False
+
+        config = configparser.ConfigParser()
+        config.read(config_path)
+        old_model = config.get("llm", "model", fallback="unknown")
+        config.set("llm", "model", model)
+
+        with open(config_path, "w", encoding="utf-8") as f:
+            config.write(f)
+
+        logger.info("Modelo cambiado: %s → %s. Reiniciando worker.", old_model, model)
+        return True
+
+    logger.warning("Comando desconocido: %s", cmd)
+    return False
+
+
 def main(config_path: Optional[str] = None) -> None:
     config = configparser.ConfigParser()
     config.read(config_path or DEFAULT_CONFIG)
 
     setup_logging(config)
     logger = logging.getLogger("worker")
-    logger.info("OrinSec worker iniciado")
+    logger.info("OrinSec worker iniciado (v2)")
 
     api = ApiClient(config_path or DEFAULT_CONFIG)
     poll_interval = config.getint("worker", "poll_interval", fallback=15)
     task_timeout = config.getint("worker", "task_timeout", fallback=120)
+    heartbeat_interval = config.getint("worker", "heartbeat_interval", fallback=30)
+
+    # Contador para heartbeat (no enviamos en cada poll)
+    last_heartbeat = 0.0
+    last_model = config.get("llm", "model", fallback="unknown")
 
     while True:
         try:
-            tasks = api.get_pending_tasks()
-        except Exception as exc:
-            logger.error("Error consultando tareas: %s", exc)
-            time.sleep(poll_interval)
-            continue
+            # ── 1. Heartbeat ──────────────────────────────────────────────
+            now = time.time()
+            if now - last_heartbeat >= heartbeat_interval:
+                try:
+                    metrics = get_metrics()
+                    metrics["model_loaded"] = last_model
+                    metrics["status"] = "online"
+                    if api.send_heartbeat(metrics):
+                        logger.debug("Heartbeat enviado")
+                        last_heartbeat = now
+                    else:
+                        logger.warning("Heartbeat rechazado por el hosting")
+                except Exception as exc:
+                    logger.warning("Error enviando heartbeat: %s", exc)
 
-        if not tasks:
-            logger.debug("Sin tareas pendientes")
-            time.sleep(poll_interval)
-            continue
-
-        for task in tasks:
-            task_id = task.get("id")
-            task_type = task.get("task_type")
-            input_data = task.get("input_data", "{}")
-
-            logger.info("Procesando tarea %s (tipo: %s)", task_id, task_type)
-
-            # Reclamar
-            if not api.claim_task(task_id):
-                logger.warning("No se pudo reclamar tarea %s", task_id)
-                continue
-
-            # Ejecutar
-            task_class = TASK_REGISTRY.get(task_type)
-            if not task_class:
-                logger.error("Tipo de tarea desconocido: %s", task_type)
-                api.send_error(task_id, f"Tipo de tarea desconocido: {task_type}")
-                continue
-
+            # ── 2. Comandos remotos ───────────────────────────────────────
             try:
-                import json
-                data = json.loads(input_data) if isinstance(input_data, str) else input_data
-                runner = task_class(config_path or DEFAULT_CONFIG)
-
-                # Timeout manual simple
-                start = time.time()
-                result = runner.execute(data)
-                elapsed = time.time() - start
-
-                if elapsed > task_timeout:
-                    logger.warning("Tarea %s excedió timeout (%ss)", task_id, elapsed)
-
-                api.send_result(
-                    task_id,
-                    result_html=result.get("result_html", ""),
-                    result_text=result.get("result_text", ""),
-                )
-                logger.info("Tarea %s completada en %.1fs", task_id, elapsed)
-
+                commands = api.get_commands()
+                for cmd in commands:
+                    if apply_command(config_path or DEFAULT_CONFIG, cmd, logger):
+                        # Reinicio controlado: systemd levantará el proceso nuevo
+                        sys.exit(0)
             except Exception as exc:
-                logger.exception("Error ejecutando tarea %s", task_id)
-                api.send_error(task_id, str(exc))
+                logger.warning("Error consultando comandos: %s", exc)
 
-        time.sleep(poll_interval)
+            # ── 3. Tareas pendientes ──────────────────────────────────────
+            try:
+                tasks = api.get_pending_tasks()
+            except Exception as exc:
+                logger.error("Error consultando tareas: %s", exc)
+                time.sleep(poll_interval)
+                continue
+
+            if not tasks:
+                logger.debug("Sin tareas pendientes")
+                time.sleep(poll_interval)
+                continue
+
+            for task in tasks:
+                task_id = task.get("id")
+                task_type = task.get("task_type")
+                input_data = task.get("input_data", "{}")
+
+                logger.info("Procesando tarea %s (tipo: %s)", task_id, task_type)
+
+                # Reclamar
+                if not api.claim_task(task_id):
+                    logger.warning("No se pudo reclamar tarea %s", task_id)
+                    continue
+
+                # Ejecutar
+                task_class = TASK_REGISTRY.get(task_type)
+                if not task_class:
+                    logger.error("Tipo de tarea desconocido: %s", task_type)
+                    api.send_error(task_id, f"Tipo de tarea desconocido: {task_type}")
+                    continue
+
+                try:
+                    data = json.loads(input_data) if isinstance(input_data, str) else input_data
+                    runner = task_class(config_path or DEFAULT_CONFIG)
+
+                    # Timeout manual simple
+                    start = time.time()
+                    result = runner.execute(data)
+                    elapsed = time.time() - start
+
+                    if elapsed > task_timeout:
+                        logger.warning("Tarea %s excedió timeout (%ss)", task_id, elapsed)
+
+                    api.send_result(
+                        task_id,
+                        result_html=result.get("result_html", ""),
+                        result_text=result.get("result_text", ""),
+                    )
+                    logger.info("Tarea %s completada en %.1fs", task_id, elapsed)
+
+                except Exception as exc:
+                    logger.exception("Error ejecutando tarea %s", task_id)
+                    api.send_error(task_id, str(exc))
+
+            time.sleep(poll_interval)
+
+        except KeyboardInterrupt:
+            logger.info("Worker detenido por usuario")
+            break
+        except Exception as exc:
+            logger.exception("Error inesperado en el loop principal: %s", exc)
+            time.sleep(poll_interval)
 
 
 if __name__ == "__main__":

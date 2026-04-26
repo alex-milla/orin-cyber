@@ -96,6 +96,31 @@ switch ($action) {
         jsonResponse(['success' => true]);
         break;
 
+    case 'send_worker_command':
+        $apiKeyId = filter_input(INPUT_POST, 'api_key_id', FILTER_VALIDATE_INT);
+        $command = validateInput($_POST['command'] ?? '', 50);
+        $payload = $_POST['payload'] ?? '';
+
+        if (!$apiKeyId) {
+            jsonResponse(['error' => 'Worker no válido'], 400);
+        }
+        if (!in_array($command, ['change_model', 'restart'], true)) {
+            jsonResponse(['error' => 'Comando no válido'], 400);
+        }
+
+        // Validar que el payload sea JSON válido (o vacío)
+        if ($payload !== '' && json_decode($payload) === null && json_last_error() !== JSON_ERROR_NONE) {
+            jsonResponse(['error' => 'Payload JSON inválido'], 400);
+        }
+
+        Database::insert('worker_commands', [
+            'api_key_id' => $apiKeyId,
+            'command' => $command,
+            'payload' => $payload !== '' ? $payload : null,
+        ]);
+        jsonResponse(['success' => true]);
+        break;
+
     default:
         jsonResponse(['error' => 'Acción no válida'], 400);
 }

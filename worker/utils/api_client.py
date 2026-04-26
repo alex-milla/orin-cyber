@@ -92,3 +92,25 @@ class ApiClient:
             return data is not None and data.get("success", False)
         except requests.RequestException:
             return False
+
+    def send_heartbeat(self, metrics: dict) -> bool:
+        """Envía métricas del sistema al hosting."""
+        try:
+            data = self._request(
+                "POST", "/api/v1/heartbeat.php",
+                json=metrics,
+            )
+            return data is not None and data.get("success", False)
+        except requests.RequestException as exc:
+            logger.debug("Heartbeat failed: %s", exc)
+            return False
+
+    def get_commands(self) -> list:
+        """Obtiene comandos pendientes del hosting."""
+        try:
+            data = self._request("GET", "/api/v1/commands.php")
+            if data and "commands" in data:
+                return data["commands"]
+        except requests.RequestException as exc:
+            logger.debug("Commands poll failed: %s", exc)
+        return []
