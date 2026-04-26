@@ -5,6 +5,8 @@ require_once __DIR__ . '/includes/config.php';
 require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/functions.php';
 
+session_start();
+
 $lockFile = DATA_DIR . '/.installed';
 $alreadyInstalled = file_exists(DB_PATH) || file_exists($lockFile);
 
