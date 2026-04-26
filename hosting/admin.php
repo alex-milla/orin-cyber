@@ -156,7 +156,13 @@ require __DIR__ . '/templates/header.php';
         </tr></thead>
         <tbody>
         <?php foreach ($workers as $w):
-            $isOnline = (time() - strtotime($w['created_at'])) < 120;
+            try {
+                $hbTime = new DateTime($w['created_at'], new DateTimeZone('UTC'));
+                $now = new DateTime('now', new DateTimeZone('UTC'));
+                $isOnline = ($now->getTimestamp() - $hbTime->getTimestamp()) < 120;
+            } catch (Exception $e) {
+                $isOnline = false;
+            }
             $gpuInfo = $w['gpu_info'] ? json_decode($w['gpu_info'], true) : null;
             $gpuText = $gpuInfo ? ($gpuInfo['name'] ?? 'GPU') . ' ' . ($gpuInfo['load_percent'] ?? '?') . '%' : '—';
             $uptime = $w['uptime_seconds'] ? gmdate('H:i:s', $w['uptime_seconds']) : '—';
