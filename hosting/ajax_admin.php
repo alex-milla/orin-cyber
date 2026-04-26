@@ -38,7 +38,8 @@ switch ($action) {
 
     case 'save_github_pat':
         $pat = trim($_POST['pat'] ?? '');
-        if ($pat !== '' && !preg_match('/^gh[pousr]_[A-Za-z0-9_]{36,251}$/', $pat)) {
+        // Aceptar tokens clásicos (ghp_xxx) y fine-grained (github_pat_xxx)
+        if ($pat !== '' && !preg_match('/^(gh[pousr]_[A-Za-z0-9_]{36,}|github_pat_[A-Za-z0-9_]{22,})$/', $pat)) {
             jsonResponse(['error' => 'El token no tiene el formato válido de un GitHub PAT'], 400);
         }
         Database::query("INSERT OR REPLACE INTO config (key, value) VALUES ('github_pat', ?)", [$pat]);
