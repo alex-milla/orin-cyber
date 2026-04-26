@@ -1,0 +1,26 @@
+# Base de datos y datos sensibles
+hosting/data/*.db
+hosting/data/*.sqlite
+hosting/data/*.sqlite3
+
+# Configuraciones locales
+worker/config.ini
+hosting/includes/config.local.php
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log

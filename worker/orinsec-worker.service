@@ -1,0 +1,16 @@
+[Unit]
+Description=OrinSec Worker
+After=network.target llama-server.service
+Wants=llama-server.service
+
+[Service]
+Type=simple
+User=orinsec
+WorkingDirectory=/home/orinsec/orinsec
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/orinsec/orinsec/venv/bin/python /home/orinsec/orinsec/worker.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
