@@ -28,7 +28,16 @@ require __DIR__ . '/templates/header.php';
 
     <?php if ($tab === 'updates'): ?>
     <div id="update-panel">
-        <h3>Estado del sistema</h3>
+        <h3>🔐 GitHub PAT (repo privado)</h3>
+        <p class="small">Si este repositorio es privado, introduce aquí un <strong>Personal Access Token</strong> de GitHub con permiso <code>repo</code> para que el updater pueda descargar releases.</p>
+        <form method="POST" action="ajax_admin.php?action=save_github_pat" onsubmit="return savePat(this);" style="display:flex; gap:.5rem; align-items:flex-end;">
+            <?php echo csrfInput(); ?>
+            <input type="password" name="pat" value="<?php echo htmlspecialchars($githubPat); ?>" placeholder="ghp_xxxxxxxxxxxx" style="flex:1; font-family:monospace;">
+            <button type="submit">💾 Guardar</button>
+        </form>
+        <p id="pat-msg" class="small" style="margin-top:.5rem;"></p>
+
+        <h3 style="margin-top:2rem;">Estado del sistema</h3>
         <p>Versión instalada: <code id="current-version"><?php echo htmlspecialchars($currentVersion); ?></code></p>
         <p>Versión remota: <code id="remote-version">Consultando...</code></p>
         <p id="remote-message" class="small"></p>
@@ -100,20 +109,9 @@ require __DIR__ . '/templates/header.php';
     $apiKeys = Database::fetchAll("SELECT id, name, api_key, is_active, last_used, created_at FROM api_keys ORDER BY created_at DESC");
     $regRow = Database::fetchOne("SELECT value FROM config WHERE key = 'allow_registration'");
     $regEnabled = !$regRow || $regRow['value'] === '1';
-    $patRow = Database::fetchOne("SELECT value FROM config WHERE key = 'github_pat'");
-    $githubPat = $patRow['value'] ?? '';
     ?>
 
-    <h3>🔐 GitHub PAT (repo privado)</h3>
-    <p class="small">Si este repositorio es privado, introduce aquí un <strong>Personal Access Token</strong> de GitHub con permiso <code>repo</code> para que el updater pueda descargar releases.</p>
-    <form method="POST" action="ajax_admin.php?action=save_github_pat" onsubmit="return savePat(this);" style="display:flex; gap:.5rem; align-items:flex-end;">
-        <?php echo csrfInput(); ?>
-        <input type="password" name="pat" value="<?php echo htmlspecialchars($githubPat); ?>" placeholder="ghp_xxxxxxxxxxxx" style="flex:1; font-family:monospace;">
-        <button type="submit">💾 Guardar</button>
-    </form>
-    <p id="pat-msg" class="small" style="margin-top:.5rem;"></p>
-
-    <h3 style="margin-top:2rem;">🔑 API Keys — Workers conectados</h3>
+    <h3>🔑 API Keys — Workers conectados</h3>
     <p class="small">Cada worker o sistema externo debe usar su propia API key. Puedes revocar una key sin afectar a los demás.</p>
 
     <table style="width:100%; border-collapse:collapse; margin-bottom:1rem;">
