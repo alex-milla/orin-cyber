@@ -43,6 +43,12 @@ switch ($action) {
         jsonResponse(['success' => true, 'enabled' => $newValue === '1']);
         break;
 
+    case 'regenerate_api_key':
+        $newKey = generateSecureToken(32);
+        Database::query("INSERT OR REPLACE INTO config (key, value) VALUES ('api_key', ?)", [$newKey]);
+        jsonResponse(['success' => true, 'api_key' => $newKey]);
+        break;
+
     default:
         jsonResponse(['error' => 'Acción no válida'], 400);
 }

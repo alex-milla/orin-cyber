@@ -101,9 +101,17 @@ require __DIR__ . '/templates/header.php';
     $regRow = Database::fetchOne("SELECT value FROM config WHERE key = 'allow_registration'");
     $regEnabled = !$regRow || $regRow['value'] === '1';
     ?>
-    <p><strong>API Key del worker:</strong></p>
-    <code style="display:block; background:#f5f5f5; padding:1rem; word-break:break-all;"><?php echo htmlspecialchars($apiKey); ?></code>
-    <p class="small">Esta clave debe configurarse en <code>worker/config.ini</code> del Orin Nano.</p>
+    <h3>API Key del worker</h3>
+    <p class="small">Esta clave autentica a los workers y sistemas externos que se conectan a la API.</p>
+    <div style="display:flex; gap:.5rem; align-items:center;">
+        <input type="password" id="apikey-field" value="<?php echo htmlspecialchars($apiKey); ?>" readonly style="flex:1; font-family:monospace;">
+        <button type="button" class="secondary" onclick="toggleApiKey()">👁️ Mostrar</button>
+    </div>
+    <form method="POST" action="ajax_admin.php?action=regenerate_api_key" onsubmit="return regenerateKey(this);" style="margin-top:.5rem;">
+        <?php echo csrfInput(); ?>
+        <button type="submit" class="secondary">🔄 Regenerar API Key</button>
+        <p id="key-msg" class="small"></p>
+    </form>
     
     <h3 style="margin-top:2rem;">Registro de usuarios</h3>
     <p>Estado: <strong><?php echo $regEnabled ? 'Abierto' : 'Cerrado'; ?></strong></p>
@@ -203,6 +211,35 @@ async function doRollback(file) {
     let d = await r.json();
     if (d.error) { log('❌ ' + d.error); }
     else { log('✅ Restaurado. Recargando...'); setTimeout(() => location.reload(), 2000); }
+}
+
+function toggleApiKey() {
+    const field = document.getElementById('apikey-field');
+    const btn = event.target;
+    if (field.type === 'password') {
+        field.type = 'text';
+        btn.textContent = '🙈 Ocultar';
+    } else {
+        field.type = 'password';
+        btn.textContent = '👁️ Mostrar';
+    }
+}
+
+async function regenerateKey(form) {
+    if (!confirm('¿Regenerar API Key? Los workers con la clave antigua dejarán de funcionar hasta que actualices worker/config.ini.')) return false;
+    const fd = new FormData(form);
+    const resp = await fetch(form.action, { method: 'POST', body: fd });
+    const data = await resp.json();
+    const msg = document.getElementById('key-msg');
+    if (data.success) {
+        document.getElementById('apikey-field').value = data.api_key;
+        msg.style.color = '#2e7d32';
+        msg.textContent = 'API Key regenerada. Actualiza worker/config.ini.';
+    } else {
+        msg.style.color = '#c62828';
+        msg.textContent = data.error || 'Error';
+    }
+    return false;
 }
 
 async function addUser(form) {
