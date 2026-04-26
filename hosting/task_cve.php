@@ -36,13 +36,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'max_results' => $maxResults
             ], JSON_UNESCAPED_UNICODE);
             
-            $taskId = Database::insert('tasks', [
+            $newTaskId = Database::insert('tasks', [
                 'task_type' => 'cve_search',
                 'input_data' => $input,
                 'status' => 'pending'
             ]);
+            
+            // PRG pattern: redirect to avoid duplicate task on refresh
+            if ($newTaskId) {
+                $_SESSION['last_task_id'] = $newTaskId;
+                header('Location: task_cve.php');
+                exit;
+            }
         }
     }
+}
+
+// Restore task ID from PRG redirect
+if (isset($_SESSION['last_task_id'])) {
+    $taskId = $_SESSION['last_task_id'];
+    unset($_SESSION['last_task_id']);
 }
 
 // --- Worker status widget data ---
