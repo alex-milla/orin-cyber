@@ -18,16 +18,28 @@ $pageTitle = 'Dashboard — OrinSec';
 require __DIR__ . '/templates/header.php';
 ?>
 <div class="card">
-    <h2>📊 Panel principal — v0.1.3</h2>
-    <p>Bienvenido, <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong>.</p>
-    <p><a href="task_cve.php"><button>➕ Nueva búsqueda de CVE</button></a></p>
-    <?php if (isAdmin()): ?>
-    <p><a href="admin.php"><button class="secondary">⚙️ Panel de administración</button></a></p>
-    <?php endif; ?>
+    <h2>👋 Bienvenido, <?php echo htmlspecialchars($_SESSION['username']); ?></h2>
+    <p class="small" style="color:var(--text-muted);">OrinSec — Plataforma de ciberseguridad asistida por IA local</p>
 </div>
 
 <div class="card">
-    <h2>Historial de tareas</h2>
+    <h2>🛠️ Herramientas disponibles</h2>
+    <div class="tools-grid">
+        <a href="task_cve.php" class="tool-card">
+            <div class="icon">🔍</div>
+            <h3>Búsqueda CVE</h3>
+            <p>Consulta vulnerabilidades en NVD, EPSS, CISA KEV y GitHub con análisis de IA.</p>
+        </a>
+        <div class="tool-card disabled">
+            <div class="icon">⏳</div>
+            <h3>Próximamente</h3>
+            <p>Nuevas herramientas se añadirán aquí automáticamente.</p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>📋 Historial de tareas</h2>
     <?php if (empty($tasks)): ?>
         <p class="small">No hay tareas todavía.</p>
     <?php else: ?>

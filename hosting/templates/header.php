@@ -8,7 +8,7 @@ if (!isset($pageTitle)) $pageTitle = 'OrinSec';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($pageTitle); ?></title>
-    <link rel="stylesheet" href="assets/css/style.css?v=2">
+    <link rel="stylesheet" href="assets/css/style.css?v=3">
     <script>
     (function() {
         const saved = localStorage.getItem('orinsec-theme') || 'system';
@@ -27,11 +27,16 @@ if (!isset($pageTitle)) $pageTitle = 'OrinSec';
 </head>
 <body>
 <header>
-    <h1>🔒 OrinSec</h1>
+    <h1><a href="index.php" style="text-decoration:none;color:inherit;">🔒 OrinSec</a></h1>
     <?php if (isLoggedIn()): ?>
     <nav>
         <a href="index.php">Inicio</a>
-        <a href="task_cve.php">Buscar CVE</a>
+        <div class="dropdown">
+            <span class="dropdown-toggle">Herramientas <span class="dropdown-arrow">▾</span></span>
+            <div class="dropdown-menu">
+                <a href="task_cve.php">🔍 Búsqueda CVE</a>
+            </div>
+        </div>
         <?php if (isAdmin()): ?><a href="admin.php">Admin</a><?php endif; ?>
         <span class="user-greeting">Hola, <?php echo htmlspecialchars($_SESSION['username']); ?></span>
         <a href="logout.php">Salir</a>

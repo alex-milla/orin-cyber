@@ -511,6 +511,190 @@ pre {
     margin: 4rem auto;
 }
 
+/* ---------- Dropdown menu ---------- */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+.dropdown-toggle {
+    cursor: pointer;
+    user-select: none;
+}
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 180px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+    z-index: 200;
+    padding: 0.4rem 0;
+}
+.dropdown-menu a {
+    display: block;
+    padding: 0.6rem 1rem;
+    color: var(--text);
+    font-size: 0.95rem;
+    text-decoration: none;
+    border-radius: 0;
+    white-space: nowrap;
+}
+.dropdown-menu a:hover {
+    background: var(--surface-hover);
+    color: var(--primary);
+}
+.dropdown:hover .dropdown-menu,
+.dropdown:focus-within .dropdown-menu {
+    display: block;
+}
+.dropdown-arrow {
+    font-size: 0.7em;
+    margin-left: 4px;
+    opacity: 0.7;
+}
+
+/* ---------- Tool cards ---------- */
+.tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+.tool-card {
+    display: block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    text-decoration: none;
+    color: var(--text);
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+.tool-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--accent);
+}
+.tool-card .icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+.tool-card h3 {
+    margin: 0 0 0.25rem;
+    font-size: 1.05rem;
+    color: var(--primary);
+}
+.tool-card p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+.tool-card.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* ---------- Worker widget ---------- */
+.worker-widget {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    margin-top: 1.5rem;
+}
+.worker-widget h3 {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.worker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+}
+.worker-grid .metric {
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 0.75rem;
+    font-size: 0.9rem;
+}
+.worker-grid .metric-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.15rem;
+}
+.status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 0.35rem;
+}
+.status-dot.online { background: var(--success); }
+.status-dot.offline { background: var(--error); }
+
+/* ---------- CVE tags ---------- */
+.cve-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+.cve-tag {
+    display: inline-block;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.35rem 0.85rem;
+    font-size: 0.85rem;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s;
+}
+.cve-tag:hover {
+    background: var(--surface-hover);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* ---------- Advanced search toggle ---------- */
+.advanced-toggle {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 0;
+    margin-top: 0.75rem;
+}
+.advanced-toggle:hover {
+    color: var(--primary);
+}
+.advanced-fields {
+    display: none;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+.advanced-fields.open {
+    display: block;
+}
+
+/* ---------- Form prominent input ---------- */
+.form-cve-prominent input[type="text"] {
+    font-size: 1.15rem;
+    padding: 0.85rem 1rem;
+    font-family: var(--font-mono);
+    letter-spacing: 0.02em;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 640px) {
     header { padding: 0 1rem; }
@@ -519,4 +703,5 @@ pre {
     main { padding: 1.5rem 1rem 3rem; }
     .card { padding: 1.25rem; }
     th, td { padding: 0.6rem 0.5rem; font-size: 0.9rem; }
+    .tools-grid { grid-template-columns: 1fr; }
 }
