@@ -31,10 +31,12 @@ if (!isset($pageTitle)) $pageTitle = 'OrinSec';
     <?php if (isLoggedIn()): ?>
     <nav>
         <a href="index.php">Inicio</a>
-        <div class="dropdown">
-            <span class="dropdown-toggle">Herramientas <span class="dropdown-arrow">▾</span></span>
+        <div class="dropdown" id="tools-dropdown">
+            <span class="dropdown-toggle" onclick="event.stopPropagation();document.getElementById('tools-dropdown').classList.toggle('open');">Herramientas <span class="dropdown-arrow">▾</span></span>
             <div class="dropdown-menu">
-                <a href="task_cve.php">🔍 Búsqueda CVE</a>
+                <div class="dropdown-menu-inner">
+                    <a href="task_cve.php">🔍 Búsqueda CVE</a>
+                </div>
             </div>
         </div>
         <?php if (isAdmin()): ?><a href="admin.php">Admin</a><?php endif; ?>
@@ -46,6 +48,11 @@ if (!isset($pageTitle)) $pageTitle = 'OrinSec';
             <button data-theme="system" onclick="setTheme('system')" title="Sistema">💻</button>
         </div>
     </nav>
+    <script>
+    document.addEventListener('click', function() {
+        document.getElementById('tools-dropdown').classList.remove('open');
+    });
+    </script>
     <?php else: ?>
     <nav>
         <div class="theme-switcher">
