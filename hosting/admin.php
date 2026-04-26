@@ -259,7 +259,8 @@ require __DIR__ . '/templates/header.php';
         <tr>
             <td><?php echo htmlspecialchars($k['name']); ?></td>
             <td class="mono">
-                <span id="key-<?php echo $k['id']; ?>" class="blur-reveal" title="Clic para revelar"><?php echo htmlspecialchars(substr($k['api_key'], 0, 8) . '...' . substr($k['api_key'], -8)); ?></span>
+                <span id="key-<?php echo $k['id']; ?>" class="blur-reveal" title="Clic para revelar" data-full="<?php echo htmlspecialchars($k['api_key'], ENT_QUOTES); ?>"><?php echo htmlspecialchars(substr($k['api_key'], 0, 8) . '...' . substr($k['api_key'], -8)); ?></span>
+                <button class="secondary" style="font-size:0.8rem; padding:0.3rem 0.5rem;" onclick="copyKey('key-<?php echo $k['id']; ?>')">📋</button>
             </td>
             <td><?php echo $k['is_active'] ? '<span class="status-completed">Activa</span>' : '<span class="status-error">Revocada</span>'; ?></td>
             <td class="small"><?php echo $k['last_used'] ? htmlspecialchars($k['last_used']) : 'Nunca'; ?></td>
@@ -289,6 +290,14 @@ require __DIR__ . '/templates/header.php';
         </div>
         <button type="submit">➕ Añadir key</button>
     </form>
+    <div id="key-result" class="mt-2" style="display:none;">
+        <div class="alert alert-success">
+            <p>Nueva API key generada:</p>
+            <code id="key-new-value" style="font-size:1.1rem; padding:.5rem .75rem; display:inline-block; margin:.5rem 0;"></code>
+            <button onclick="copyToClipboard('key-new-value')">📋 Copiar</button>
+            <p class="small">Guárdala ahora — no se volverá a mostrar.</p>
+        </div>
+    </div>
     <p id="key-msg" class="small mt-1"></p>
     
     <h3 class="mt-4">Registro de usuarios</h3>
@@ -456,13 +465,46 @@ async function addKey(form) {
     const data = await resp.json();
     const msg = document.getElementById('key-msg');
     if (data.success) {
-        msg.style.color = '#2e7d32';
-        msg.textContent = 'Nueva API key creada: ' + data.api_key;
-        setTimeout(() => location.reload(), 2000);
+        document.getElementById('key-new-value').textContent = data.api_key;
+        document.getElementById('key-result').style.display = 'block';
+        msg.textContent = '';
     } else {
-        msg.style.color = '#c62828';
+        document.getElementById('key-result').style.display = 'none';
+        msg.className = 'alert alert-error mt-1';
         msg.textContent = data.error || 'Error';
     }
+}
+
+function copyToClipboard(elementId) {
+    const text = document.getElementById(elementId).textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Copiado al portapapeles');
+    }).catch(() => {
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        alert('Copiado al portapapeles');
+    });
+}
+
+function copyKey(elementId) {
+    const el = document.getElementById(elementId);
+    const full = el.dataset.full || el.textContent;
+    navigator.clipboard.writeText(full).then(() => {
+        alert('Copiado al portapapeles');
+    }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = full;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        alert('Copiado al portapapeles');
+    });
 }
 
 async function revokeKey(id) {
