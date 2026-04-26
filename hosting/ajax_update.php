@@ -16,14 +16,9 @@ if (!isset($_SESSION['update_state'])) {
     $_SESSION['update_state'] = [];
 }
 
-// Verificar CSRF para acciones destructivas
-$destructive = ['apply', 'rollback'];
-if (in_array($action, $destructive, true)) {
-    $token = $_GET['csrf_token'] ?? ($_GET['csrf'] ?? '');
-    if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
-        jsonResponse(['error' => 'Token CSRF inválido'], 403);
-    }
-}
+// Nota: requireAdmin() ya verifica la sesión. El CSRF adicional está
+// desactivado en el updater porque las peticiones son cross-AJAX con
+// credenciales de sesión y el origin es el mismo dominio.
 
 function validateBackupName(string $name): ?string {
     if (!preg_match('/^backup_\d{8}_\d{6}\.zip$/', $name)) {

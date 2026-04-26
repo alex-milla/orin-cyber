@@ -87,7 +87,7 @@ require __DIR__ . '/templates/header.php';
                 <button id="btn-check" onclick="checkUpdate()">🔄 Buscar actualizaciones</button>
                 <button id="btn-update" onclick="doUpdate()" style="display:none;">⬇️ Actualizar ahora</button>
             </div>
-            <div id="update-log" style="font-family:monospace; background:#f5f5f5; padding:1rem; border-radius:4px; min-height:60px; display:none;"></div>
+            <div id="update-log" style="font-family:monospace; background:#f5f5f5; padding:1rem; border-radius:4px; min-height:60px; display:none; white-space:pre-wrap; line-height:1.6;"></div>
         </div>
 
         <h3 style="margin-top:2rem;">Backups disponibles</h3>
