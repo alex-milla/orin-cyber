@@ -126,16 +126,39 @@ class CveSearchTask(BaseTask):
             user_prompt=f"Analiza los siguientes datos de CVEs y genera un informe estructurado en español.\n\nDatos estructurados:\n{context}",
         )
 
+        # Fallback si el LLM retorna vacío (prompt muy largo para el modelo)
+        if not report_text or not report_text.strip():
+            logger.warning("LLM returned empty response, generating fallback analysis")
+            first = enriched[0] if enriched else {}
+            cve = first.get("cve", {})
+            epss = first.get("epss")
+            kev = first.get("kev")
+            priority = first.get("priority", "D")
+            report_text = (
+                f"## ANÁLISIS DE RIESGO — {cve.get('cve_id', 'Unknown')}\n\n"
+                f"**Contexto:** {cve.get('description_es') or cve.get('description', 'No disponible')}\n\n"
+                f"**Datos objetivos:**\n"
+                f"- CVSS: {cve.get('score', 'N/A')} ({cve.get('severity', 'N/A')})\n"
+                f"- EPSS: {epss['score_percent'] if epss else 'N/A'}% (percentil {epss['percentile_percent'] if epss else 'N/A'}%)\n"
+                f"- CISA KEV: {'SÍ — explotación activa confirmada' if kev else 'No listado'}\n"
+                f"- Prioridad de parcheo: {priority}\n\n"
+                f"**Recomendaciones:**\n"
+                f"1. Verificar boletín oficial del fabricante para versión de parche exacta.\n"
+                f"2. Aplicar controles compensatorios: aislamiento, restricción de privilegios, monitoreo de IOCs.\n"
+                f"3. Priorizar según rating {priority}.\n\n"
+                f"*Nota: El análisis detallado del LLM no pudo generarse (timeout o respuesta vacía). "
+                f"Los datos mostrados provienen de fuentes objetivas (NVD, EPSS, CISA KEV)."
+            )
+
         # ── Formatear salida HTML ─────────────────────────────────────────
         try:
             result_html = render_cve_report(enriched, report_text)
         except Exception as exc:
             logger.exception("render_cve_report failed: %s", exc)
-            # Fallback: texto plano envuelto en HTML básico
-            safe_text = (report_text or "Error generando reporte visual.").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            safe_text = report_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             result_html = f"<pre style='white-space:pre-wrap;'>{safe_text}</pre>"
 
         return {
             "result_html": result_html,
-            "result_text": report_text or "",
+            "result_text": report_text,
         }

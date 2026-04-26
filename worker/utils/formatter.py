@@ -129,7 +129,9 @@ def render_cve_report(enriched: list, llm_text: str) -> str:
         for repo in github:
             if not isinstance(repo, dict):
                 continue
-            gh_rows += f"<li><a href='{repo.get('url', '#')}' target='_blank' rel='noopener'>{repo.get('name', 'Unknown')}</a> — ⭐ {repo.get('stars', 0)} — {(repo.get('description') or '')[:80]}</li>"
+            url = repo.get('url') or '#'
+            name = repo.get('name') or 'Unknown'
+            gh_rows += f"<li><a href='{url}' target='_blank' rel='noopener' style='color:var(--primary);text-decoration:underline;'>{name}</a> — ⭐ {repo.get('stars', 0)} — {(repo.get('description') or '')[:80]}</li>"
         gh_rows += "</ul>"
         if github and any(isinstance(r, dict) for r in github):
             html += _section(f"💣 Public Exploits (Total: {len(github)})", gh_rows)
