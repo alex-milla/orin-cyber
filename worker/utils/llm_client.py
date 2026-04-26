@@ -38,7 +38,7 @@ class LlmClient:
         }
 
         logger.info("LLM request: %s tokens max", self.max_tokens)
-        resp = requests.post(url, json=payload, timeout=120)
+        resp = requests.post(url, json=payload, timeout=300)
         resp.raise_for_status()
         data = resp.json()
         if not isinstance(data, dict):
@@ -75,7 +75,7 @@ class LlmClient:
             "temperature": 0.1,
         }
         try:
-            resp = requests.post(url, json=payload, timeout=60)
+            resp = requests.post(url, json=payload, timeout=180)
             resp.raise_for_status()
             data = resp.json()
             if isinstance(data, dict):
