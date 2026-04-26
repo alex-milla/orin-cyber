@@ -2,6 +2,7 @@
 
 import logging
 import os
+import socket
 import time
 from typing import Any, Optional
 
@@ -18,9 +19,9 @@ except ImportError:
 
 def _read_file_int(path: str) -> Optional[int]:
     try:
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return int(f.read().strip())
-    except (OSError, ValueError):
+    except (OSError, ValueError, TypeError):
         return None
 
 
@@ -30,49 +31,99 @@ def _read_thermal_zones() -> list[dict]:
     base = "/sys/class/thermal"
     if not os.path.isdir(base):
         return zones
-    for name in sorted(os.listdir(base)):
-        if not name.startswith("thermal_zone"):
-            continue
-        zone_path = os.path.join(base, name)
-        temp = _read_file_int(os.path.join(zone_path, "temp"))
-        if temp is None:
-            continue
-        # temp está en miligrados
-        zones.append({
-            "name": name,
-            "temp_c": temp / 1000.0,
-        })
+    try:
+        for name in sorted(os.listdir(base)):
+            if not name.startswith("thermal_zone"):
+                continue
+            temp = _read_file_int(os.path.join(base, name, "temp"))
+            if temp is None:
+                continue
+            zones.append({"name": name, "temp_c": temp / 1000.0})
+    except OSError:
+        pass
     return zones
 
 
 def _get_jetson_gpu() -> Optional[dict]:
-    """Intenta leer GPU load en Jetson via devfreq o tegrastats."""
-    # Jetson Orin: /sys/class/devfreq/17000000.gv11b/load
-    devfreq_paths = []
+    """Intenta leer GPU load en Jetson via devfreq."""
     devfreq_base = "/sys/class/devfreq"
-    if os.path.isdir(devfreq_base):
+    if not os.path.isdir(devfreq_base):
+        return None
+    try:
         for entry in os.listdir(devfreq_base):
-            if "gv11b" in entry or "gpu" in entry:
-                devfreq_paths.append(os.path.join(devfreq_base, entry, "load"))
-
-    for path in devfreq_paths:
-        try:
-            with open(path, "r") as f:
-                raw = f.read().strip()
-                # Formato típico: "@load_freq"
-                if "@" in raw:
-                    load = int(raw.split("@")[0])
-                    return {"name": "Jetson GPU", "load_percent": load}
-        except (OSError, ValueError):
-            continue
+            if "gv11b" not in entry and "gpu" not in entry:
+                continue
+            path = os.path.join(devfreq_base, entry, "load")
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    raw = f.read().strip()
+                    if "@" in raw:
+                        load = int(raw.split("@")[0])
+                        return {"name": "Jetson GPU", "load_percent": load}
+            except (OSError, ValueError):
+                continue
+    except OSError:
+        pass
     return None
 
 
+def _safe_psutil_cpu() -> Optional[float]:
+    if not _psutil:
+        return None
+    try:
+        return _psutil.cpu_percent(interval=0.5)
+    except Exception as exc:
+        logger.debug("cpu_percent failed: %s", exc)
+        return None
+
+
+def _safe_psutil_mem() -> Optional[dict]:
+    if not _psutil:
+        return None
+    try:
+        mem = _psutil.virtual_memory()
+        return {
+            "percent": mem.percent,
+            "total_mb": mem.total // (1024 * 1024),
+            "used_mb": mem.used // (1024 * 1024),
+        }
+    except Exception as exc:
+        logger.debug("virtual_memory failed: %s", exc)
+        return None
+
+
+def _safe_psutil_disk() -> Optional[float]:
+    if not _psutil:
+        return None
+    try:
+        disk = _psutil.disk_usage("/")
+        return disk.percent
+    except Exception as exc:
+        logger.debug("disk_usage failed: %s", exc)
+        return None
+
+
+def _safe_boot_time() -> float:
+    if _psutil:
+        try:
+            return _psutil.boot_time()
+        except Exception:
+            pass
+    try:
+        with open("/proc/stat", "r", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("btime"):
+                    return float(line.split()[1])
+    except (OSError, ValueError):
+        pass
+    return 0.0
+
+
 def get_metrics() -> dict[str, Any]:
-    """Devuelve dict con métricas del sistema."""
+    """Devuelve dict con métricas del sistema. Cada métrica falla de forma aislada."""
     metrics: dict[str, Any] = {
-        "hostname": os.uname().nodename,
-        "uptime_seconds": int(time.time() - _get_boot_time()),
+        "hostname": socket.gethostname(),
+        "uptime_seconds": max(0, int(time.time() - _safe_boot_time())),
         "cpu_percent": None,
         "memory_percent": None,
         "memory_total_mb": None,
@@ -82,46 +133,32 @@ def get_metrics() -> dict[str, Any]:
         "gpu_info": None,
     }
 
-    if _psutil:
-        # CPU
-        metrics["cpu_percent"] = _psutil.cpu_percent(interval=0.5)
+    cpu = _safe_psutil_cpu()
+    if cpu is not None:
+        metrics["cpu_percent"] = cpu
 
-        # Memoria
-        mem = _psutil.virtual_memory()
-        metrics["memory_percent"] = mem.percent
-        metrics["memory_total_mb"] = mem.total // (1024 * 1024)
-        metrics["memory_used_mb"] = mem.used // (1024 * 1024)
+    mem = _safe_psutil_mem()
+    if mem:
+        metrics["memory_percent"] = mem["percent"]
+        metrics["memory_total_mb"] = mem["total_mb"]
+        metrics["memory_used_mb"] = mem["used_mb"]
 
-        # Disco
-        try:
-            disk = _psutil.disk_usage("/")
-            metrics["disk_percent"] = disk.percent
-        except OSError:
-            pass
+    disk = _safe_psutil_disk()
+    if disk is not None:
+        metrics["disk_percent"] = disk
 
-    # Temperatura (tomar la máxima de todas las zonas)
-    zones = _read_thermal_zones()
-    if zones:
-        metrics["temperature_c"] = max(z["temp_c"] for z in zones)
+    try:
+        zones = _read_thermal_zones()
+        if zones:
+            metrics["temperature_c"] = max(z["temp_c"] for z in zones)
+    except Exception as exc:
+        logger.debug("thermal zones failed: %s", exc)
 
-    # GPU Jetson
-    gpu = _get_jetson_gpu()
-    if gpu:
-        metrics["gpu_info"] = gpu
+    try:
+        gpu = _get_jetson_gpu()
+        if gpu:
+            metrics["gpu_info"] = gpu
+    except Exception as exc:
+        logger.debug("jetson gpu failed: %s", exc)
 
     return metrics
-
-
-def _get_boot_time() -> float:
-    """Tiempo de arranque del sistema."""
-    if _psutil:
-        return _psutil.boot_time()
-    # Fallback: /proc/stat btime
-    try:
-        with open("/proc/stat", "r") as f:
-            for line in f:
-                if line.startswith("btime"):
-                    return float(line.split()[1])
-    except OSError:
-        pass
-    return 0.0
