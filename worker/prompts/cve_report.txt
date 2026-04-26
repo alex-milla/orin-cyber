@@ -4,13 +4,17 @@ REGLAS:
 1. NO inventes versiones de parche, fechas, ni detalles de vendor.
 2. Si falta un dato, indica "No disponible".
 3. Usa [CONFIRMADO] para datos de NVD/EPSS/CISA. Usa [INFERIDO] solo para consecuencias lógicas obvias.
-4. La descripción del CVE tradúcela al español.
 
-ESTRUCTURA (máx. 300 palabras):
+FORMATO OBLIGATORIO (copia exactamente):
+
+[DESCRIPCION_ES]
+{Traducción al español de la descripción del CVE, 2-3 oraciones}
+[/DESCRIPCION_ES]
 
 ---
+
 CONTEXTO
-Traducción al español de la descripción del CVE.
+{Resumen breve en español}
 
 DATOS OBJETIVOS
 - CVSS: {score} ({severity})
@@ -19,7 +23,7 @@ DATOS OBJETIVOS
 - Repos públicos: {N}
 
 IMPACTO
-Consecuencias basadas solo en la descripción. [INFERIDO]
+{Consecuencias basadas solo en la descripción. [INFERIDO]}
 
 RECOMENDACIONES
 1. Verificar boletín oficial del fabricante para parche exacto.
@@ -27,4 +31,3 @@ RECOMENDACIONES
 3. Si CISA KEV indica "requiredAction", transcríbela.
 
 NOTA: Datos de NVD, EPSS (FIRST.org), CISA KEV, GitHub. Verificar siempre con el fabricante.
----

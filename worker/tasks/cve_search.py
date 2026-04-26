@@ -82,14 +82,6 @@ class CveSearchTask(BaseTask):
                 "result_text": "No se encontraron CVEs con los criterios indicados.",
             }
 
-        # ── Traducir descripciones al español (top 3 en modo búsqueda, todos en modo ID) ──
-        max_translate = len(cves) if cve_id else min(3, len(cves))
-        for idx, cve in enumerate(cves):
-            if idx < max_translate:
-                desc = cve.get("description", "")
-                if desc:
-                    cve["description_es"] = self.llm.translate(desc, target_lang="es", max_tokens=256)
-
         # ── Enriquecer cada CVE con datos adicionales ─────────────────────
         enriched = []
         for cve in cves:
@@ -120,25 +112,42 @@ class CveSearchTask(BaseTask):
         # ── Preparar datos para el LLM ────────────────────────────────────
         context = json.dumps(enriched, indent=2, ensure_ascii=False)
 
-        # ── Llamar al LLM para análisis sintético ─────────────────────────
+        # ── Llamar al LLM (1 sola llamada: traduce + analiza) ──────────────
         report_text = self.llm.chat(
             system_prompt=self.prompt_template,
-            user_prompt=f"Analiza los siguientes datos de CVEs y genera un informe estructurado en español.\n\nDatos estructurados:\n{context}",
+            user_prompt=f"Analiza los siguientes datos de CVEs. Primero traduce la descripción al español, luego genera el informe estructurado.\n\nDatos estructurados:\n{context}",
         )
 
-        # Fallback si el LLM retorna vacío (prompt muy largo para el modelo)
+        # Extraer traducción del output del LLM para usarla en el header HTML
+        import re
+        first_enriched = enriched[0] if enriched else {}
+        cve_data = first_enriched.get("cve", {})
+        desc_translated = None
+        if report_text:
+            match = re.search(r'\[DESCRIPCION_ES\]\s*(.*?)\s*\[/DESCRIPCION_ES\]', report_text, re.DOTALL)
+            if match:
+                desc_translated = match.group(1).strip()
+                # Remover el bloque del report_text para no duplicar
+                report_text = re.sub(r'\[DESCRIPCION_ES\]\s*.*?\s*\[/DESCRIPCION_ES\]\s*', '', report_text, count=1, flags=re.DOTALL).strip()
+                logger.info("Extracted Spanish description (%s chars)", len(desc_translated))
+            else:
+                logger.info("No [DESCRIPCION_ES] block found in LLM output")
+
+        # Guardar traducción en el dict del CVE para el formatter
+        if desc_translated:
+            cve_data["description_es"] = desc_translated
+
+        # Fallback si el LLM retorna vacío
         if not report_text or not report_text.strip():
             logger.warning("LLM returned empty response, generating fallback analysis")
-            first = enriched[0] if enriched else {}
-            cve = first.get("cve", {})
-            epss = first.get("epss")
-            kev = first.get("kev")
-            priority = first.get("priority", "D")
+            epss = first_enriched.get("epss")
+            kev = first_enriched.get("kev")
+            priority = first_enriched.get("priority", "D")
             report_text = (
-                f"## ANÁLISIS DE RIESGO — {cve.get('cve_id', 'Unknown')}\n\n"
-                f"**Contexto:** {cve.get('description_es') or cve.get('description', 'No disponible')}\n\n"
+                f"## ANÁLISIS DE RIESGO — {cve_data.get('cve_id', 'Unknown')}\n\n"
+                f"**Contexto:** {cve_data.get('description', 'No disponible')}\n\n"
                 f"**Datos objetivos:**\n"
-                f"- CVSS: {cve.get('score', 'N/A')} ({cve.get('severity', 'N/A')})\n"
+                f"- CVSS: {cve_data.get('score', 'N/A')} ({cve_data.get('severity', 'N/A')})\n"
                 f"- EPSS: {epss['score_percent'] if epss else 'N/A'}% (percentil {epss['percentile_percent'] if epss else 'N/A'}%)\n"
                 f"- CISA KEV: {'SÍ — explotación activa confirmada' if kev else 'No listado'}\n"
                 f"- Prioridad de parcheo: {priority}\n\n"
