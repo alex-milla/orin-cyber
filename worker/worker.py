@@ -21,6 +21,7 @@ from tasks.cve_search import CveSearchTask
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CONFIG = os.path.join(BASE_DIR, "config.ini")
+CURRENT_MODEL_FILE = os.path.join(BASE_DIR, ".current_model")
 
 # Registry de tareas disponibles
 TASK_REGISTRY = {
@@ -44,6 +45,28 @@ def setup_logging(config: configparser.ConfigParser) -> None:
     )
 
 
+def _save_current_model(model: str) -> None:
+    """Persiste el modelo activo para sobrevivir reinicios del worker."""
+    try:
+        with open(CURRENT_MODEL_FILE, "w", encoding="utf-8") as f:
+            f.write(model)
+    except Exception:
+        pass
+
+
+def _load_current_model(config: configparser.ConfigParser) -> str:
+    """Lee modelo persistido o cae en config.ini."""
+    try:
+        if os.path.exists(CURRENT_MODEL_FILE):
+            with open(CURRENT_MODEL_FILE, "r", encoding="utf-8") as f:
+                model = f.read().strip()
+                if model:
+                    return model
+    except Exception:
+        pass
+    return config.get("llm", "model", fallback="unknown")
+
+
 def _llama_server_is_ready(host: str, port: str) -> bool:
     """Verifica si llama-server responde a peticiones."""
     import requests
@@ -57,8 +80,26 @@ def _llama_server_is_ready(host: str, port: str) -> bool:
     return False
 
 
+def _llama_server_pid() -> Optional[int]:
+    """Devuelve el PID de llama-server si está corriendo, o None."""
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", "llama-server"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return int(result.stdout.strip().split()[0])
+    except Exception:
+        pass
+    return None
+
+
 def _restart_llama_server(config: configparser.ConfigParser, model: str, logger: logging.Logger) -> bool:
-    """Mata llama-server existente y levanta uno nuevo con el modelo indicado."""
+    """Asegura que llama-server esté corriendo con el modelo indicado.
+
+    Si ya hay un proceso cargando, espera hasta 120s sin matarlo.
+    Solo reinicia si no hay proceso o si no responde después de 120s.
+    """
     try:
         exe = config.get("llama_server", "executable_path", fallback="llama-server")
         models_dir = config.get("llama_server", "models_dir", fallback="./models/")
@@ -91,10 +132,22 @@ def _restart_llama_server(config: configparser.ConfigParser, model: str, logger:
             logger.error("Modelo no encontrado: %s", model_path)
             return False
 
-        # Kill existing llama-server
-        logger.info("Matando llama-server existente...")
-        subprocess.run(["pkill", "-f", "llama-server"], capture_output=True)
-        time.sleep(2)
+        # Verificar si ya hay un proceso corriendo
+        existing_pid = _llama_server_pid()
+        if existing_pid:
+            logger.info("llama-server ya está corriendo (PID %d). Verificando que responda...", existing_pid)
+            for attempt in range(1, 61):
+                if _llama_server_is_ready(host, port):
+                    logger.info("llama-server respondiendo correctamente.")
+                    return True
+                time.sleep(2)
+                if attempt % 10 == 0:
+                    logger.info("Esperando llama-server... (%d/60)", attempt)
+            logger.warning("llama-server no responde después de 120s. Reiniciando...")
+            subprocess.run(["pkill", "-9", "-f", "llama-server"], capture_output=True)
+            time.sleep(2)
+        else:
+            logger.info("No hay llama-server corriendo. Iniciando...")
 
         # Build args
         args = [exe, "-m", model_path, "-c", ctx, "--host", host, "--port", port]
@@ -110,16 +163,17 @@ def _restart_llama_server(config: configparser.ConfigParser, model: str, logger:
             start_new_session=True,
         )
 
-        # Wait for server to be ready (poll every 2s, up to 60s)
+        # Wait for server to be ready (poll every 2s, up to 120s)
         logger.info("Esperando a que llama-server esté listo...")
-        for attempt in range(1, 31):
+        for attempt in range(1, 61):
             time.sleep(2)
             if _llama_server_is_ready(host, port):
                 logger.info("llama-server listo y respondiendo después de %ds.", attempt * 2)
                 return True
-            logger.debug("llama-server aún no responde (intento %d/30)", attempt)
+            if attempt % 10 == 0:
+                logger.info("Esperando llama-server... (%d/60)", attempt)
 
-        logger.warning("llama-server iniciado pero no responde después de 60s. El worker continuará de todos modos.")
+        logger.warning("llama-server iniciado pero no responde después de 120s.")
         return True
 
     except Exception as exc:
@@ -128,7 +182,11 @@ def _restart_llama_server(config: configparser.ConfigParser, model: str, logger:
 
 
 def apply_command(config_path: str, command: dict, logger: logging.Logger) -> bool:
-    """Procesa un comando recibido del hosting. Retorna True si requiere reinicio."""
+    """Procesa un comando recibido del hosting.
+
+    Retorna True solo si el worker completo debe reiniciarse (systemd).
+    change_model ya no reinicia el worker — solo reinicia llama-server.
+    """
     cmd = command.get("command")
     payload = command.get("payload") or {}
 
@@ -150,15 +208,15 @@ def apply_command(config_path: str, command: dict, logger: logging.Logger) -> bo
         with open(config_path, "w", encoding="utf-8") as f:
             config.write(f)
 
+        _save_current_model(model)
         logger.info("Modelo cambiado en config: %s → %s", old_model, model)
 
-        # Restart llama-server with new model
+        # Restart llama-server with new model (no reiniciar el worker)
         if _restart_llama_server(config, model, logger):
-            logger.info("Reiniciando worker para aplicar nuevo modelo.")
-            return True
+            logger.info("llama-server reiniciado con nuevo modelo. Worker continúa.")
         else:
-            logger.error("No se pudo reiniciar llama-server. Modelo guardado en config pero el servidor no cambió.")
-            return False
+            logger.error("No se pudo reiniciar llama-server con el nuevo modelo.")
+        return False
 
     logger.warning("Comando desconocido: %s", cmd)
     return False
@@ -182,9 +240,9 @@ def main(config_path: Optional[str] = None) -> None:
     except Exception:
         host, port = "localhost", "8080"
 
+    current_model = _load_current_model(config)
     if not _llama_server_is_ready(host, port):
         logger.warning("llama-server no responde. Intentando iniciar automáticamente...")
-        current_model = config.get("llm", "model", fallback="unknown")
         if _restart_llama_server(config, current_model, logger):
             logger.info("llama-server iniciado correctamente al arranque del worker.")
         else:
@@ -199,7 +257,7 @@ def main(config_path: Optional[str] = None) -> None:
 
     # Contador para heartbeat (no enviamos en cada poll)
     last_heartbeat = 0.0
-    last_model = config.get("llm", "model", fallback="unknown")
+    last_model = current_model
 
     while True:
         try:
@@ -225,6 +283,9 @@ def main(config_path: Optional[str] = None) -> None:
                     if apply_command(config_path or DEFAULT_CONFIG, cmd, logger):
                         # Reinicio controlado: systemd levantará el proceso nuevo
                         sys.exit(0)
+                # Releer config por si cambió el modelo (change_model no reinicia worker)
+                config.read(config_path or DEFAULT_CONFIG)
+                last_model = _load_current_model(config)
             except Exception as exc:
                 logger.warning("Error consultando comandos: %s", exc)
 
@@ -247,6 +308,13 @@ def main(config_path: Optional[str] = None) -> None:
                 input_data = task.get("input_data", "{}")
 
                 logger.info("Procesando tarea %s (tipo: %s)", task_id, task_type)
+
+                # Verificar llama-server antes de cada tarea (protege contra OOM/crash)
+                if not _llama_server_is_ready(host, port):
+                    logger.warning("llama-server no responde antes de tarea %s. Reiniciando...", task_id)
+                    if not _restart_llama_server(config, last_model, logger):
+                        logger.error("No se pudo reiniciar llama-server. Saltando tarea %s.", task_id)
+                        continue
 
                 # Reclamar
                 if not api.claim_task(task_id):
