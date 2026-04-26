@@ -85,7 +85,10 @@ class CveSearchTask(BaseTask):
         # ── Enriquecer cada CVE con datos adicionales ─────────────────────
         enriched = []
         for cve in cves:
-            cve_id = cve["cve_id"]
+            if not isinstance(cve, dict):
+                logger.warning("Skipping invalid CVE entry (not a dict): %s", cve)
+                continue
+            cve_id = cve.get("cve_id", "unknown")
             logger.info("Enriching %s", cve_id)
 
             epss = get_epss(cve_id)
@@ -116,9 +119,15 @@ class CveSearchTask(BaseTask):
         )
 
         # ── Formatear salida HTML ─────────────────────────────────────────
-        result_html = render_cve_report(enriched, report_text)
+        try:
+            result_html = render_cve_report(enriched, report_text)
+        except Exception as exc:
+            logger.exception("render_cve_report failed: %s", exc)
+            # Fallback: texto plano envuelto en HTML básico
+            safe_text = (report_text or "Error generando reporte visual.").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            result_html = f"<pre style='white-space:pre-wrap;'>{safe_text}</pre>"
 
         return {
             "result_html": result_html,
-            "result_text": report_text,
+            "result_text": report_text or "",
         }

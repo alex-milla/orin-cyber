@@ -49,6 +49,8 @@ def get_kev(cve_id: str) -> Optional[dict]:
     cve_upper = cve_id.upper()
 
     for vuln in catalog.get("vulnerabilities", []):
+        if not isinstance(vuln, dict):
+            continue
         if vuln.get("cveID", "").upper() == cve_upper:
             return {
                 "listed": True,

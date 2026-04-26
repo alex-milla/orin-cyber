@@ -81,7 +81,9 @@ def render_cve_report(enriched: list, llm_text: str) -> str:
 
     # Tomamos el primer CVE (modo lookup por ID) o todos (modo búsqueda)
     first = enriched[0]
-    cve = first["cve"]
+    if not isinstance(first, dict):
+        return "<p>Error interno: entrada de datos inválida.</p>"
+    cve = first.get("cve") or {}
     epss = first.get("epss")
     kev = first.get("kev")
     github = first.get("github")
@@ -123,14 +125,16 @@ def render_cve_report(enriched: list, llm_text: str) -> str:
 
     # ── GitHub Exploits ─────────────────────────────────────────────────
     if github:
-        if github:
-            gh_rows = "<ul style='margin:0;padding-left:1.2rem;'>"
-            for repo in github:
-                gh_rows += f"<li><a href='{repo['url']}' target='_blank' rel='noopener'>{repo['name']}</a> — ⭐ {repo['stars']} — {repo.get('description', '')[:80]}</li>"
-            gh_rows += "</ul>"
+        gh_rows = "<ul style='margin:0;padding-left:1.2rem;'>"
+        for repo in github:
+            if not isinstance(repo, dict):
+                continue
+            gh_rows += f"<li><a href='{repo.get('url', '#')}' target='_blank' rel='noopener'>{repo.get('name', 'Unknown')}</a> — ⭐ {repo.get('stars', 0)} — {(repo.get('description') or '')[:80]}</li>"
+        gh_rows += "</ul>"
+        if github and any(isinstance(r, dict) for r in github):
+            html += _section(f"💣 Public Exploits (Total: {len(github)})", gh_rows)
         else:
-            gh_rows = "<p class='small'>No se encontraron repositorios públicos relacionados.</p>"
-        html += _section(f"💣 Public Exploits (Total: {len(github)})", gh_rows)
+            html += _section("💣 Public Exploits", "<p class='small'>No se encontraron repositorios públicos relacionados.</p>")
 
     # ── EPSS ────────────────────────────────────────────────────────────
     if epss:

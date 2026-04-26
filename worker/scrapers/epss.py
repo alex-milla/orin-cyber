@@ -25,10 +25,12 @@ def get_epss(cve_id: str) -> Optional[dict]:
         resp.raise_for_status()
         data = resp.json()
 
-        if not data.get("data"):
+        entries = data.get("data") if isinstance(data, dict) else None
+        if not entries or not isinstance(entries, list):
             return None
-
-        entry = data["data"][0]
+        entry = entries[0]
+        if not isinstance(entry, dict):
+            return None
         score = float(entry.get("epss", 0))
         percentile = float(entry.get("percentile", 0))
 

@@ -11,6 +11,14 @@ logger = logging.getLogger(__name__)
 NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 
 
+def _safe_first(lst: list | None) -> dict | None:
+    """Devuelve el primer elemento de una lista si es un dict, None en caso contrario."""
+    if not lst or not isinstance(lst, list):
+        return None
+    first = lst[0]
+    return first if isinstance(first, dict) else None
+
+
 def search_cves(
     keyword: str,
     version: str = "",
@@ -54,7 +62,7 @@ def search_cves(
     results = []
 
     for item in items:
-        cve = item.get("cve", {})
+        cve = item.get("cve") or {} if isinstance(item, dict) else {}
         cve_id = cve.get("id", "unknown")
         descriptions = cve.get("descriptions", [])
         desc = ""
@@ -66,28 +74,30 @@ def search_cves(
             desc = descriptions[0].get("value", "")
 
         metrics = cve.get("metrics", {})
-        cvss = metrics.get("cvssMetricV31", [{}])[0] if metrics.get("cvssMetricV31") else {}
+        cvss = _safe_first(metrics.get("cvssMetricV31"))
         if not cvss:
-            cvss = metrics.get("cvssMetricV30", [{}])[0] if metrics.get("cvssMetricV30") else {}
+            cvss = _safe_first(metrics.get("cvssMetricV30"))
 
         score = None
         severity_level = "N/A"
         vector = None
         version = None
-        if cvss and "cvssData" in cvss:
-            score = cvss["cvssData"].get("baseScore")
-            severity_level = cvss["cvssData"].get("baseSeverity", "N/A")
-            vector = cvss["cvssData"].get("vectorString", "")
-            version = cvss["cvssData"].get("version", "")
+        cvss_data = cvss.get("cvssData") if cvss else None
+        if cvss_data:
+            score = cvss_data.get("baseScore")
+            severity_level = cvss_data.get("baseSeverity", "N/A")
+            vector = cvss_data.get("vectorString", "")
+            version = cvss_data.get("version", "")
 
         # Intentar CVSS v4 si no hay v3
         if not score:
-            cvss_v4 = metrics.get("cvssMetricV40", [{}])[0] if metrics.get("cvssMetricV40") else {}
-            if cvss_v4 and "cvssData" in cvss_v4:
-                score = cvss_v4["cvssData"].get("baseScore")
-                severity_level = cvss_v4["cvssData"].get("baseSeverity", "N/A")
-                vector = cvss_v4["cvssData"].get("vectorString", "")
-                version = cvss_v4["cvssData"].get("version", "")
+            cvss_v4 = _safe_first(metrics.get("cvssMetricV40"))
+            cvss_data_v4 = cvss_v4.get("cvssData") if cvss_v4 else None
+            if cvss_data_v4:
+                score = cvss_data_v4.get("baseScore")
+                severity_level = cvss_data_v4.get("baseSeverity", "N/A")
+                vector = cvss_data_v4.get("vectorString", "")
+                version = cvss_data_v4.get("version", "")
 
         references = [
             ref.get("url", "")
@@ -129,7 +139,7 @@ def get_cve_by_id(cve_id: str) -> dict | None:
         return None
 
     # Reutilizar la lógica de parsing
-    cve = items[0].get("cve", {})
+    cve = items[0].get("cve") or {}
     descriptions = cve.get("descriptions", [])
     desc = ""
     for d in descriptions:
@@ -140,27 +150,29 @@ def get_cve_by_id(cve_id: str) -> dict | None:
         desc = descriptions[0].get("value", "")
 
     metrics = cve.get("metrics", {})
-    cvss = metrics.get("cvssMetricV31", [{}])[0] if metrics.get("cvssMetricV31") else {}
+    cvss = _safe_first(metrics.get("cvssMetricV31"))
     if not cvss:
-        cvss = metrics.get("cvssMetricV30", [{}])[0] if metrics.get("cvssMetricV30") else {}
+        cvss = _safe_first(metrics.get("cvssMetricV30"))
 
     score = None
     severity_level = "N/A"
     vector = None
     version = None
-    if cvss and "cvssData" in cvss:
-        score = cvss["cvssData"].get("baseScore")
-        severity_level = cvss["cvssData"].get("baseSeverity", "N/A")
-        vector = cvss["cvssData"].get("vectorString", "")
-        version = cvss["cvssData"].get("version", "")
+    cvss_data = cvss.get("cvssData") if cvss else None
+    if cvss_data:
+        score = cvss_data.get("baseScore")
+        severity_level = cvss_data.get("baseSeverity", "N/A")
+        vector = cvss_data.get("vectorString", "")
+        version = cvss_data.get("version", "")
 
     if not score:
-        cvss_v4 = metrics.get("cvssMetricV40", [{}])[0] if metrics.get("cvssMetricV40") else {}
-        if cvss_v4 and "cvssData" in cvss_v4:
-            score = cvss_v4["cvssData"].get("baseScore")
-            severity_level = cvss_v4["cvssData"].get("baseSeverity", "N/A")
-            vector = cvss_v4["cvssData"].get("vectorString", "")
-            version = cvss_v4["cvssData"].get("version", "")
+        cvss_v4 = _safe_first(metrics.get("cvssMetricV40"))
+        cvss_data_v4 = cvss_v4.get("cvssData") if cvss_v4 else None
+        if cvss_data_v4:
+            score = cvss_data_v4.get("baseScore")
+            severity_level = cvss_data_v4.get("baseSeverity", "N/A")
+            vector = cvss_data_v4.get("vectorString", "")
+            version = cvss_data_v4.get("version", "")
 
     references = [ref.get("url", "") for ref in cve.get("references", []) if ref.get("url")]
 

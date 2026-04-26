@@ -41,11 +41,18 @@ class LlmClient:
         resp = requests.post(url, json=payload, timeout=120)
         resp.raise_for_status()
         data = resp.json()
+        if not isinstance(data, dict):
+            logger.error("Unexpected LLM response type: %s", type(data))
+            raise RuntimeError("Respuesta inesperada del LLM (tipo inválido)")
 
-        if "choices" in data and len(data["choices"]) > 0:
-            content = data["choices"][0].get("message", {}).get("content", "").strip()
-            logger.info("LLM response received (%s chars)", len(content))
-            return content
+        choices = data.get("choices")
+        if isinstance(choices, list) and len(choices) > 0:
+            first_choice = choices[0]
+            if isinstance(first_choice, dict):
+                message = first_choice.get("message") or {}
+                content = (message.get("content") or "").strip()
+                logger.info("LLM response received (%s chars)", len(content))
+                return content
 
         logger.error("Unexpected LLM response: %s", data)
         raise RuntimeError("Respuesta inesperada del LLM")
