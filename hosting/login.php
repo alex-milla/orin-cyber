@@ -2,7 +2,14 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/includes/config.php';
+require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/auth.php';
+
+// Si no existe la base de datos, redirigir a instalador
+if (!file_exists(DB_PATH)) {
+    header('Location: install.php');
+    exit;
+}
 
 if (isLoggedIn()) {
     header('Location: index.php');
@@ -11,13 +18,17 @@ if (isLoggedIn()) {
 
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $user = trim($_POST['username'] ?? '');
-    $pass = $_POST['password'] ?? '';
-    if (loginUser($user, $pass)) {
-        header('Location: index.php');
-        exit;
+    try {
+        $user = trim($_POST['username'] ?? '');
+        $pass = $_POST['password'] ?? '';
+        if (loginUser($user, $pass)) {
+            header('Location: index.php');
+            exit;
+        }
+        $error = 'Usuario o contraseña incorrectos.';
+    } catch (Exception $e) {
+        $error = 'Error del servidor: ' . $e->getMessage();
     }
-    $error = 'Usuario o contraseña incorrectos.';
 }
 
 $pageTitle = 'Login — OrinSec';

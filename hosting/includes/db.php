@@ -9,7 +9,12 @@ class Database {
     public static function getInstance(): PDO {
         if (self::$instance === null) {
             if (!file_exists(DATA_DIR)) {
-                mkdir(DATA_DIR, 0755, true);
+                if (!@mkdir(DATA_DIR, 0755, true)) {
+                    throw new RuntimeException('No se pudo crear el directorio de datos: ' . DATA_DIR);
+                }
+            }
+            if (!is_writable(DATA_DIR)) {
+                throw new RuntimeException('El directorio de datos no tiene permisos de escritura: ' . DATA_DIR);
             }
             self::$instance = new PDO('sqlite:' . DB_PATH);
             self::$instance->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
