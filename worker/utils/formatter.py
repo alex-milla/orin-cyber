@@ -124,19 +124,16 @@ def render_cve_report(enriched: list, llm_text: str) -> str:
     html += _section("🔍 Vulnerability Information", info_rows)
 
     # ── GitHub Exploits ─────────────────────────────────────────────────
-    if github:
+    if github and any(isinstance(r, dict) for r in github):
         gh_rows = "<ul style='margin:0;padding-left:1.2rem;'>"
         for repo in github:
             if not isinstance(repo, dict):
                 continue
             url = repo.get('url') or '#'
             name = repo.get('name') or 'Unknown'
-            gh_rows += f"<li><a href='{url}' target='_blank' rel='noopener' style='color:var(--primary);text-decoration:underline;'>{name}</a> — ⭐ {repo.get('stars', 0)} — {(repo.get('description') or '')[:80]}</li>"
+            gh_rows += f"<li><a href='{url}' target='_blank' rel='noopener' style='color:var(--primary);text-decoration:underline;'>{name}</a></li>"
         gh_rows += "</ul>"
-        if github and any(isinstance(r, dict) for r in github):
-            html += _section(f"💣 Public Exploits (Total: {len(github)})", gh_rows)
-        else:
-            html += _section("💣 Public Exploits", "<p class='small'>No se encontraron repositorios públicos relacionados.</p>")
+        html += _section(f"💣 Public Exploits (Total: {len(github)})", gh_rows)
 
     # ── EPSS ────────────────────────────────────────────────────────────
     if epss:
