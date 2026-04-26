@@ -475,35 +475,38 @@ async function addKey(form) {
     }
 }
 
+function showToast(msg) {
+    const t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;bottom:2rem;right:2rem;background:var(--success);color:#fff;padding:.75rem 1.25rem;border-radius:var(--radius-sm);font-weight:600;z-index:9999;box-shadow:var(--shadow-lg);transition:opacity .3s;';
+    document.body.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 2000);
+}
+
 function copyToClipboard(elementId) {
     const text = document.getElementById(elementId).textContent;
-    navigator.clipboard.writeText(text).then(() => {
-        alert('Copiado al portapapeles');
-    }).catch(() => {
-        // Fallback
+    navigator.clipboard.writeText(text).then(() => showToast('✅ Copiado')).catch(() => {
         const ta = document.createElement('textarea');
         ta.value = text;
         document.body.appendChild(ta);
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
-        alert('Copiado al portapapeles');
+        showToast('✅ Copiado');
     });
 }
 
 function copyKey(elementId) {
     const el = document.getElementById(elementId);
     const full = el.dataset.full || el.textContent;
-    navigator.clipboard.writeText(full).then(() => {
-        alert('Copiado al portapapeles');
-    }).catch(() => {
+    navigator.clipboard.writeText(full).then(() => showToast('✅ Copiado')).catch(() => {
         const ta = document.createElement('textarea');
         ta.value = full;
         document.body.appendChild(ta);
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
-        alert('Copiado al portapapeles');
+        showToast('✅ Copiado');
     });
 }
 
