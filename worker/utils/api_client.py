@@ -31,6 +31,7 @@ class ApiClient:
         }
 
     def _request(self, method: str, endpoint: str, **kwargs) -> Optional[dict]:
+        import time
         url = f"{self.base_url}{endpoint}"
         for attempt in range(1, self.max_retries + 1):
             try:
@@ -44,6 +45,7 @@ class ApiClient:
                 if attempt == self.max_retries:
                     logger.error("Max retries reached for %s %s", method, url)
                     raise
+                time.sleep(1.5)  # backoff entre reintentos
         return None
 
     def get_pending_tasks(self) -> list:

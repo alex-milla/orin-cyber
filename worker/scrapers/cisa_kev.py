@@ -11,13 +11,16 @@ CISA_KEV_URL = "https://api.cisa.gov/known-exploited-vulnerabilities/catalog"
 
 # Cache en memoria del catálogo completo (se refresca al reiniciar el worker)
 _kev_cache: Optional[dict] = None
+_kev_load_failed = False
 
 
 def _load_catalog() -> dict:
     """Carga el catálogo CISA KEV completo."""
-    global _kev_cache
+    global _kev_cache, _kev_load_failed
     if _kev_cache is not None:
         return _kev_cache
+    if _kev_load_failed:
+        return {"vulnerabilities": []}
 
     try:
         resp = requests.get(
@@ -32,6 +35,7 @@ def _load_catalog() -> dict:
         return data
     except Exception as exc:
         logger.warning("CISA KEV catalog load failed: %s", exc)
+        _kev_load_failed = True
         _kev_cache = {"vulnerabilities": []}
         return _kev_cache
 
