@@ -47,6 +47,5 @@ require __DIR__ . '/templates/header.php';
         <input type="password" name="password" required maxlength="128" autocomplete="current-password">
         <button type="submit" style="margin-top:1rem; width:100%;">Entrar</button>
     </form>
-    <p style="text-align:center; margin-top:1rem;"><a href="register.php">Crear cuenta</a></p>
 </div>
 <?php require __DIR__ . '/templates/footer.php'; ?>
