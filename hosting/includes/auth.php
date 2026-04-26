@@ -10,6 +10,10 @@ function isLoggedIn(): bool {
     return isset($_SESSION['user_id']) && $_SESSION['user_id'] > 0;
 }
 
+function isAdmin(): bool {
+    return isLoggedIn() && !empty($_SESSION['is_admin']);
+}
+
 function requireAuth(): void {
     if (!isLoggedIn()) {
         if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
@@ -20,19 +24,35 @@ function requireAuth(): void {
     }
 }
 
+function requireAdmin(): void {
+    requireAuth();
+    if (!isAdmin()) {
+        if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+            jsonResponse(['error' => 'Acceso denegado'], 403);
+        }
+        header('Location: index.php');
+        exit;
+    }
+}
+
 function loginUser(string $username, string $password): bool {
     $user = Database::fetchOne(
-        'SELECT id, password_hash FROM users WHERE username = ?',
+        'SELECT id, password_hash, is_admin FROM users WHERE username = ?',
         [$username]
     );
+    
     if (!$user) {
         return false;
     }
+    
     if (!password_verify($password, $user['password_hash'])) {
         return false;
     }
+    
     $_SESSION['user_id'] = $user['id'];
     $_SESSION['username'] = $username;
+    $_SESSION['is_admin'] = (bool) $user['is_admin'];
+    
     return true;
 }
 
@@ -51,12 +71,13 @@ function logoutUser(): void {
     session_destroy();
 }
 
-function registerUser(string $username, string $password): bool {
+function registerUser(string $username, string $password, bool $admin = false): bool {
     $hash = password_hash($password, PASSWORD_BCRYPT);
     try {
         Database::insert('users', [
             'username' => $username,
-            'password_hash' => $hash
+            'password_hash' => $hash,
+            'is_admin' => $admin ? 1 : 0
         ]);
         return true;
     } catch (PDOException $e) {

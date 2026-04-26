@@ -30,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$installed) {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
+            is_admin INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )");
 
@@ -42,11 +43,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$installed) {
         $db->prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)")
            ->execute(['api_key', $apiKey]);
 
+        $version = '0.1.0';
+        $db->prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)")
+           ->execute(['version', $version]);
+
         $adminUser = $_POST['admin_user'] ?? 'admin';
         $adminPass = $_POST['admin_pass'] ?? generateSecureToken(16);
         $hash = password_hash($adminPass, PASSWORD_BCRYPT);
         
-        $db->prepare("INSERT INTO users (username, password_hash) VALUES (?, ?)")
+        $db->prepare("INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)")
            ->execute([$adminUser, $hash]);
 
         $success = true;

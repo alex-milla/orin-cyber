@@ -43,6 +43,7 @@ if (!isset($pageTitle)) $pageTitle = 'OrinSec';
     <nav>
         <a href="index.php">Inicio</a>
         <a href="task_cve.php">Buscar CVE</a>
+        <?php if (isAdmin()): ?><a href="admin.php">Admin</a><?php endif; ?>
         <span style="opacity:.7;">Hola, <?php echo htmlspecialchars($_SESSION['username']); ?></span>
         <a href="logout.php">Salir</a>
     </nav>

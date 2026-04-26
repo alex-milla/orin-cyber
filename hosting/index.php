@@ -21,6 +21,9 @@ require __DIR__ . '/templates/header.php';
     <h2>Panel principal</h2>
     <p>Bienvenido, <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong>.</p>
     <p><a href="task_cve.php"><button>➕ Nueva búsqueda de CVE</button></a></p>
+    <?php if (isAdmin()): ?>
+    <p><a href="admin.php"><button class="secondary">⚙️ Panel de administración</button></a></p>
+    <?php endif; ?>
 </div>
 
 <div class="card">
