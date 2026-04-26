@@ -44,6 +44,19 @@ def setup_logging(config: configparser.ConfigParser) -> None:
     )
 
 
+def _llama_server_is_ready(host: str, port: str) -> bool:
+    """Verifica si llama-server responde a peticiones."""
+    import requests
+    for url in [f"http://{host}:{port}/health", f"http://{host}:{port}/v1/models"]:
+        try:
+            resp = requests.get(url, timeout=3)
+            if resp.status_code == 200:
+                return True
+        except Exception:
+            pass
+    return False
+
+
 def _restart_llama_server(config: configparser.ConfigParser, model: str, logger: logging.Logger) -> bool:
     """Mata llama-server existente y levanta uno nuevo con el modelo indicado."""
     try:
@@ -94,24 +107,9 @@ def _restart_llama_server(config: configparser.ConfigParser, model: str, logger:
         time.sleep(10)
 
         # Verify server is responding
-        import requests
-        health_url = f"http://{host}:{port}/health"
-        try:
-            resp = requests.get(health_url, timeout=5)
-            if resp.status_code == 200:
-                logger.info("llama-server listo y respondiendo.")
-                return True
-        except Exception:
-            pass
-
-        # Fallback: try /v1/models endpoint
-        try:
-            resp = requests.get(f"http://{host}:{port}/v1/models", timeout=5)
-            if resp.status_code == 200:
-                logger.info("llama-server listo y respondiendo.")
-                return True
-        except Exception:
-            pass
+        if _llama_server_is_ready(host, port):
+            logger.info("llama-server listo y respondiendo.")
+            return True
 
         logger.warning("llama-server iniciado pero no responde aún. El worker se reiniciará de todos modos.")
         return True
@@ -165,6 +163,26 @@ def main(config_path: Optional[str] = None) -> None:
     setup_logging(config)
     logger = logging.getLogger("worker")
     logger.info("OrinSec worker iniciado (v2)")
+
+    # Asegurar que llama-server esté corriendo al inicio
+    server_url = config.get("llm", "server_url", fallback="http://localhost:8080")
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(server_url)
+        host = parsed.hostname or "localhost"
+        port = str(parsed.port or "8080")
+    except Exception:
+        host, port = "localhost", "8080"
+
+    if not _llama_server_is_ready(host, port):
+        logger.warning("llama-server no responde. Intentando iniciar automáticamente...")
+        current_model = config.get("llm", "model", fallback="unknown")
+        if _restart_llama_server(config, current_model, logger):
+            logger.info("llama-server iniciado correctamente al arranque del worker.")
+        else:
+            logger.error("No se pudo iniciar llama-server automáticamente. Las tareas de LLM fallarán.")
+    else:
+        logger.info("llama-server ya está respondiendo en %s:%s", host, port)
 
     api = ApiClient(config_path or DEFAULT_CONFIG)
     poll_interval = config.getint("worker", "poll_interval", fallback=15)

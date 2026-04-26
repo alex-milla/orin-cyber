@@ -1,16 +1,20 @@
 [Unit]
-Description=OrinSec Worker
-After=network.target llama-server.service
-Wants=llama-server.service
+Description=OrinSec Worker — CVE analysis & task runner
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=orinsec
-WorkingDirectory=/home/orinsec/orinsec
+User=alex
+Group=alex
+WorkingDirectory=/home/alex/orinsec/worker
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/home/orinsec/orinsec/venv/bin/python /home/orinsec/orinsec/worker.py
+Environment=PATH=/home/alex/orinsec/worker/venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/alex/orinsec/worker/venv/bin/python /home/alex/orinsec/worker/worker.py
 Restart=always
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
