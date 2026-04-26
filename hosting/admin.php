@@ -10,16 +10,57 @@ require_once __DIR__ . '/includes/updater.php';
 requireAdmin();
 
 $tab = $_GET['tab'] ?? 'updates';
-$updater = new Updater();
-$currentVersion = $updater->getCurrentVersion();
-$users = Database::fetchAll('SELECT id, username, is_admin, created_at FROM users ORDER BY created_at DESC');
-$backups = $updater->listBackups();
+$renderError = '';
+
+try {
+    $updater = new Updater();
+    $currentVersion = $updater->getCurrentVersion();
+} catch (Throwable $e) {
+    $currentVersion = '0.0.0';
+    $renderError = 'Updater error: ' . $e->getMessage();
+}
+
+try {
+    $users = Database::fetchAll('SELECT id, username, is_admin, created_at FROM users ORDER BY created_at DESC');
+} catch (Throwable $e) {
+    $users = [];
+    $renderError = ($renderError ? $renderError . ' | ' : '') . 'Users DB error: ' . $e->getMessage();
+}
+
+try {
+    $backups = $updater->listBackups();
+} catch (Throwable $e) {
+    $backups = [];
+}
+
+try {
+    $apiKeys = Database::fetchAll("SELECT id, name, api_key, is_active, last_used, created_at FROM api_keys ORDER BY created_at DESC");
+} catch (Throwable $e) {
+    $apiKeys = [];
+}
+
+try {
+    $regRow = Database::fetchOne("SELECT value FROM config WHERE key = 'allow_registration'");
+    $regEnabled = !$regRow || $regRow['value'] === '1';
+} catch (Throwable $e) {
+    $regEnabled = false;
+}
+
+try {
+    $patRow = Database::fetchOne("SELECT value FROM config WHERE key = 'github_pat'");
+    $githubPat = $patRow['value'] ?? '';
+} catch (Throwable $e) {
+    $githubPat = '';
+}
 
 $pageTitle = 'Administración — OrinSec';
 require __DIR__ . '/templates/header.php';
 ?>
 <div class="card">
     <h2>⚙️ Panel de administración</h2>
+    <?php if ($renderError): ?>
+        <p style="color:#c62828; background:#ffebee; padding:1rem; border-radius:4px;"><?php echo htmlspecialchars($renderError); ?></p>
+    <?php endif; ?>
     <div style="display:flex; gap:1rem; margin-bottom:1rem; border-bottom:2px solid #ddd;">
         <a href="?tab=updates" style="padding:.5rem 0; text-decoration:none; font-weight:600; color:<?php echo $tab==='updates'?'var(--primary)':'#666'; ?>; border-bottom:3px solid <?php echo $tab==='updates'?'var(--primary)':'transparent'; ?>;">Actualizaciones</a>
         <a href="?tab=users" style="padding:.5rem 0; text-decoration:none; font-weight:600; color:<?php echo $tab==='users'?'var(--primary)':'#666'; ?>; border-bottom:3px solid <?php echo $tab==='users'?'var(--primary)':'transparent'; ?>;">Usuarios</a>
@@ -72,6 +113,9 @@ require __DIR__ . '/templates/header.php';
 
     <?php elseif ($tab === 'users'): ?>
     <h3>Usuarios registrados</h3>
+    <?php if (empty($users)): ?>
+        <p class="small">No hay usuarios registrados.</p>
+    <?php else: ?>
     <table style="width:100%; border-collapse:collapse;">
         <thead><tr style="border-bottom:2px solid #ddd;">
             <th style="text-align:left; padding:.5rem;">ID</th>
@@ -90,6 +134,7 @@ require __DIR__ . '/templates/header.php';
         <?php endforeach; ?>
         </tbody>
     </table>
+    <?php endif; ?>
 
     <h3 style="margin-top:2rem;">Crear usuario</h3>
     <form method="POST" action="ajax_admin.php?action=add_user" onsubmit="return addUser(this);">
@@ -105,15 +150,13 @@ require __DIR__ . '/templates/header.php';
 
     <?php else: ?>
     <h3>Configuración del sistema</h3>
-    <?php
-    $apiKeys = Database::fetchAll("SELECT id, name, api_key, is_active, last_used, created_at FROM api_keys ORDER BY created_at DESC");
-    $regRow = Database::fetchOne("SELECT value FROM config WHERE key = 'allow_registration'");
-    $regEnabled = !$regRow || $regRow['value'] === '1';
-    ?>
 
     <h3>🔑 API Keys — Workers conectados</h3>
     <p class="small">Cada worker o sistema externo debe usar su propia API key. Puedes revocar una key sin afectar a los demás.</p>
 
+    <?php if (empty($apiKeys)): ?>
+        <p class="small">No hay API keys.</p>
+    <?php else: ?>
     <table style="width:100%; border-collapse:collapse; margin-bottom:1rem;">
         <thead><tr style="border-bottom:2px solid #ddd;">
             <th style="text-align:left; padding:.5rem;">Nombre</th>
@@ -144,6 +187,7 @@ require __DIR__ . '/templates/header.php';
         <?php endforeach; ?>
         </tbody>
     </table>
+    <?php endif; ?>
 
     <h4>Añadir nuevo worker</h4>
     <form method="POST" action="ajax_admin.php?action=add_api_key" onsubmit="return addKey(this);" style="display:flex; gap:.5rem; align-items:flex-end;">
@@ -275,6 +319,7 @@ async function savePat(form) {
 }
 
 async function addKey(form) {
+    event.preventDefault();
     const fd = new FormData(form);
     const resp = await fetch(form.action, { method: 'POST', body: fd });
     const data = await resp.json();
@@ -287,7 +332,6 @@ async function addKey(form) {
         msg.style.color = '#c62828';
         msg.textContent = data.error || 'Error';
     }
-    return false;
 }
 
 async function revokeKey(id) {
@@ -325,6 +369,22 @@ async function deleteKey(id) {
     else alert(data.error || 'Error');
 }
 
+async function toggleReg(form) {
+    event.preventDefault();
+    const fd = new FormData(form);
+    const resp = await fetch(form.action, { method: 'POST', body: fd });
+    const data = await resp.json();
+    const msg = document.getElementById('reg-msg');
+    if (data.success) {
+        msg.style.color = '#2e7d32';
+        msg.textContent = data.enabled ? 'Registro abierto.' : 'Registro cerrado.';
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        msg.style.color = '#c62828';
+        msg.textContent = data.error || 'Error';
+    }
+}
+
 async function addUser(form) {
     event.preventDefault();
     const fd = new FormData(form);
@@ -339,22 +399,6 @@ async function addUser(form) {
     } else {
         msg.style.color = '#c62828';
         msg.textContent = data.error || 'Error al crear usuario';
-    }
-}
-
-async function toggleReg(form) {
-    event.preventDefault();
-    const fd = new FormData(form);
-    const resp = await fetch(form.action, { method: 'POST', body: fd });
-    const data = await resp.json();
-    const msg = document.getElementById('reg-msg');
-    if (data.success) {
-        msg.style.color = '#2e7d32';
-        msg.textContent = data.enabled ? 'Registro abierto.' : 'Registro cerrado.';
-        setTimeout(() => location.reload(), 1000);
-    } else {
-        msg.style.color = '#c62828';
-        msg.textContent = data.error || 'Error';
     }
 }
 </script>
