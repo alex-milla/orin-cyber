@@ -5,7 +5,6 @@ require_once __DIR__ . '/includes/config.php';
 require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/auth.php';
 
-// Si no existe la base de datos, redirigir a instalador
 if (!file_exists(DB_PATH)) {
     header('Location: install.php');
     exit;
@@ -21,11 +20,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $user = trim($_POST['username'] ?? '');
         $pass = $_POST['password'] ?? '';
-        if (loginUser($user, $pass)) {
+        $result = loginUser($user, $pass);
+        if ($result['success']) {
             header('Location: index.php');
             exit;
         }
-        $error = 'Usuario o contraseña incorrectos.';
+        $error = $result['error'];
     } catch (Exception $e) {
         $error = 'Error del servidor: ' . $e->getMessage();
     }
@@ -40,10 +40,11 @@ require __DIR__ . '/templates/header.php';
         <p style="color:#c62828;"><?php echo htmlspecialchars($error); ?></p>
     <?php endif; ?>
     <form method="POST">
+        <?php echo csrfInput(); ?>
         <label>Usuario</label>
-        <input type="text" name="username" required autofocus>
+        <input type="text" name="username" required autofocus maxlength="64" autocomplete="username">
         <label>Contraseña</label>
-        <input type="password" name="password" required>
+        <input type="password" name="password" required maxlength="128" autocomplete="current-password">
         <button type="submit" style="margin-top:1rem; width:100%;">Entrar</button>
     </form>
 </div>

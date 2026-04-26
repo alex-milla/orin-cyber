@@ -4,6 +4,12 @@ declare(strict_types=1);
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 
+// Configurar cookies de sesión ANTES de session_start()
+ini_set('session.cookie_httponly', '1');
+ini_set('session.cookie_secure', '1');
+ini_set('session.cookie_samesite', 'Strict');
+ini_set('session.use_strict_mode', '1');
+
 session_start();
 
 function isLoggedIn(): bool {
@@ -35,25 +41,30 @@ function requireAdmin(): void {
     }
 }
 
-function loginUser(string $username, string $password): bool {
+function loginUser(string $username, string $password): array {
+    // Anti brute-force
+    if (!checkBruteForce($username)) {
+        return ['success' => false, 'error' => 'Demasiados intentos. Espera 5 minutos.'];
+    }
+
     $user = Database::fetchOne(
         'SELECT id, password_hash, is_admin FROM users WHERE username = ?',
         [$username]
     );
     
-    if (!$user) {
-        return false;
+    if (!$user || !password_verify($password, $user['password_hash'])) {
+        return ['success' => false, 'error' => 'Usuario o contraseña incorrectos.'];
     }
     
-    if (!password_verify($password, $user['password_hash'])) {
-        return false;
-    }
+    // Login exitoso: limpiar intentos fallidos y regenerar ID de sesión
+    clearBruteForce($username);
+    session_regenerate_id(true);
     
     $_SESSION['user_id'] = $user['id'];
     $_SESSION['username'] = $username;
     $_SESSION['is_admin'] = (bool) $user['is_admin'];
     
-    return true;
+    return ['success' => true];
 }
 
 function logoutUser(): void {

@@ -11,28 +11,35 @@ $taskId = null;
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $product = trim($_POST['product'] ?? '');
-    $version = trim($_POST['version'] ?? '');
-    $year = trim($_POST['year'] ?? '');
-    $severity = trim($_POST['severity'] ?? '');
-    $maxResults = (int) ($_POST['max_results'] ?? 10);
-    
-    if ($product === '') {
-        $error = 'El producto/software es obligatorio.';
+    // Verificar CSRF
+    $token = $_POST['csrf_token'] ?? '';
+    if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
+        $error = 'Token de seguridad inválido. Recarga la página.';
     } else {
-        $input = json_encode([
-            'product' => $product,
-            'version' => $version,
-            'year' => $year,
-            'severity' => $severity,
-            'max_results' => $maxResults
-        ], JSON_UNESCAPED_UNICODE);
+        $product = validateInput($_POST['product'] ?? '', 100);
+        $version = validateInput($_POST['version'] ?? '', 50, '/^[\w\s\.\-+_\/]+$/u') ?: '';
+        $year = validateInput($_POST['year'] ?? '', 4, '/^\d{0,4}$/') ?: '';
+        $severity = validateInput($_POST['severity'] ?? '', 10, '/^(LOW|MEDIUM|HIGH|CRITICAL)?$/') ?: '';
+        $maxResults = filter_input(INPUT_POST, 'max_results', FILTER_VALIDATE_INT) ?: 10;
+        $maxResults = max(1, min($maxResults, 20));
         
-        $taskId = Database::insert('tasks', [
-            'task_type' => 'cve_search',
-            'input_data' => $input,
-            'status' => 'pending'
-        ]);
+        if (!$product) {
+            $error = 'El producto/software es obligatorio y contiene caracteres no permitidos.';
+        } else {
+            $input = json_encode([
+                'product' => $product,
+                'version' => $version,
+                'year' => $year,
+                'severity' => $severity,
+                'max_results' => $maxResults
+            ], JSON_UNESCAPED_UNICODE);
+            
+            $taskId = Database::insert('tasks', [
+                'task_type' => 'cve_search',
+                'input_data' => $input,
+                'status' => 'pending'
+            ]);
+        }
     }
 }
 
@@ -61,11 +68,12 @@ require __DIR__ . '/templates/header.php';
             <p style="color:#c62828;"><?php echo htmlspecialchars($error); ?></p>
         <?php endif; ?>
         <form method="POST">
+            <?php echo csrfInput(); ?>
             <label>Producto / Software *</label>
-            <input type="text" name="product" placeholder="Ej: Apache HTTP Server" required>
+            <input type="text" name="product" placeholder="Ej: Apache HTTP Server" required maxlength="100">
             
             <label>Versión</label>
-            <input type="text" name="version" placeholder="Ej: 2.4.51">
+            <input type="text" name="version" placeholder="Ej: 2.4.51" maxlength="50">
             
             <label>Año mínimo</label>
             <select name="year">

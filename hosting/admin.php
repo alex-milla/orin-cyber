@@ -52,7 +52,7 @@ require __DIR__ . '/templates/header.php';
                     <td style="padding:.5rem;"><?php echo htmlspecialchars($b['file']); ?></td>
                     <td style="padding:.5rem;"><?php echo htmlspecialchars($b['size']); ?></td>
                     <td style="padding:.5rem;"><?php echo htmlspecialchars($b['date']); ?></td>
-                    <td style="padding:.5rem;"><button class="secondary" onclick="doRollback('<?php echo htmlspecialchars($b['file']); ?>')">↩️ Restaurar</button></td>
+                    <td style="padding:.5rem;"><button class="secondary" onclick="doRollback('<?php echo htmlspecialchars($b['file'], ENT_QUOTES); ?>')">↩️ Restaurar</button></td>
                 </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -83,10 +83,11 @@ require __DIR__ . '/templates/header.php';
 
     <h3 style="margin-top:2rem;">Crear usuario</h3>
     <form method="POST" action="ajax_admin.php?action=add_user" onsubmit="return addUser(this);">
+        <?php echo csrfInput(); ?>
         <label>Usuario</label>
-        <input type="text" name="username" required>
+        <input type="text" name="username" required maxlength="64" pattern="[\w\-.@]+" title="Letras, números, guiones, puntos y @">
         <label>Contraseña</label>
-        <input type="password" name="password" required>
+        <input type="password" name="password" required minlength="8" maxlength="128">
         <label><input type="checkbox" name="is_admin" value="1"> Administrador</label>
         <button type="submit" style="margin-top:1rem;">Crear usuario</button>
         <p id="user-msg" style="margin-top:.5rem;"></p>
@@ -106,6 +107,7 @@ require __DIR__ . '/templates/header.php';
 
 <script>
 let remoteInfo = null;
+const csrfToken = <?php echo json_encode(csrfToken()); ?>;
 
 function log(msg) {
     const el = document.getElementById('update-log');
@@ -161,7 +163,7 @@ async function doUpdate() {
     log('✅ Extraído');
 
     log('4/4 Aplicando actualización...');
-    let r4 = await fetch('ajax_update.php?action=apply&backup=' + encodeURIComponent(d1.file));
+    let r4 = await fetch('ajax_update.php?action=apply&backup=' + encodeURIComponent(d1.file) + '&csrf=' + encodeURIComponent(csrfToken));
     let d4 = await r4.json();
     if (d4.error) {
         log('❌ Aplicación fallida: ' + d4.error);
@@ -176,7 +178,7 @@ async function doUpdate() {
 
 async function rollback(file) {
     log('↩️ Rollback a ' + file + '...');
-    let r = await fetch('ajax_update.php?action=rollback&file=' + encodeURIComponent(file));
+    let r = await fetch('ajax_update.php?action=rollback&file=' + encodeURIComponent(file) + '&csrf=' + encodeURIComponent(csrfToken));
     let d = await r.json();
     if (d.error) { log('❌ Rollback fallido: ' + d.error); }
     else { log('✅ Rollback completado. Recargando...'); setTimeout(() => location.reload(), 2000); }
@@ -186,7 +188,7 @@ async function doRollback(file) {
     if (!confirm('¿Restaurar backup ' + file + '?')) return;
     document.getElementById('update-log').textContent = '';
     log('Restaurando ' + file + '...');
-    let r = await fetch('ajax_update.php?action=rollback&file=' + encodeURIComponent(file));
+    let r = await fetch('ajax_update.php?action=rollback&file=' + encodeURIComponent(file) + '&csrf=' + encodeURIComponent(csrfToken));
     let d = await r.json();
     if (d.error) { log('❌ ' + d.error); }
     else { log('✅ Restaurado. Recargando...'); setTimeout(() => location.reload(), 2000); }

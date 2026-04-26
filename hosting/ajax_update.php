@@ -12,9 +12,25 @@ requireAdmin();
 $action = $_GET['action'] ?? '';
 $updater = new Updater();
 
-// Guardar estado entre pasos en sesión
 if (!isset($_SESSION['update_state'])) {
     $_SESSION['update_state'] = [];
+}
+
+// Verificar CSRF para acciones destructivas
+$destructive = ['apply', 'rollback'];
+if (in_array($action, $destructive, true)) {
+    $token = $_GET['csrf_token'] ?? '';
+    if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
+        jsonResponse(['error' => 'Token CSRF inválido'], 403);
+    }
+}
+
+// Validador estricto de nombres de archivo backup
+function validateBackupName(string $name): ?string {
+    if (!preg_match('/^backup_\d{8}_\d{6}\.zip$/', $name)) {
+        return null;
+    }
+    return $name;
 }
 
 switch ($action) {
@@ -67,10 +83,11 @@ switch ($action) {
             if (!$sourceDir || !is_dir($sourceDir)) {
                 jsonResponse(['error' => 'No hay fuente extraída'], 400);
             }
-            // Convertir basename a path absoluto
-            if (basename($backupFile) === $backupFile) {
-                $backupFile = DATA_DIR . '/backups/' . $backupFile;
+            $valid = validateBackupName(basename($backupFile));
+            if (!$valid) {
+                jsonResponse(['error' => 'Nombre de backup inválido'], 400);
             }
+            $backupFile = DATA_DIR . '/backups/' . $valid;
             $updater->applyUpdate($sourceDir, $backupFile);
             $updater->cleanup();
             unset($_SESSION['update_state']);
@@ -83,9 +100,11 @@ switch ($action) {
     case 'rollback':
         try {
             $file = $_GET['file'] ?? '';
-            if (basename($file) === $file) {
-                $file = DATA_DIR . '/backups/' . $file;
+            $valid = validateBackupName(basename($file));
+            if (!$valid) {
+                jsonResponse(['error' => 'Nombre de backup inválido'], 400);
             }
+            $file = DATA_DIR . '/backups/' . $valid;
             $updater->rollback($file);
             jsonResponse(['success' => true]);
         } catch (Exception $e) {

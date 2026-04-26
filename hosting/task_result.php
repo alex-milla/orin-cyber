@@ -23,6 +23,10 @@ if (!$task) {
     exit;
 }
 
+// Sanitizar HTML del resultado: lista blanca de etiquetas seguras
+$allowedTags = '<p><br><hr><h1><h2><h3><h4><h5><h6><ul><ol><li><strong><em><b><i><a><code><pre><blockquote><div><span><table><thead><tbody><tr><th><td>';
+$safeHtml = strip_tags($task['result_html'] ?? '', $allowedTags);
+
 $pageTitle = 'Resultado #' . $taskId . ' — OrinSec';
 require __DIR__ . '/templates/header.php';
 ?>
@@ -52,7 +56,7 @@ require __DIR__ . '/templates/header.php';
         </div>
     <?php else: ?>
         <div id="result-content">
-            <?php echo $task['result_html'] ?? '<p class="small">Sin contenido HTML.</p>'; ?>
+            <?php echo $safeHtml ?: '<p class="small">Sin contenido HTML.</p>'; ?>
         </div>
         <div class="actions">
             <button onclick="copyText()">📋 Copiar texto plano</button>

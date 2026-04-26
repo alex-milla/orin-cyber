@@ -8,7 +8,6 @@ require_once __DIR__ . '/includes/functions.php';
 $lockFile = DATA_DIR . '/.installed';
 $alreadyInstalled = file_exists(DB_PATH) || file_exists($lockFile);
 
-// Si ya está instalado, bloquear acceso
 if ($alreadyInstalled) {
     http_response_code(403);
     header('Content-Type: text/html; charset=utf-8');
@@ -17,7 +16,7 @@ if ($alreadyInstalled) {
         . '.box{border:1px solid #ddd;border-radius:8px;padding:1.5rem;}'
         . '.ok{color:#2e7d32;background:#e8f5e9;padding:1rem;border-radius:4px;}</style></head>'
         . '<body><div class="box"><h1>✅ OrinSec ya está instalado</h1>'
-        . '<p class="ok">El sistema ya está configurado. Si necesitas reinstalar, elimina <code>data/orinsec.db</code> y este mensaje desaparecerá.</p>'
+        . '<p class="ok">El sistema ya está configurado. Si necesitas reinstalar, elimina <code>data/orinsec.db</code> y <code>data/.installed</code>.</p>'
         . '<p><a href="login.php">Ir al login</a></p></div></body></html>';
     exit;
 }
@@ -29,64 +28,78 @@ $success = false;
 $message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    try {
-        $db = Database::getInstance();
+    // Validar CSRF
+    $token = $_POST['csrf_token'] ?? '';
+    if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
+        $error = 'Token de seguridad inválido. Recarga la página.';
+    } else {
+        try {
+            $adminUser = validateInput($_POST['admin_user'] ?? '', 64);
+            $adminPass = $_POST['admin_pass'] ?? '';
+            
+            if (!$adminUser || strlen($adminUser) < 3) {
+                throw new RuntimeException('Usuario inválido (mínimo 3 caracteres, solo letras, números, guiones y puntos)');
+            }
+            if ($adminPass !== '' && strlen($adminPass) < 8) {
+                throw new RuntimeException('La contraseña debe tener al menos 8 caracteres');
+            }
+            if ($adminPass === '') {
+                $adminPass = generateSecureToken(16);
+            }
 
-        $db->exec("CREATE TABLE IF NOT EXISTS tasks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            task_type TEXT NOT NULL,
-            input_data TEXT NOT NULL,
-            status TEXT DEFAULT 'pending',
-            result_html TEXT,
-            result_text TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            started_at DATETIME,
-            completed_at DATETIME,
-            error_message TEXT
-        )");
+            $db = Database::getInstance();
 
-        $db->exec("CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            is_admin INTEGER DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )");
+            $db->exec("CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_type TEXT NOT NULL,
+                input_data TEXT NOT NULL,
+                status TEXT DEFAULT 'pending',
+                result_html TEXT,
+                result_text TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                started_at DATETIME,
+                completed_at DATETIME,
+                error_message TEXT
+            )");
 
-        $db->exec("CREATE TABLE IF NOT EXISTS config (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        )");
+            $db->exec("CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                is_admin INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
 
-        $apiKey = generateSecureToken(32);
-        $db->prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)")
-           ->execute(['api_key', $apiKey]);
+            $db->exec("CREATE TABLE IF NOT EXISTS config (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )");
 
-        $version = '0.1.0';
-        $db->prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)")
-           ->execute(['version', $version]);
+            $apiKey = generateSecureToken(32);
+            $db->prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)")
+               ->execute(['api_key', $apiKey]);
 
-        $adminUser = $_POST['admin_user'] ?? 'admin';
-        $adminPass = $_POST['admin_pass'] ?? generateSecureToken(16);
-        $hash = password_hash($adminPass, PASSWORD_BCRYPT);
-        
-        $db->prepare("INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)")
-           ->execute([$adminUser, $hash]);
+            $version = '0.1.0';
+            $db->prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)")
+               ->execute(['version', $version]);
 
-        // Crear archivo de bloqueo
-        file_put_contents($lockFile, date('c'));
+            $hash = password_hash($adminPass, PASSWORD_BCRYPT);
+            $db->prepare("INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)")
+               ->execute([$adminUser, $hash]);
 
-        // Intentar auto-renombrar install.php para inaccesibilidad total
-        $self = __FILE__;
-        $renamed = @rename($self, $self . '.bak');
+            file_put_contents($lockFile, date('c'));
 
-        $success = true;
-        $message = "Instalación completada. API Key: {$apiKey}. Usuario admin: {$adminUser} / {$adminPass}";
-        if (!$renamed) {
-            $message .= "\nNota: No se pudo renombrar install.php automáticamente. Por seguridad, renómbralo manualmente a install.php.bak";
+            $self = __FILE__;
+            $renamed = @rename($self, $self . '.bak');
+
+            $success = true;
+            $message = "Instalación completada. API Key: {$apiKey}. Usuario admin: {$adminUser} / {$adminPass}";
+            if (!$renamed) {
+                $message .= "\nNota: No se pudo renombrar install.php automáticamente. Por seguridad, renómbralo manualmente a install.php.bak";
+            }
+        } catch (Exception $e) {
+            $error = $e->getMessage();
         }
-    } catch (Exception $e) {
-        $error = $e->getMessage();
     }
 }
 ?>
@@ -117,10 +130,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <p class="err">Error: <?php echo htmlspecialchars($error); ?></p>
             <?php endif; ?>
             <form method="POST">
+                <?php echo csrfInput(); ?>
                 <label>Usuario administrador</label>
-                <input type="text" name="admin_user" value="admin" required>
+                <input type="text" name="admin_user" value="admin" required maxlength="64" pattern="[\w\-.@]+" title="Letras, números, guiones, puntos y @">
                 <label>Contraseña administrador</label>
-                <input type="password" name="admin_pass" placeholder="Dejar en blanco para generar aleatoria">
+                <input type="password" name="admin_pass" placeholder="Dejar en blanco para generar aleatoria (mín. 8 chars)">
                 <button type="submit">Instalar</button>
             </form>
         <?php endif; ?>

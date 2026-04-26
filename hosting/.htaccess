@@ -4,7 +4,7 @@
     Deny from all
 </FilesMatch>
 
-<FilesMatch "\.(db|sqlite|sqlite3|log|ini)$">
+<FilesMatch "\.(db|sqlite|sqlite3|log|ini|bak)$">
     Order allow,deny
     Deny from all
 </FilesMatch>
@@ -12,22 +12,25 @@
 # Deshabilitar listado de directorios
 Options -Indexes
 
-# Rewrite para URLs limpias (opcional, preparado para futuro)
-RewriteEngine On
-RewriteBase /
+# Ocultar versión PHP
+php_flag expose_php off
 
-# Si el archivo/directorio no existe, redirigir a index.php (futuro)
-# RewriteCond %{REQUEST_FILENAME} !-f
-# RewriteCond %{REQUEST_FILENAME} !-d
-# RewriteRule ^(.*)$ index.php [QSA,L]
-
-# Seguridad headers
+# Headers de seguridad
 <IfModule mod_headers.c>
     Header always set X-Frame-Options "SAMEORIGIN"
     Header always set X-Content-Type-Options "nosniff"
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set X-XSS-Protection "1; mode=block"
+    
+    # CSP restrictivo (ajustar si se rompe algo)
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self';"
+    
+    # HSTS (descomentar cuando tengas HTTPS forzado y probado)
+    # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
 </IfModule>
 
 # PHP settings
 php_value upload_max_filesize 10M
 php_value post_max_size 10M
+php_value max_execution_time 30
+php_value memory_limit 128M
