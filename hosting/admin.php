@@ -180,7 +180,7 @@ require __DIR__ . '/templates/header.php';
 
     <h3 class="mt-4">📡 Enviar comando a worker</h3>
     <p class="small">Los comandos se ejecutan en el próximo ciclo de polling del worker.</p>
-    <form method="POST" action="ajax_admin.php?action=send_worker_command" onsubmit="return sendWorkerCmd(this);">
+    <form method="POST" action="ajax_admin.php?action=send_worker_command" onsubmit="return sendWorkerCmd(this);" id="worker-cmd-form">
         <?php echo csrfInput(); ?>
         <label>Worker</label>
         <select name="api_key_id" required>
@@ -190,15 +190,35 @@ require __DIR__ . '/templates/header.php';
             <?php endforeach; ?>
         </select>
         <label>Comando</label>
-        <select name="command" required>
+        <select name="command" required id="cmd-select" onchange="toggleModelSelect()">
             <option value="change_model">Cambiar modelo</option>
             <option value="restart">Reiniciar worker</option>
         </select>
-        <label>Payload (JSON opcional)</label>
-        <input type="text" name="payload" placeholder='{"model":"qwen3-4b.gguf"}'>
+        <div id="model-select-wrap">
+            <label>Modelo</label>
+            <select id="model-select" onchange="updatePayload()">
+                <option value="Qwen3.5-4B-Q4_K_M.gguf">Qwen 3.5 — 4B (calidad alta, lento)</option>
+                <option value="Phi-4-mini-instruct-Q4_K_M.gguf">Phi-4 Mini — 3.8B (rápido, español decente)</option>
+                <option value="gemma-4-E2B-it-Q4_K_M.gguf">Gemma 2B — 2B (muy rápido, español mediocre)</option>
+            </select>
+            <p class="small" style="color:var(--warning);">⚠️ Este comando solo edita el config.ini del worker. <strong>Tenés que reiniciar manualmente llama-server</strong> en el Orin Nano para cargar el nuevo modelo.</p>
+        </div>
+        <input type="hidden" name="payload" id="cmd-payload" value='{"model":"Qwen3.5-4B-Q4_K_M.gguf"}'>
         <button type="submit" class="mt-2">📤 Enviar comando</button>
     </form>
     <p id="cmd-msg" class="mt-1"></p>
+    <script>
+    function toggleModelSelect() {
+        const cmd = document.getElementById('cmd-select').value;
+        const wrap = document.getElementById('model-select-wrap');
+        wrap.style.display = cmd === 'change_model' ? 'block' : 'none';
+    }
+    function updatePayload() {
+        const model = document.getElementById('model-select').value;
+        document.getElementById('cmd-payload').value = JSON.stringify({model: model});
+    }
+    toggleModelSelect();
+    </script>
 
     <?php elseif ($tab === 'users'): ?>
     <h3>Usuarios registrados</h3>
