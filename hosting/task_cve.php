@@ -66,7 +66,14 @@ try {
         "SELECT * FROM worker_heartbeats ORDER BY created_at DESC LIMIT 1"
     );
     if ($worker && !empty($worker['created_at'])) {
-        $workerOnline = (time() - strtotime($worker['created_at'])) < 180;
+        // SQLite stores CURRENT_TIMESTAMP in UTC; force UTC comparison
+        try {
+            $heartbeatTime = new DateTime($worker['created_at'], new DateTimeZone('UTC'));
+            $now = new DateTime('now', new DateTimeZone('UTC'));
+            $workerOnline = ($now->getTimestamp() - $heartbeatTime->getTimestamp()) < 180;
+        } catch (Exception $e) {
+            $workerOnline = false;
+        }
     }
 } catch (Exception $e) {
     $worker = null;
@@ -230,10 +237,10 @@ require __DIR__ . '/templates/header.php';
                     <td class="status-<?php echo $t['status']; ?>"><?php echo ucfirst(htmlspecialchars($t['status'])); ?></td>
                     <td class="small"><?php echo htmlspecialchars($t['created_at']); ?></td>
                     <td>
-                        <?php if ($t['status'] === 'completed' || $t['status'] === 'error'): ?>
+                        <?php if ($t['status'] === 'completed' || $t['status'] === 'error' || $t['status'] === 'cancelled'): ?>
                             <a href="task_result.php?id=<?php echo $t['id']; ?>">Ver</a>
                         <?php else: ?>
-                            <span class="small">Esperando...</span>
+                            <button type="button" class="btn small danger" onclick="cancelTask(<?php echo $t['id']; ?>, '<?php echo $_SESSION['csrf_token']; ?>')">Cancelar</button>
                         <?php endif; ?>
                     </td>
                 </tr>
@@ -256,4 +263,23 @@ require __DIR__ . '/templates/header.php';
 </div>
 <?php endif; ?>
 
+<script>
+function cancelTask(taskId, csrfToken) {
+    if (!confirm('¿Cancelar tarea #' + taskId + '?')) return;
+    fetch('api/v1/task_cancel.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({task_id: taskId, csrf_token: csrfToken})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'No se pudo cancelar'));
+        }
+    })
+    .catch(err => alert('Error de red: ' + err));
+}
+</script>
 <?php require __DIR__ . '/templates/footer.php'; ?>

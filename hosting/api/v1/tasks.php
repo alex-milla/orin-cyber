@@ -24,6 +24,13 @@ Database::query("UPDATE api_keys SET last_used = ? WHERE id = ?", [date('Y-m-d H
 
 $action = $_GET['action'] ?? '';
 
+// Auto-timeout tareas atascadas en processing (>15 min sin respuesta)
+Database::query(
+    "UPDATE tasks SET status = 'error', error_message = ?
+     WHERE status = 'processing' AND started_at < datetime('now', '-15 minutes')",
+    ['Timeout: el worker no respondió dentro del tiempo límite (15 min)']
+);
+
 switch ($action) {
     case 'pending':
         $task = Database::fetchOne(
@@ -91,6 +98,32 @@ switch ($action) {
         jsonResponse(['success' => true, 'message' => 'Resultado recibido']);
         break;
 
+    case 'cancel':
+        $data = getJsonInput();
+        $taskId = filter_var($data['task_id'] ?? 0, FILTER_VALIDATE_INT);
+        
+        if ($taskId <= 0) {
+            jsonResponse(['error' => 'task_id requerido'], 400);
+        }
+        
+        $updated = Database::update(
+            'tasks',
+            [
+                'status' => 'cancelled',
+                'completed_at' => date('Y-m-d H:i:s'),
+                'error_message' => 'Cancelada por el usuario'
+            ],
+            'id = ? AND status IN (?, ?)',
+            [$taskId, 'pending', 'processing']
+        );
+        
+        if ($updated === 0) {
+            jsonResponse(['error' => 'Tarea no encontrada o ya finalizada'], 409);
+        }
+        
+        jsonResponse(['success' => true, 'message' => 'Tarea cancelada']);
+        break;
+
     default:
-        jsonResponse(['error' => 'Acción no válida. Use pending, claim o result'], 400);
+        jsonResponse(['error' => 'Acción no válida. Use pending, claim, result o cancel'], 400);
 }

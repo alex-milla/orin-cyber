@@ -102,16 +102,16 @@ def _restart_llama_server(config: configparser.ConfigParser, model: str, logger:
             start_new_session=True,
         )
 
-        # Wait for server to be ready
-        logger.info("Esperando 10s a que llama-server esté listo...")
-        time.sleep(10)
+        # Wait for server to be ready (poll every 2s, up to 60s)
+        logger.info("Esperando a que llama-server esté listo...")
+        for attempt in range(1, 31):
+            time.sleep(2)
+            if _llama_server_is_ready(host, port):
+                logger.info("llama-server listo y respondiendo después de %ds.", attempt * 2)
+                return True
+            logger.debug("llama-server aún no responde (intento %d/30)", attempt)
 
-        # Verify server is responding
-        if _llama_server_is_ready(host, port):
-            logger.info("llama-server listo y respondiendo.")
-            return True
-
-        logger.warning("llama-server iniciado pero no responde aún. El worker se reiniciará de todos modos.")
+        logger.warning("llama-server iniciado pero no responde después de 60s. El worker continuará de todos modos.")
         return True
 
     except Exception as exc:
