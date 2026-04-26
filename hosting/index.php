@@ -7,12 +7,17 @@ require_once __DIR__ . '/includes/auth.php';
 
 requireAuth();
 
-$tasks = Database::fetchAll(
-    "SELECT id, task_type, status, created_at, completed_at 
-     FROM tasks 
-     ORDER BY created_at DESC 
-     LIMIT 20"
-);
+$tasks = [];
+try {
+    $tasks = Database::fetchAll(
+        "SELECT id, task_type, status, created_at, completed_at 
+         FROM tasks 
+         ORDER BY created_at DESC 
+         LIMIT 20"
+    );
+} catch (Exception $e) {
+    $tasks = [];
+}
 
 $pageTitle = 'Dashboard — OrinSec';
 require __DIR__ . '/templates/header.php';

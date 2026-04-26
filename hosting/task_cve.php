@@ -46,23 +46,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // --- Worker status widget data ---
-$worker = Database::fetchOne(
-    "SELECT * FROM worker_heartbeats ORDER BY timestamp DESC LIMIT 1"
-);
+$worker = null;
 $workerOnline = false;
-if ($worker && !empty($worker['timestamp'])) {
-    $workerOnline = (time() - strtotime($worker['timestamp'])) < 90;
+try {
+    $worker = Database::fetchOne(
+        "SELECT * FROM worker_heartbeats ORDER BY timestamp DESC LIMIT 1"
+    );
+    if ($worker && !empty($worker['timestamp'])) {
+        $workerOnline = (time() - strtotime($worker['timestamp'])) < 90;
+    }
+} catch (Exception $e) {
+    $worker = null;
 }
 
 // --- CVE search history ---
-$cveHistory = Database::fetchAll(
-    "SELECT id, status, created_at FROM tasks WHERE task_type='cve_search' ORDER BY created_at DESC LIMIT 20"
-);
+$cveHistory = [];
+try {
+    $cveHistory = Database::fetchAll(
+        "SELECT id, status, created_at FROM tasks WHERE task_type='cve_search' ORDER BY created_at DESC LIMIT 20"
+    );
+} catch (Exception $e) {
+    $cveHistory = [];
+}
 
 // --- Recent CVE IDs (from completed tasks) ---
-$recentCveRows = Database::fetchAll(
-    "SELECT input_data FROM tasks WHERE task_type='cve_search' AND status='completed' ORDER BY created_at DESC LIMIT 30"
-);
+$recentCveRows = [];
+try {
+    $recentCveRows = Database::fetchAll(
+        "SELECT input_data FROM tasks WHERE task_type='cve_search' AND status='completed' ORDER BY created_at DESC LIMIT 30"
+    );
+} catch (Exception $e) {
+    $recentCveRows = [];
+}
 $recentCves = [];
 foreach ($recentCveRows as $row) {
     $data = json_decode($row['input_data'] ?? '{}', true);
