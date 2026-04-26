@@ -4,7 +4,7 @@ import re
 
 
 def markdown_to_html(text: str) -> str:
-    """Convierte markdown básico a HTML seguro."""
+    """Convierte markdown básico a HTML seguro y compacto."""
     text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     text = re.sub(r"^### (.+)$", r"<h3>\1</h3>", text, flags=re.MULTILINE)
@@ -15,6 +15,7 @@ def markdown_to_html(text: str) -> str:
     text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
     text = re.sub(r"\*(.+?)\*", r"<em>\1</em>", text)
 
+    # Procesar listas
     lines = text.split("\n")
     new_lines = []
     in_list = False
@@ -34,15 +35,29 @@ def markdown_to_html(text: str) -> str:
         new_lines.append("</ul>")
     text = "\n".join(new_lines)
 
-    def para_repl(match):
-        line = match.group(0)
-        if line.startswith("<"):
-            return line
-        return f"<p>{line}</p>"
+    # Agrupar líneas consecutivas de texto en un solo <p>
+    paragraphs = []
+    current_para = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            if current_para:
+                paragraphs.append("<p>" + " ".join(current_para) + "</p>")
+                current_para = []
+            paragraphs.append("")
+        elif stripped.startswith("<"):
+            if current_para:
+                paragraphs.append("<p>" + " ".join(current_para) + "</p>")
+                current_para = []
+            paragraphs.append(stripped)
+        else:
+            current_para.append(stripped)
+    if current_para:
+        paragraphs.append("<p>" + " ".join(current_para) + "</p>")
 
-    text = re.sub(r"^(?!<)(.+)$", para_repl, text, flags=re.MULTILINE)
-    text = text.replace("\n\n", "\n")
+    text = "\n".join(paragraphs)
 
+    # Enlaces markdown
     text = re.sub(
         r'\[([^\]]+)\]\(([^)]+)\)',
         r'<a href="\2" target="_blank" rel="noopener">\1</a>',

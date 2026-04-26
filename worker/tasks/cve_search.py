@@ -118,20 +118,20 @@ class CveSearchTask(BaseTask):
             user_prompt=f"Analiza los siguientes datos de CVEs. Primero traduce la descripción al español, luego genera el informe estructurado.\n\nDatos estructurados:\n{context}",
         )
 
-        # Extraer traducción del output del LLM para usarla en el header HTML
+        # Extraer traducción del output del LLM (sección CONTEXTO)
         import re
         first_enriched = enriched[0] if enriched else {}
         cve_data = first_enriched.get("cve", {})
         desc_translated = None
         if report_text:
-            match = re.search(r'\[DESCRIPCION_ES\]\s*(.*?)\s*\[/DESCRIPCION_ES\]', report_text, re.DOTALL)
+            # Buscar "CONTEXTO\n" y tomar las siguientes 1-3 líneas no vacías
+            match = re.search(r'CONTEXTO\s*\n+((?:.+\n){1,3})', report_text, re.IGNORECASE)
             if match:
-                desc_translated = match.group(1).strip()
-                # Remover el bloque del report_text para no duplicar
-                report_text = re.sub(r'\[DESCRIPCION_ES\]\s*.*?\s*\[/DESCRIPCION_ES\]\s*', '', report_text, count=1, flags=re.DOTALL).strip()
+                lines = [l.strip() for l in match.group(1).splitlines() if l.strip()]
+                desc_translated = " ".join(lines[:3])
                 logger.info("Extracted Spanish description (%s chars)", len(desc_translated))
             else:
-                logger.info("No [DESCRIPCION_ES] block found in LLM output")
+                logger.info("No CONTEXTO section found in LLM output")
 
         # Guardar traducción en el dict del CVE para el formatter
         if desc_translated:
