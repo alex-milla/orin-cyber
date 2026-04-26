@@ -5,11 +5,30 @@ require_once __DIR__ . '/includes/config.php';
 require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/functions.php';
 
+$lockFile = DATA_DIR . '/.installed';
+$alreadyInstalled = file_exists(DB_PATH) || file_exists($lockFile);
+
+// Si ya está instalado, bloquear acceso
+if ($alreadyInstalled) {
+    http_response_code(403);
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Instalación completada</title>'
+        . '<style>body{font-family:system-ui,sans-serif;max-width:600px;margin:3rem auto;padding:0 1rem;text-align:center;}'
+        . '.box{border:1px solid #ddd;border-radius:8px;padding:1.5rem;}'
+        . '.ok{color:#2e7d32;background:#e8f5e9;padding:1rem;border-radius:4px;}</style></head>'
+        . '<body><div class="box"><h1>✅ OrinSec ya está instalado</h1>'
+        . '<p class="ok">El sistema ya está configurado. Si necesitas reinstalar, elimina <code>data/orinsec.db</code> y este mensaje desaparecerá.</p>'
+        . '<p><a href="login.php">Ir al login</a></p></div></body></html>';
+    exit;
+}
+
 header('Content-Type: text/html; charset=utf-8');
 
-$installed = file_exists(DB_PATH);
+$error = '';
+$success = false;
+$message = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$installed) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $db = Database::getInstance();
 
@@ -54,8 +73,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$installed) {
         $db->prepare("INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)")
            ->execute([$adminUser, $hash]);
 
+        // Crear archivo de bloqueo
+        file_put_contents($lockFile, date('c'));
+
+        // Intentar auto-renombrar install.php para inaccesibilidad total
+        $self = __FILE__;
+        $renamed = @rename($self, $self . '.bak');
+
         $success = true;
         $message = "Instalación completada. API Key: {$apiKey}. Usuario admin: {$adminUser} / {$adminPass}";
+        if (!$renamed) {
+            $message .= "\nNota: No se pudo renombrar install.php automáticamente. Por seguridad, renómbralo manualmente a install.php.bak";
+        }
     } catch (Exception $e) {
         $error = $e->getMessage();
     }
@@ -71,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$installed) {
         .box { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; }
         input { width: 100%; padding: .5rem; margin: .5rem 0 1rem; box-sizing: border-box; }
         button { padding: .6rem 1.2rem; cursor: pointer; }
-        .ok { color: #2e7d32; background: #e8f5e9; padding: 1rem; border-radius: 4px; }
+        .ok { color: #2e7d32; background: #e8f5e9; padding: 1rem; border-radius: 4px; word-break: break-all; }
         .err { color: #c62828; background: #ffebee; padding: 1rem; border-radius: 4px; }
         code { background: #f5f5f5; padding: .2rem .4rem; border-radius: 3px; word-break: break-all; }
     </style>
@@ -79,14 +108,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$installed) {
 <body>
     <div class="box">
         <h1>🛠️ Instalación OrinSec</h1>
-        <?php if ($installed): ?>
-            <p class="ok">La base de datos ya existe. No es necesario reinstalar.</p>
-        <?php elseif (isset($success)): ?>
-            <p class="ok"><?php echo htmlspecialchars($message); ?></p>
+        <?php if ($success): ?>
+            <p class="ok"><?php echo nl2br(htmlspecialchars($message)); ?></p>
             <p><strong>Guarda la API key y las credenciales. No se mostrarán de nuevo.</strong></p>
             <p><a href="login.php">Ir al login</a></p>
         <?php else: ?>
-            <?php if (isset($error)): ?>
+            <?php if ($error): ?>
                 <p class="err">Error: <?php echo htmlspecialchars($error); ?></p>
             <?php endif; ?>
             <form method="POST">
