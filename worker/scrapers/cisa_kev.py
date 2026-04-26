@@ -7,7 +7,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-CISA_KEV_URL = "https://api.cisa.gov/known-exploited-vulnerabilities/catalog"
+CISA_KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 
 # Cache en memoria del catálogo completo (se refresca al reiniciar el worker)
 _kev_cache: Optional[dict] = None
