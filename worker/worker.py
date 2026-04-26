@@ -9,6 +9,8 @@ import configparser
 import json
 import logging
 import os
+import shutil
+import subprocess
 import sys
 import time
 from typing import Optional
@@ -42,6 +44,83 @@ def setup_logging(config: configparser.ConfigParser) -> None:
     )
 
 
+def _restart_llama_server(config: configparser.ConfigParser, model: str, logger: logging.Logger) -> bool:
+    """Mata llama-server existente y levanta uno nuevo con el modelo indicado."""
+    try:
+        exe = config.get("llama_server", "executable_path", fallback="llama-server")
+        models_dir = config.get("llama_server", "models_dir", fallback="./models/")
+        ctx = config.get("llama_server", "context_size", fallback="8192")
+        host = config.get("llama_server", "host", fallback="0.0.0.0")
+        port = config.get("llama_server", "port", fallback="8080")
+        extra = config.get("llama_server", "extra_args", fallback="")
+
+        # Resolve executable path
+        if not os.path.isabs(exe):
+            resolved = shutil.which(exe)
+            if resolved:
+                exe = resolved
+            elif os.path.exists(os.path.join(BASE_DIR, exe)):
+                exe = os.path.join(BASE_DIR, exe)
+
+        model_path = os.path.join(models_dir, model)
+        if not os.path.isabs(model_path):
+            model_path = os.path.join(BASE_DIR, model_path)
+
+        if not os.path.exists(model_path):
+            logger.error("Modelo no encontrado: %s", model_path)
+            return False
+
+        # Kill existing llama-server
+        logger.info("Matando llama-server existente...")
+        subprocess.run(["pkill", "-f", "llama-server"], capture_output=True)
+        time.sleep(2)
+
+        # Build args
+        args = [exe, "-m", model_path, "-c", ctx, "--host", host, "--port", port]
+        if extra:
+            args.extend(extra.split())
+
+        # Start new llama-server
+        logger.info("Iniciando llama-server: %s", " ".join(args))
+        subprocess.Popen(
+            args,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+
+        # Wait for server to be ready
+        logger.info("Esperando 10s a que llama-server esté listo...")
+        time.sleep(10)
+
+        # Verify server is responding
+        import requests
+        health_url = f"http://{host}:{port}/health"
+        try:
+            resp = requests.get(health_url, timeout=5)
+            if resp.status_code == 200:
+                logger.info("llama-server listo y respondiendo.")
+                return True
+        except Exception:
+            pass
+
+        # Fallback: try /v1/models endpoint
+        try:
+            resp = requests.get(f"http://{host}:{port}/v1/models", timeout=5)
+            if resp.status_code == 200:
+                logger.info("llama-server listo y respondiendo.")
+                return True
+        except Exception:
+            pass
+
+        logger.warning("llama-server iniciado pero no responde aún. El worker se reiniciará de todos modos.")
+        return True
+
+    except Exception as exc:
+        logger.exception("Error reiniciando llama-server: %s", exc)
+        return False
+
+
 def apply_command(config_path: str, command: dict, logger: logging.Logger) -> bool:
     """Procesa un comando recibido del hosting. Retorna True si requiere reinicio."""
     cmd = command.get("command")
@@ -65,8 +144,15 @@ def apply_command(config_path: str, command: dict, logger: logging.Logger) -> bo
         with open(config_path, "w", encoding="utf-8") as f:
             config.write(f)
 
-        logger.info("Modelo cambiado: %s → %s. Reiniciando worker.", old_model, model)
-        return True
+        logger.info("Modelo cambiado en config: %s → %s", old_model, model)
+
+        # Restart llama-server with new model
+        if _restart_llama_server(config, model, logger):
+            logger.info("Reiniciando worker para aplicar nuevo modelo.")
+            return True
+        else:
+            logger.error("No se pudo reiniciar llama-server. Modelo guardado en config pero el servidor no cambió.")
+            return False
 
     logger.warning("Comando desconocido: %s", cmd)
     return False
