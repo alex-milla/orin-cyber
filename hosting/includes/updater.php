@@ -19,10 +19,30 @@ class Updater {
         '.htaccess',
     ];
 
+    private ?string $githubPat = null;
+
     public function __construct() {
         $this->apiUrl = "https://api.github.com/repos/{$this->repoOwner}/{$this->repoName}/releases/latest";
         $this->tempDir = sys_get_temp_dir() . '/orinsec_update_' . uniqid();
         $this->backupDir = DATA_DIR . '/backups';
+        
+        $patRow = Database::fetchOne("SELECT value FROM config WHERE key = 'github_pat'");
+        $this->githubPat = $patRow['value'] ?? null;
+    }
+
+    private function httpContext(array $extra = []): array {
+        $headers = 'User-Agent: OrinSec-Updater';
+        if ($this->githubPat) {
+            $headers .= "\r\nAuthorization: Bearer {$this->githubPat}";
+        }
+        $ctx = [
+            'http' => array_merge([
+                'header' => $headers,
+                'timeout' => 30,
+                'follow_location' => true,
+            ], $extra)
+        ];
+        return $ctx;
     }
 
     /**
@@ -37,13 +57,7 @@ class Updater {
      * Obtiene información de la última release en GitHub
      */
     public function getRemoteVersion(): array {
-        $ctx = stream_context_create([
-            'http' => [
-                'header' => 'User-Agent: OrinSec-Updater',
-                'timeout' => 10,
-                'follow_location' => true,
-            ]
-        ]);
+        $ctx = stream_context_create($this->httpContext(['timeout' => 10]));
         $raw = @file_get_contents($this->apiUrl, false, $ctx);
         if (!$raw) {
             return ['error' => 'No se pudo contactar con GitHub o no hay releases disponibles'];
@@ -106,13 +120,7 @@ class Updater {
             mkdir($this->tempDir, 0755, true);
         }
         $zipFile = $this->tempDir . '/update.zip';
-        $ctx = stream_context_create([
-            'http' => [
-                'header' => 'User-Agent: OrinSec-Updater',
-                'timeout' => 60,
-                'follow_location' => true,
-            ]
-        ]);
+        $ctx = stream_context_create($this->httpContext(['timeout' => 60]));
         $data = @file_get_contents($zipUrl, false, $ctx);
         if ($data === false) {
             throw new RuntimeException('No se pudo descargar la release desde GitHub');

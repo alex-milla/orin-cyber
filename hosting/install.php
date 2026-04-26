@@ -100,6 +100,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $version = '0.1.0';
             $db->prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)")
                ->execute(['version', $version]);
+            $db->prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)")
+               ->execute(['github_pat', '']);
 
             $hash = password_hash($adminPass, PASSWORD_BCRYPT);
             $db->prepare("INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)")

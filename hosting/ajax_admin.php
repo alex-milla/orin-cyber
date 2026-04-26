@@ -36,6 +36,15 @@ switch ($action) {
         }
         break;
 
+    case 'save_github_pat':
+        $pat = trim($_POST['pat'] ?? '');
+        if ($pat !== '' && !preg_match('/^gh[pousr]_[A-Za-z0-9_]{36,251}$/', $pat)) {
+            jsonResponse(['error' => 'El token no tiene el formato válido de un GitHub PAT'], 400);
+        }
+        Database::query("INSERT OR REPLACE INTO config (key, value) VALUES ('github_pat', ?)", [$pat]);
+        jsonResponse(['success' => true]);
+        break;
+
     case 'toggle_registration':
         $current = Database::fetchOne("SELECT value FROM config WHERE key = 'allow_registration'");
         $newValue = ($current && $current['value'] === '1') ? '0' : '1';
