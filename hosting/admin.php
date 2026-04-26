@@ -229,28 +229,42 @@ function log(msg) {
 
 async function checkUpdate() {
     document.getElementById('btn-check').disabled = true;
-    const resp = await fetch('ajax_update.php?action=check');
-    const data = await resp.json();
-    document.getElementById('btn-check').disabled = false;
+    try {
+        const resp = await fetch('ajax_update.php?action=check');
+        const text = await resp.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            document.getElementById('remote-version').textContent = 'Error';
+            document.getElementById('remote-message').textContent = 'Respuesta inválida del servidor. ¿Sesión caducada? Recarga la página.';
+            return;
+        }
 
-    if (data.error) {
+        if (data.error) {
+            document.getElementById('remote-version').textContent = 'Error';
+            document.getElementById('remote-message').textContent = data.error;
+            return;
+        }
+
+        remoteInfo = data;
+        document.getElementById('remote-version').textContent = data.tag + ' — ' + data.name;
+        document.getElementById('remote-message').textContent = 'Publicada: ' + data.published;
+        if (data.body) {
+            document.getElementById('remote-message').textContent += ' | ' + data.body.substring(0, 200) + (data.body.length > 200 ? '...' : '');
+        }
+
+        const current = document.getElementById('current-version').textContent;
+        if (current !== data.tag) {
+            document.getElementById('btn-update').style.display = 'inline-block';
+        } else {
+            document.getElementById('remote-message').textContent += ' — ✅ Estás en la última versión.';
+        }
+    } catch (err) {
         document.getElementById('remote-version').textContent = 'Error';
-        document.getElementById('remote-message').textContent = data.error;
-        return;
-    }
-
-    remoteInfo = data;
-    document.getElementById('remote-version').textContent = data.tag + ' — ' + data.name;
-    document.getElementById('remote-message').textContent = 'Publicada: ' + data.published;
-    if (data.body) {
-        document.getElementById('remote-message').textContent += ' | ' + data.body.substring(0, 200) + (data.body.length > 200 ? '...' : '');
-    }
-
-    const current = document.getElementById('current-version').textContent;
-    if (current !== data.tag) {
-        document.getElementById('btn-update').style.display = 'inline-block';
-    } else {
-        document.getElementById('remote-message').textContent += ' — ✅ Estás en la última versión.';
+        document.getElementById('remote-message').textContent = 'No se pudo conectar con el servidor: ' + err.message;
+    } finally {
+        document.getElementById('btn-check').disabled = false;
     }
 }
 

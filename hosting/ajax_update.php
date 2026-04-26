@@ -7,17 +7,18 @@ require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/updater.php';
 
-requireAdmin();
+try {
+    requireAdmin();
 
-$action = $_GET['action'] ?? '';
-$updater = new Updater();
+    $action = $_GET['action'] ?? '';
+    $updater = new Updater();
 
-if (!isset($_SESSION['update_state'])) {
-    $_SESSION['update_state'] = [];
-}
+    if (!isset($_SESSION['update_state'])) {
+        $_SESSION['update_state'] = [];
+    }
 
-// Nota: requireAdmin() ya verifica la sesión. El CSRF adicional está
-// desactivado en el updater porque las peticiones son cross-AJAX con
+    // Nota: requireAdmin() ya verifica la sesión. El CSRF adicional está
+    // desactivado en el updater porque las peticiones son cross-AJAX con
 // credenciales de sesión y el origin es el mismo dominio.
 
 function validateBackupName(string $name): ?string {
@@ -119,4 +120,7 @@ switch ($action) {
 
     default:
         jsonResponse(['error' => 'Acción no válida'], 400);
+}
+} catch (Throwable $e) {
+    jsonResponse(['error' => 'Error interno: ' . $e->getMessage()], 500);
 }
