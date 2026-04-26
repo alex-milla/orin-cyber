@@ -29,7 +29,6 @@ $error = '';
 $success = false;
 $showGeneratedPassword = false;
 $generatedPassword = '';
-$apiKey = '';
 $adminUser = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -85,9 +84,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 value TEXT NOT NULL
             )");
 
-            $apiKey = generateSecureToken(32);
+            // Generar API key inicial (se gestiona desde panel admin)
             $db->prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)")
-               ->execute(['api_key', $apiKey]);
+               ->execute(['api_key', generateSecureToken(32)]);
 
             $version = '0.1.0';
             $db->prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)")
@@ -108,6 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+?>
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -137,9 +137,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php else: ?>
                 <p class="small">Usa la contraseña que introdujiste para iniciar sesión.</p>
             <?php endif; ?>
-            <p><strong>API Key:</strong></p>
-            <code><?php echo htmlspecialchars($apiKey); ?></code>
-            <p class="small">Guarda la API key. Debes configurarla en <code>worker/config.ini</code>.</p>
             <p><a href="login.php"><button>Ir al login</button></a></p>
         <?php else: ?>
             <?php if ($error): ?>
