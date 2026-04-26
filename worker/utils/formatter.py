@@ -90,7 +90,7 @@ def render_cve_report(enriched: list, llm_text: str) -> str:
     priority = first.get("priority", "D")
 
     cve_id = cve.get("cve_id", "Unknown")
-    desc = cve.get("description", "Sin descripción")
+    desc = cve.get("description_es") or cve.get("description", "Sin descripción")
     score = cve.get("score")
     severity = cve.get("severity", "N/A")
     vector = cve.get("vector", "")

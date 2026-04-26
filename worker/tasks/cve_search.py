@@ -82,18 +82,26 @@ class CveSearchTask(BaseTask):
                 "result_text": "No se encontraron CVEs con los criterios indicados.",
             }
 
+        # ── Traducir descripciones al español (top 3 en modo búsqueda, todos en modo ID) ──
+        max_translate = len(cves) if cve_id else min(3, len(cves))
+        for idx, cve in enumerate(cves):
+            if idx < max_translate:
+                desc = cve.get("description", "")
+                if desc:
+                    cve["description_es"] = self.llm.translate(desc, target_lang="es", max_tokens=256)
+
         # ── Enriquecer cada CVE con datos adicionales ─────────────────────
         enriched = []
         for cve in cves:
             if not isinstance(cve, dict):
                 logger.warning("Skipping invalid CVE entry (not a dict): %s", cve)
                 continue
-            cve_id = cve.get("cve_id", "unknown")
-            logger.info("Enriching %s", cve_id)
+            cid = cve.get("cve_id", "unknown")
+            logger.info("Enriching %s", cid)
 
-            epss = get_epss(cve_id)
-            kev = get_kev(cve_id)
-            github = find_exploits(cve_id, max_results=5)
+            epss = get_epss(cid)
+            kev = get_kev(cid)
+            github = find_exploits(cid, max_results=5)
 
             priority = _calc_priority(
                 cve.get("score"),
