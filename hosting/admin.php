@@ -107,7 +107,13 @@ require __DIR__ . '/templates/header.php';
                     <td><?php echo htmlspecialchars($b['file']); ?></td>
                     <td><?php echo htmlspecialchars($b['size']); ?></td>
                     <td><?php echo htmlspecialchars($b['date']); ?></td>
-                    <td><button class="secondary" onclick="doRollback('<?php echo htmlspecialchars($b['file'], ENT_QUOTES); ?>')">↩️ Restaurar</button></td>
+                    <td>
+                        <div class="flex gap-1 flex-wrap">
+                            <a class="btn secondary" href="ajax_update.php?action=download_backup&file=<?php echo urlencode($b['file']); ?>">⬇️ Descargar</a>
+                            <button class="secondary" onclick="doRollback('<?php echo htmlspecialchars($b['file'], ENT_QUOTES); ?>')">↩️ Restaurar</button>
+                            <button class="secondary danger" onclick="deleteBackup('<?php echo htmlspecialchars($b['file'], ENT_QUOTES); ?>')">🗑️ Eliminar</button>
+                        </div>
+                    </td>
                 </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -445,6 +451,20 @@ async function addUser(form) {
     } else {
         msg.style.color = '#c62828';
         msg.textContent = data.error || 'Error al crear usuario';
+    }
+}
+
+async function deleteBackup(file) {
+    if (!confirm('¿Eliminar permanentemente ' + file + '? No se puede deshacer.')) return;
+    try {
+        const resp = await fetch('ajax_update.php?action=delete_backup&file=' + encodeURIComponent(file));
+        const text = await resp.text();
+        let d;
+        try { d = JSON.parse(text); } catch (e) { throw new Error('Respuesta inválida del servidor'); }
+        if (d.error) { alert('❌ ' + d.error); }
+        else { location.reload(); }
+    } catch (err) {
+        alert('❌ Error: ' + err.message);
     }
 }
 </script>

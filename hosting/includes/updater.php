@@ -283,6 +283,34 @@ class Updater {
         ], $files);
     }
 
+    /**
+     * Elimina un archivo de backup
+     */
+    public function deleteBackup(string $backupFile): void {
+        if (!file_exists($backupFile)) {
+            throw new RuntimeException('Archivo de backup no encontrado');
+        }
+        if (!unlink($backupFile)) {
+            throw new RuntimeException('No se pudo eliminar el backup');
+        }
+    }
+
+    /**
+     * Envía un backup al navegador para descarga
+     */
+    public function downloadBackup(string $backupFile): void {
+        if (!file_exists($backupFile)) {
+            throw new RuntimeException('Archivo de backup no encontrado');
+        }
+        $filename = basename($backupFile);
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Length: ' . filesize($backupFile));
+        header('Cache-Control: no-store');
+        readfile($backupFile);
+        exit;
+    }
+
     private function humanSize(int $bytes): string {
         $units = ['B','KB','MB','GB'];
         $u = 0;

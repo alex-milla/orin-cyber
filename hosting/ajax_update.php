@@ -118,6 +118,35 @@ switch ($action) {
         }
         break;
 
+    case 'delete_backup':
+        try {
+            $file = $_GET['file'] ?? '';
+            $valid = validateBackupName(basename($file));
+            if (!$valid) {
+                jsonResponse(['error' => 'Nombre de backup inválido'], 400);
+            }
+            $file = DATA_DIR . '/backups/' . $valid;
+            $updater->deleteBackup($file);
+            jsonResponse(['success' => true]);
+        } catch (Exception $e) {
+            jsonResponse(['error' => $e->getMessage()], 500);
+        }
+        break;
+
+    case 'download_backup':
+        try {
+            $file = $_GET['file'] ?? '';
+            $valid = validateBackupName(basename($file));
+            if (!$valid) {
+                jsonResponse(['error' => 'Nombre de backup inválido'], 400);
+            }
+            $file = DATA_DIR . '/backups/' . $valid;
+            $updater->downloadBackup($file);
+        } catch (Exception $e) {
+            jsonResponse(['error' => $e->getMessage()], 500);
+        }
+        break;
+
     default:
         jsonResponse(['error' => 'Acción no válida'], 400);
 }
