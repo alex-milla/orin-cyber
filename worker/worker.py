@@ -67,6 +67,14 @@ def _restart_llama_server(config: configparser.ConfigParser, model: str, logger:
         port = config.get("llama_server", "port", fallback="8080")
         extra = config.get("llama_server", "extra_args", fallback="")
 
+        # Buscar config específica del modelo
+        model_name = os.path.splitext(model)[0]
+        model_section = f"model_{model_name}"
+        if model_section in config.sections():
+            ctx = config.get(model_section, "context_size", fallback=ctx)
+            extra = config.get(model_section, "extra_args", fallback=extra)
+            logger.info("Usando config específica del modelo: %s (ctx=%s)", model_section, ctx)
+
         # Resolve executable path
         if not os.path.isabs(exe):
             resolved = shutil.which(exe)

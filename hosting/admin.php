@@ -206,6 +206,8 @@ require __DIR__ . '/templates/header.php';
                 <option value="Qwen3.5-4B-Q4_K_M.gguf">Qwen 3.5 — 4B (calidad alta, lento)</option>
                 <option value="Phi-4-mini-instruct-Q4_K_M.gguf">Phi-4 Mini — 3.8B (rápido, español decente)</option>
                 <option value="gemma-4-E2B-it-Q4_K_M.gguf">Gemma 2B — 2B (muy rápido, español mediocre)</option>
+                <option value="GLM-4.6V-Flash-Q4_K_M.gguf">GLM-4.6V Flash — 4.6B (contexto corto 4K, ~5.8GB)</option>
+                <option value="DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf">DeepSeek R1 Distill Qwen — 7B (reasoning, ~4.5GB)</option>
             </select>
             <p class="small" style="color:var(--warning);">⚠️ Este comando solo edita el config.ini del worker. <strong>Tenés que reiniciar manualmente llama-server</strong> en el Orin Nano para cargar el nuevo modelo.</p>
         </div>
