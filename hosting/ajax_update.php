@@ -19,7 +19,7 @@ if (!isset($_SESSION['update_state'])) {
 // Verificar CSRF para acciones destructivas
 $destructive = ['apply', 'rollback'];
 if (in_array($action, $destructive, true)) {
-    $token = $_GET['csrf_token'] ?? '';
+    $token = $_GET['csrf_token'] ?? ($_GET['csrf'] ?? '');
     if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
         jsonResponse(['error' => 'Token CSRF inválido'], 403);
     }
