@@ -121,6 +121,27 @@ switch ($action) {
         jsonResponse(['success' => true]);
         break;
 
+    case 'cancel_task':
+        $taskId = filter_input(INPUT_POST, 'task_id', FILTER_VALIDATE_INT);
+        if (!$taskId) {
+            jsonResponse(['error' => 'task_id requerido'], 400);
+        }
+        $updated = Database::update(
+            'tasks',
+            [
+                'status' => 'cancelled',
+                'completed_at' => date('Y-m-d H:i:s'),
+                'error_message' => 'Cancelada por el usuario'
+            ],
+            'id = ? AND status IN (?, ?)',
+            [$taskId, 'pending', 'processing']
+        );
+        if ($updated === 0) {
+            jsonResponse(['error' => 'Tarea no encontrada o ya finalizada'], 409);
+        }
+        jsonResponse(['success' => true, 'message' => 'Tarea cancelada']);
+        break;
+
     default:
         jsonResponse(['error' => 'Acción no válida'], 400);
 }

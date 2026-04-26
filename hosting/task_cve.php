@@ -266,11 +266,10 @@ require __DIR__ . '/templates/header.php';
 <script>
 function cancelTask(taskId, csrfToken) {
     if (!confirm('¿Cancelar tarea #' + taskId + '?')) return;
-    fetch('api/v1/task_cancel.php', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({task_id: taskId, csrf_token: csrfToken})
-    })
+    const fd = new FormData();
+    fd.append('task_id', taskId);
+    fd.append('csrf_token', csrfToken);
+    fetch('ajax_admin.php?action=cancel_task', {method: 'POST', body: fd})
     .then(r => r.json())
     .then(data => {
         if (data.success) {
