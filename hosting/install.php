@@ -27,10 +27,12 @@ header('Content-Type: text/html; charset=utf-8');
 
 $error = '';
 $success = false;
-$message = '';
+$showGeneratedPassword = false;
+$generatedPassword = '';
+$apiKey = '';
+$adminUser = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Validar CSRF
     $token = $_POST['csrf_token'] ?? '';
     if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
         $error = 'Token de seguridad inválido. Recarga la página.';
@@ -38,6 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $adminUser = validateInput($_POST['admin_user'] ?? '', 64);
             $adminPass = $_POST['admin_pass'] ?? '';
+            $adminPass2 = $_POST['admin_pass2'] ?? '';
             
             if (!$adminUser || strlen($adminUser) < 3) {
                 throw new RuntimeException('Usuario inválido (mínimo 3 caracteres, solo letras, números, guiones y puntos)');
@@ -45,8 +48,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($adminPass !== '' && strlen($adminPass) < 8) {
                 throw new RuntimeException('La contraseña debe tener al menos 8 caracteres');
             }
+            if ($adminPass !== $adminPass2) {
+                throw new RuntimeException('Las contraseñas no coinciden');
+            }
             if ($adminPass === '') {
-                $adminPass = generateSecureToken(16);
+                $generatedPassword = generateSecureToken(16);
+                $adminPass = $generatedPassword;
+                $showGeneratedPassword = true;
             }
 
             $db = Database::getInstance();
@@ -95,10 +103,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $renamed = @rename($self, $self . '.bak');
 
             $success = true;
-            $message = "Instalación completada. API Key: {$apiKey}. Usuario admin: {$adminUser} / {$adminPass}";
-            if (!$renamed) {
-                $message .= "\nNota: No se pudo renombrar install.php automáticamente. Por seguridad, renómbralo manualmente a install.php.bak";
-            }
         } catch (Exception $e) {
             $error = $e->getMessage();
         }
@@ -124,9 +128,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="box">
         <h1>🛠️ Instalación OrinSec</h1>
         <?php if ($success): ?>
-            <p class="ok"><?php echo nl2br(htmlspecialchars($message)); ?></p>
-            <p><strong>Guarda la API key y las credenciales. No se mostrarán de nuevo.</strong></p>
-            <p><a href="login.php">Ir al login</a></p>
+            <p class="ok">✅ Instalación completada correctamente.</p>
+            <p><strong>Usuario admin:</strong> <?php echo htmlspecialchars($adminUser); ?></p>
+            <?php if ($showGeneratedPassword): ?>
+                <p><strong>Contraseña generada automáticamente:</strong></p>
+                <code><?php echo htmlspecialchars($generatedPassword); ?></code>
+                <p class="small">Guarda esta contraseña, no se mostrará de nuevo.</p>
+            <?php else: ?>
+                <p class="small">Usa la contraseña que introdujiste para iniciar sesión.</p>
+            <?php endif; ?>
+            <p><strong>API Key:</strong></p>
+            <code><?php echo htmlspecialchars($apiKey); ?></code>
+            <p class="small">Guarda la API key. Debes configurarla en <code>worker/config.ini</code>.</p>
+            <p><a href="login.php"><button>Ir al login</button></a></p>
         <?php else: ?>
             <?php if ($error): ?>
                 <p class="err">Error: <?php echo htmlspecialchars($error); ?></p>
@@ -135,8 +149,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?php echo csrfInput(); ?>
                 <label>Usuario administrador</label>
                 <input type="text" name="admin_user" value="admin" required maxlength="64" pattern="[\w\-.@]+" title="Letras, números, guiones, puntos y @">
-                <label>Contraseña administrador</label>
-                <input type="password" name="admin_pass" placeholder="Dejar en blanco para generar aleatoria (mín. 8 chars)">
+                <label>Contraseña</label>
+                <input type="password" name="admin_pass" placeholder="Mínimo 8 caracteres" minlength="8">
+                <label>Confirmar contraseña</label>
+                <input type="password" name="admin_pass2" placeholder="Repite la contraseña" minlength="8">
+                <p class="small">Deja ambos campos de contraseña en blanco para generar una aleatoria.</p>
                 <button type="submit">Instalar</button>
             </form>
         <?php endif; ?>
