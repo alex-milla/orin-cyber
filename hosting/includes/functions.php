@@ -111,7 +111,7 @@ function checkBruteForce(string $identifier, int $maxAttempts = 5, int $windowSe
 }
 
 function clearBruteForce(string $identifier): void {
-    $ip = $_SERVER['REMOTE_REMOTE'] ?? 'cli';
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'cli';
     $key = 'brute_' . md5($identifier . '_' . $ip);
     $lockFile = DATA_DIR . '/.' . $key . '.json';
     if (file_exists($lockFile)) {
