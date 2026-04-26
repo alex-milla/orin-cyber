@@ -18,7 +18,7 @@ $pageTitle = 'Dashboard — OrinSec';
 require __DIR__ . '/templates/header.php';
 ?>
 <div class="card">
-    <h2>📊 Panel principal</h2>
+    <h2>📊 Panel principal — v0.1.3</h2>
     <p>Bienvenido, <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong>.</p>
     <p><a href="task_cve.php"><button>➕ Nueva búsqueda de CVE</button></a></p>
     <?php if (isAdmin()): ?>
