@@ -5,11 +5,12 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 
 /**
- * Sistema de actualización desde GitHub con backup y rollback.
+ * Sistema de actualización desde GitHub Releases con backup y rollback.
  */
 class Updater {
-    private string $repoUrl = 'https://github.com/alex-milla/orin-cyber';
-    private string $zipUrl;
+    private string $repoOwner = 'alex-milla';
+    private string $repoName = 'orin-cyber';
+    private string $apiUrl;
     private string $tempDir;
     private string $backupDir;
     private array $exclude = [
@@ -19,7 +20,7 @@ class Updater {
     ];
 
     public function __construct() {
-        $this->zipUrl = $this->repoUrl . '/archive/refs/heads/main.zip';
+        $this->apiUrl = "https://api.github.com/repos/{$this->repoOwner}/{$this->repoName}/releases/latest";
         $this->tempDir = sys_get_temp_dir() . '/orinsec_update_' . uniqid();
         $this->backupDir = DATA_DIR . '/backups';
     }
@@ -33,25 +34,30 @@ class Updater {
     }
 
     /**
-     * Obtiene información del último commit en GitHub (versión remota)
+     * Obtiene información de la última release en GitHub
      */
     public function getRemoteVersion(): array {
-        $apiUrl = 'https://api.github.com/repos/alex-milla/orin-cyber/commits/main';
         $ctx = stream_context_create([
             'http' => [
                 'header' => 'User-Agent: OrinSec-Updater',
                 'timeout' => 10,
+                'follow_location' => true,
             ]
         ]);
-        $raw = @file_get_contents($apiUrl, false, $ctx);
+        $raw = @file_get_contents($this->apiUrl, false, $ctx);
         if (!$raw) {
-            return ['error' => 'No se pudo contactar con GitHub'];
+            return ['error' => 'No se pudo contactar con GitHub o no hay releases disponibles'];
         }
         $data = json_decode($raw, true);
+        if (empty($data['tag_name'])) {
+            return ['error' => 'Respuesta inesperada de GitHub'];
+        }
         return [
-            'sha' => substr($data['sha'] ?? 'unknown', 0, 7),
-            'date' => $data['commit']['committer']['date'] ?? 'unknown',
-            'message' => $data['commit']['message'] ?? 'Sin mensaje',
+            'tag' => $data['tag_name'],
+            'name' => $data['name'] ?? $data['tag_name'],
+            'published' => $data['published_at'] ?? 'unknown',
+            'body' => $data['body'] ?? 'Sin notas de release',
+            'zip_url' => $data['zipball_url'] ?? null,
         ];
     }
 
@@ -78,7 +84,6 @@ class Updater {
             $relative = str_replace($base . '/', '', $file->getPathname());
             $relative = str_replace('\\', '/', $relative);
 
-            // Excluir data/ y backups anteriores
             if (str_starts_with($relative, 'data/') || str_starts_with($relative, 'data\\')) {
                 continue;
             }
@@ -94,9 +99,9 @@ class Updater {
     }
 
     /**
-     * Descarga el ZIP del repo desde GitHub
+     * Descarga el ZIP de la última release desde GitHub
      */
-    public function downloadUpdate(): string {
+    public function downloadUpdate(string $zipUrl): string {
         if (!is_dir($this->tempDir)) {
             mkdir($this->tempDir, 0755, true);
         }
@@ -104,19 +109,20 @@ class Updater {
         $ctx = stream_context_create([
             'http' => [
                 'header' => 'User-Agent: OrinSec-Updater',
-                'timeout' => 30,
+                'timeout' => 60,
+                'follow_location' => true,
             ]
         ]);
-        $data = @file_get_contents($this->zipUrl, false, $ctx);
+        $data = @file_get_contents($zipUrl, false, $ctx);
         if ($data === false) {
-            throw new RuntimeException('No se pudo descargar la actualización desde GitHub');
+            throw new RuntimeException('No se pudo descargar la release desde GitHub');
         }
         file_put_contents($zipFile, $data);
         return $zipFile;
     }
 
     /**
-     * Extrae el ZIP descargado
+     * Extrae el ZIP descargado. GitHub releases usan nombres tipo: repo-tag/
      */
     public function extractUpdate(string $zipFile): string {
         $zip = new ZipArchive();
@@ -126,19 +132,16 @@ class Updater {
         $zip->extractTo($this->tempDir);
         $zip->close();
 
-        // GitHub extrae como orin-cyber-main/
-        $extracted = $this->tempDir . '/orin-cyber-main';
-        if (!is_dir($extracted)) {
-            // Intentar detectar carpeta
-            $dirs = glob($this->tempDir . '/*', GLOB_ONLYDIR);
-            foreach ($dirs as $d) {
-                if (is_dir($d . '/hosting')) {
-                    $extracted = $d;
-                    break;
-                }
+        // Detectar carpeta extraída (GitHub releases: orin-cyber-0.1.0/)
+        $extracted = null;
+        $dirs = glob($this->tempDir . '/*', GLOB_ONLYDIR);
+        foreach ($dirs as $d) {
+            if (is_dir($d . '/hosting')) {
+                $extracted = $d;
+                break;
             }
         }
-        if (!is_dir($extracted . '/hosting')) {
+        if (!$extracted) {
             throw new RuntimeException('Estructura del ZIP inesperada (no se encontró hosting/)');
         }
         return $extracted . '/hosting';
@@ -147,10 +150,9 @@ class Updater {
     /**
      * Aplica la actualización reemplazando archivos
      */
-    public function applyUpdate(string $sourceDir, string $backupFile): void {
+    public function applyUpdate(string $sourceDir, string $backupFile, string $newVersion): void {
         $targetDir = BASE_DIR;
 
-        // Lista de archivos a copiar (excluyendo protegidos)
         $iterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($sourceDir, RecursiveDirectoryIterator::SKIP_DOTS),
             RecursiveIteratorIterator::SELF_FIRST
@@ -160,7 +162,6 @@ class Updater {
             $relative = str_replace($sourceDir . '/', '', $file->getPathname());
             $relative = str_replace('\\', '/', $relative);
 
-            // Saltar archivos/carpetas protegidos
             $skip = false;
             foreach ($this->exclude as $ex) {
                 if ($relative === $ex || str_starts_with($relative, $ex . '/') || str_starts_with($relative, $ex . '\\')) {
@@ -182,9 +183,6 @@ class Updater {
             }
         }
 
-        // Actualizar versión en DB
-        $remote = $this->getRemoteVersion();
-        $newVersion = isset($remote['sha']) ? 'main-' . $remote['sha'] : date('Y.m.d');
         Database::query("INSERT OR REPLACE INTO config (key, value) VALUES ('version', ?)", [$newVersion]);
     }
 
@@ -212,9 +210,6 @@ class Updater {
         }
     }
 
-    /**
-     * Elimina directorio recursivamente
-     */
     private function rmrf(string $dir): void {
         $files = array_diff(scandir($dir), ['.', '..']);
         foreach ($files as $file) {
@@ -224,9 +219,6 @@ class Updater {
         rmdir($dir);
     }
 
-    /**
-     * Lista backups disponibles
-     */
     public function listBackups(): array {
         if (!is_dir($this->backupDir)) return [];
         $files = glob($this->backupDir . '/*.zip');

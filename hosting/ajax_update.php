@@ -25,7 +25,6 @@ if (in_array($action, $destructive, true)) {
     }
 }
 
-// Validador estricto de nombres de archivo backup
 function validateBackupName(string $name): ?string {
     if (!preg_match('/^backup_\d{8}_\d{6}\.zip$/', $name)) {
         return null;
@@ -54,8 +53,17 @@ switch ($action) {
 
     case 'download':
         try {
-            $zipFile = $updater->downloadUpdate();
+            $remote = $_SESSION['update_state']['remote'] ?? null;
+            if (!$remote || empty($remote['zip_url'])) {
+                // Fetch fresh if not cached
+                $remote = $updater->getRemoteVersion();
+                if (isset($remote['error'])) {
+                    jsonResponse(['error' => $remote['error']], 500);
+                }
+            }
+            $zipFile = $updater->downloadUpdate($remote['zip_url']);
             $_SESSION['update_state']['zip'] = $zipFile;
+            $_SESSION['update_state']['remote'] = $remote;
             jsonResponse(['success' => true]);
         } catch (Exception $e) {
             jsonResponse(['error' => $e->getMessage()], 500);
@@ -80,6 +88,7 @@ switch ($action) {
         try {
             $sourceDir = $_SESSION['update_state']['source'] ?? '';
             $backupFile = $_GET['backup'] ?? '';
+            $remote = $_SESSION['update_state']['remote'] ?? null;
             if (!$sourceDir || !is_dir($sourceDir)) {
                 jsonResponse(['error' => 'No hay fuente extraída'], 400);
             }
@@ -88,7 +97,8 @@ switch ($action) {
                 jsonResponse(['error' => 'Nombre de backup inválido'], 400);
             }
             $backupFile = DATA_DIR . '/backups/' . $valid;
-            $updater->applyUpdate($sourceDir, $backupFile);
+            $newVersion = $remote['tag'] ?? date('Y.m.d');
+            $updater->applyUpdate($sourceDir, $backupFile, $newVersion);
             $updater->cleanup();
             unset($_SESSION['update_state']);
             jsonResponse(['success' => true, 'version' => $updater->getCurrentVersion()]);

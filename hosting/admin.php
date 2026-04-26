@@ -180,11 +180,14 @@ async function checkUpdate() {
     }
 
     remoteInfo = data;
-    document.getElementById('remote-version').textContent = data.sha + ' (' + data.date + ')';
-    document.getElementById('remote-message').textContent = data.message;
+    document.getElementById('remote-version').textContent = data.tag + ' — ' + data.name;
+    document.getElementById('remote-message').textContent = 'Publicada: ' + data.published;
+    if (data.body) {
+        document.getElementById('remote-message').textContent += ' | ' + data.body.substring(0, 200) + (data.body.length > 200 ? '...' : '');
+    }
 
     const current = document.getElementById('current-version').textContent;
-    if (current !== data.sha && current !== 'main-' + data.sha) {
+    if (current !== data.tag) {
         document.getElementById('btn-update').style.display = 'inline-block';
     } else {
         document.getElementById('remote-message').textContent += ' — ✅ Estás en la última versión.';
