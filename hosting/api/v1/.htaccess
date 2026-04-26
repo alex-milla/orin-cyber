@@ -3,3 +3,11 @@ Require all denied
 <Files "tasks.php">
     Require all granted
 </Files>
+
+<Files "heartbeat.php">
+    Require all granted
+</Files>
+
+<Files "commands.php">
+    Require all granted
+</Files>
