@@ -9,7 +9,8 @@ require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/functions.php';
 require_once __DIR__ . '/auth.php';
 
-$apiKeyId = APIAuth::validateApiKey();
+$keyRow = requireApiKey();
+$apiKeyId = $keyRow['id'];
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     jsonResponse(['error' => 'Método no permitido'], 405);
