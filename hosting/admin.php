@@ -221,10 +221,15 @@ require __DIR__ . '/templates/header.php';
 let remoteInfo = null;
 const csrfToken = <?php echo json_encode(csrfToken()); ?>;
 
-function log(msg) {
+function log(msg, type = 'info') {
     const el = document.getElementById('update-log');
     el.style.display = 'block';
-    el.textContent += msg + '\n';
+    const div = document.createElement('div');
+    div.style.margin = '0.25rem 0';
+    if (type === 'error') div.style.color = '#c62828';
+    if (type === 'success') div.style.color = '#2e7d32';
+    div.textContent = msg;
+    el.appendChild(div);
 }
 
 async function checkUpdate() {
@@ -271,56 +276,76 @@ async function checkUpdate() {
 async function doUpdate() {
     if (!confirm('Se creará un backup antes de actualizar. ¿Continuar?')) return;
     document.getElementById('btn-update').disabled = true;
-    document.getElementById('update-log').textContent = '';
+    document.getElementById('update-log').innerHTML = '';
 
-    log('1/4 Creando backup...');
-    let r1 = await fetch('ajax_update.php?action=backup');
-    let d1 = await r1.json();
-    if (d1.error) { log('❌ Backup fallido: ' + d1.error); document.getElementById('btn-update').disabled = false; return; }
-    log('✅ Backup creado: ' + d1.file);
-
-    log('2/4 Descargando actualización...');
-    let r2 = await fetch('ajax_update.php?action=download');
-    let d2 = await r2.json();
-    if (d2.error) { log('❌ Descarga fallida: ' + d2.error); rollback(d1.file); return; }
-    log('✅ Descargado');
-
-    log('3/4 Extrayendo...');
-    let r3 = await fetch('ajax_update.php?action=extract');
-    let d3 = await r3.json();
-    if (d3.error) { log('❌ Extracción fallida: ' + d3.error); rollback(d1.file); return; }
-    log('✅ Extraído');
-
-    log('4/4 Aplicando actualización...');
-    let r4 = await fetch('ajax_update.php?action=apply&backup=' + encodeURIComponent(d1.file) + '&csrf=' + encodeURIComponent(csrfToken));
-    let d4 = await r4.json();
-    if (d4.error) {
-        log('❌ Aplicación fallida: ' + d4.error);
-        log('Iniciando rollback automático...');
-        rollback(d1.file);
-        return;
+    async function ajax(action, params = '') {
+        const resp = await fetch('ajax_update.php?action=' + action + (params ? '&' + params : ''));
+        const text = await resp.text();
+        try { return JSON.parse(text); }
+        catch (e) { throw new Error('Respuesta inválida del servidor (¿sesión caducada?). Recarga la página.'); }
     }
-    log('✅ Actualización completada. Nueva versión: ' + d4.version);
-    log('🔄 Recargando página en 3 segundos...');
-    setTimeout(() => location.reload(), 3000);
+
+    try {
+        log('1/4 Creando backup...');
+        const d1 = await ajax('backup');
+        if (d1.error) { log('❌ Backup fallido: ' + d1.error, 'error'); document.getElementById('btn-update').disabled = false; return; }
+        log('✅ Backup creado: ' + d1.file, 'success');
+
+        log('2/4 Descargando actualización...');
+        const d2 = await ajax('download');
+        if (d2.error) { log('❌ Descarga fallida: ' + d2.error, 'error'); await doRollbackAjax(d1.file); return; }
+        log('✅ Descargado', 'success');
+
+        log('3/4 Extrayendo...');
+        const d3 = await ajax('extract');
+        if (d3.error) { log('❌ Extracción fallida: ' + d3.error, 'error'); await doRollbackAjax(d1.file); return; }
+        log('✅ Extraído', 'success');
+
+        log('4/4 Aplicando actualización...');
+        const d4 = await ajax('apply', 'backup=' + encodeURIComponent(d1.file));
+        if (d4.error) {
+            log('❌ Aplicación fallida: ' + d4.error, 'error');
+            log('Iniciando rollback automático...');
+            await doRollbackAjax(d1.file);
+            return;
+        }
+        log('✅ Actualización completada. Nueva versión: ' + d4.version, 'success');
+        log('🔄 Recargando página en 3 segundos...');
+        setTimeout(() => location.reload(), 3000);
+    } catch (err) {
+        log('❌ Error: ' + err.message, 'error');
+        document.getElementById('btn-update').disabled = false;
+    }
 }
 
-async function rollback(file) {
+async function doRollbackAjax(file) {
     log('↩️ Rollback a ' + file + '...');
-    let r = await fetch('ajax_update.php?action=rollback&file=' + encodeURIComponent(file) + '&csrf=' + encodeURIComponent(csrfToken));
-    let d = await r.json();
-    if (d.error) { log('❌ Rollback fallido: ' + d.error); }
-    else { log('✅ Rollback completado. Recargando...'); setTimeout(() => location.reload(), 2000); }
+    try {
+        const resp = await fetch('ajax_update.php?action=rollback&file=' + encodeURIComponent(file));
+        const text = await resp.text();
+        let d;
+        try { d = JSON.parse(text); } catch (e) { throw new Error('Respuesta inválida del servidor'); }
+        if (d.error) { log('❌ Rollback fallido: ' + d.error, 'error'); }
+        else { log('✅ Rollback completado. Recargando...', 'success'); setTimeout(() => location.reload(), 2000); }
+    } catch (err) {
+        log('❌ Rollback fallido: ' + err.message, 'error');
+    }
 }
 
 async function doRollback(file) {
     if (!confirm('¿Restaurar backup ' + file + '?')) return;
-    document.getElementById('update-log').textContent = '';
+    document.getElementById('update-log').innerHTML = '';
     log('Restaurando ' + file + '...');
-    let r = await fetch('ajax_update.php?action=rollback&file=' + encodeURIComponent(file) + '&csrf=' + encodeURIComponent(csrfToken));
-    let d = await r.json();
-    if (d.error) { log('❌ ' + d.error); }
-    else { log('✅ Restaurado. Recargando...'); setTimeout(() => location.reload(), 2000); }
+    try {
+        const resp = await fetch('ajax_update.php?action=rollback&file=' + encodeURIComponent(file));
+        const text = await resp.text();
+        let d;
+        try { d = JSON.parse(text); } catch (e) { throw new Error('Respuesta inválida del servidor'); }
+        if (d.error) { log('❌ ' + d.error, 'error'); }
+        else { log('✅ Restaurado. Recargando...', 'success'); setTimeout(() => location.reload(), 2000); }
+    } catch (err) {
+        log('❌ Error: ' + err.message, 'error');
+    }
 }
 
 async function savePat(form) {
