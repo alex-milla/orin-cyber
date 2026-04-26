@@ -259,7 +259,7 @@ require __DIR__ . '/templates/header.php';
         <tr>
             <td><?php echo htmlspecialchars($k['name']); ?></td>
             <td class="mono">
-                <span id="key-<?php echo $k['id']; ?>" class="blur-reveal" title="Clic para revelar" data-full="<?php echo htmlspecialchars($k['api_key'], ENT_QUOTES); ?>"><?php echo htmlspecialchars(substr($k['api_key'], 0, 8) . '...' . substr($k['api_key'], -8)); ?></span>
+                <span id="key-<?php echo $k['id']; ?>" class="blur-reveal" title="Clic para revelar" data-full="<?php echo htmlspecialchars($k['api_key'], ENT_QUOTES); ?>" onclick="revealKey(this)"><?php echo htmlspecialchars(substr($k['api_key'], 0, 8) . '...' . substr($k['api_key'], -8)); ?></span>
                 <button class="secondary" style="font-size:0.8rem; padding:0.3rem 0.5rem;" onclick="copyKey('key-<?php echo $k['id']; ?>')">📋</button>
             </td>
             <td><?php echo $k['is_active'] ? '<span class="status-completed">Activa</span>' : '<span class="status-error">Revocada</span>'; ?></td>
@@ -494,6 +494,13 @@ function copyToClipboard(elementId) {
         document.body.removeChild(ta);
         showToast('✅ Copiado');
     });
+}
+
+function revealKey(el) {
+    el.textContent = el.dataset.full;
+    el.style.filter = 'none';
+    el.style.cursor = 'default';
+    el.onclick = null;
 }
 
 function copyKey(elementId) {
