@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
         $error = 'Token de seguridad inválido. Recarga la página.';
     } else {
+        $cveId = validateInput($_POST['cve_id'] ?? '', 50, '/^CVE-\d{4}-\d+$/i') ?: '';
         $product = validateInput($_POST['product'] ?? '', 100);
         $version = validateInput($_POST['version'] ?? '', 50, '/^[\w\s\.\-+_\/]+$/u') ?: '';
         $year = validateInput($_POST['year'] ?? '', 4, '/^\d{0,4}$/') ?: '';
@@ -24,10 +25,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $maxResults = filter_input(INPUT_POST, 'max_results', FILTER_VALIDATE_INT) ?: 10;
         $maxResults = max(1, min($maxResults, 20));
         
-        if (!$product) {
-            $error = 'El producto/software es obligatorio y contiene caracteres no permitidos.';
+        if (!$cveId && !$product) {
+            $error = 'Introduce un CVE ID o un producto/software.';
         } else {
             $input = json_encode([
+                'cve_id' => $cveId,
                 'product' => $product,
                 'version' => $version,
                 'year' => $year,
@@ -70,8 +72,12 @@ require __DIR__ . '/templates/header.php';
         <?php endif; ?>
         <form method="POST">
             <?php echo csrfInput(); ?>
+            <label>CVE ID (búsqueda directa)</label>
+            <input type="text" name="cve_id" placeholder="Ej: CVE-2024-3393" maxlength="50" pattern="CVE-\d{4}-\d+" title="Formato: CVE-YYYY-NNNNN">
+            <p class="small">Si introduces un CVE ID, se ignoran los demás campos y se busca directamente.</p>
+
             <label>Producto / Software *</label>
-            <input type="text" name="product" placeholder="Ej: Apache HTTP Server" required maxlength="100">
+            <input type="text" name="product" placeholder="Ej: Apache HTTP Server" maxlength="100">
             
             <label>Versión</label>
             <input type="text" name="version" placeholder="Ej: 2.4.51" maxlength="50">

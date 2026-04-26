@@ -7,13 +7,37 @@ from datetime import datetime
 from typing import Any
 
 from tasks.base import BaseTask
-from scrapers.nvd import search_cves
+from scrapers.nvd import search_cves, get_cve_by_id
+from scrapers.epss import get_epss
+from scrapers.cisa_kev import get_kev
+from scrapers.github_exploits import find_exploits
 from utils.llm_client import LlmClient
-from utils.formatter import markdown_to_html, wrap_html_document
+from utils.formatter import render_cve_report
 
 logger = logging.getLogger(__name__)
 
 PROMPT_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "prompts", "cve_report.txt")
+
+
+def _calc_priority(score: float | None, epss_score: float | None, kev_listed: bool) -> str:
+    """Calcula prioridad de parcheo basada en datos objetivos."""
+    if kev_listed:
+        return "A+"
+    if score is not None and epss_score is not None:
+        if score >= 9.0 and epss_score >= 0.5:
+            return "A+"
+        if score >= 7.0 and epss_score >= 0.3:
+            return "A"
+        if score >= 7.0 or epss_score >= 0.3:
+            return "B"
+    if score is not None:
+        if score >= 9.0:
+            return "A"
+        if score >= 7.0:
+            return "B"
+        if score >= 4.0:
+            return "C"
+    return "D"
 
 
 class CveSearchTask(BaseTask):
@@ -25,44 +49,74 @@ class CveSearchTask(BaseTask):
             self.prompt_template = f.read()
 
     def execute(self, input_data: dict[str, Any]) -> dict[str, str]:
+        cve_id = input_data.get("cve_id", "").strip().upper()
         product = input_data.get("product", "").strip()
         version = input_data.get("version", "").strip()
         year = input_data.get("year", "").strip()
         severity = input_data.get("severity", "").strip()
         max_results = int(input_data.get("max_results", 10))
 
-        logger.info("CVE search: product=%s version=%s year=%s severity=%s", product, version, year, severity)
+        # ── Modo búsqueda por CVE ID ──────────────────────────────────────
+        if cve_id:
+            logger.info("CVE lookup by ID: %s", cve_id)
+            cve_data = get_cve_by_id(cve_id)
+            if not cve_data:
+                return {
+                    "result_html": f"<p class='alert alert-error'>CVE {cve_id} no encontrado en NVD.</p>",
+                    "result_text": f"CVE {cve_id} no encontrado en NVD.",
+                }
+            cves = [cve_data]
+        else:
+            logger.info("CVE search: product=%s version=%s year=%s severity=%s", product, version, year, severity)
+            cves = search_cves(
+                keyword=product,
+                version=version,
+                year=year,
+                severity=severity,
+                max_results=max_results,
+            )
 
-        # 1. Buscar en NVD
-        cves = search_cves(
-            keyword=product,
-            version=version,
-            year=year,
-            severity=severity,
-            max_results=max_results,
-        )
+        if not cves:
+            return {
+                "result_html": "<p class='alert alert-warning'>No se encontraron CVEs con los criterios indicados.</p>",
+                "result_text": "No se encontraron CVEs con los criterios indicados.",
+            }
 
-        # 2. Preparar datos para el LLM
-        raw_json = json.dumps(cves, indent=2, ensure_ascii=False)
-        user_prompt = f"""Producto: {product}
-Versión: {version or 'No especificada'}
-Filtros: Año={year or 'Cualquiera'}, Severidad mínima={severity or 'Cualquiera'}
+        # ── Enriquecer cada CVE con datos adicionales ─────────────────────
+        enriched = []
+        for cve in cves:
+            cve_id = cve["cve_id"]
+            logger.info("Enriching %s", cve_id)
 
-Datos crudos de NVD:
-{raw_json}"""
+            epss = get_epss(cve_id)
+            kev = get_kev(cve_id)
+            github = find_exploits(cve_id, max_results=5)
 
-        # 3. Llamar al LLM
+            priority = _calc_priority(
+                cve.get("score"),
+                epss["score"] if epss else None,
+                kev is not None,
+            )
+
+            enriched.append({
+                "cve": cve,
+                "epss": epss,
+                "kev": kev,
+                "github": github,
+                "priority": priority,
+            })
+
+        # ── Preparar datos para el LLM ────────────────────────────────────
+        context = json.dumps(enriched, indent=2, ensure_ascii=False)
+
+        # ── Llamar al LLM para análisis sintético ─────────────────────────
         report_text = self.llm.chat(
             system_prompt=self.prompt_template,
-            user_prompt=user_prompt,
+            user_prompt=f"Analiza los siguientes datos de CVEs y genera un informe estructurado en español.\n\nDatos estructurados:\n{context}",
         )
 
-        # 4. Formatear salida
-        html_body = markdown_to_html(report_text)
-        result_html = wrap_html_document(
-            html_body,
-            title=f"Informe CVE — {product} {version}".strip(),
-        )
+        # ── Formatear salida HTML ─────────────────────────────────────────
+        result_html = render_cve_report(enriched, report_text)
 
         return {
             "result_html": result_html,
