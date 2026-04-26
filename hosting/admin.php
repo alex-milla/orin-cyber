@@ -262,6 +262,7 @@ async function doRollback(file) {
 }
 
 async function savePat(form) {
+    event.preventDefault();
     const fd = new FormData(form);
     const resp = await fetch(form.action, { method: 'POST', body: fd });
     const data = await resp.json();
@@ -273,7 +274,6 @@ async function savePat(form) {
         msg.style.color = '#c62828';
         msg.textContent = data.error || 'Error';
     }
-    return false;
 }
 
 async function addKey(form) {
@@ -328,6 +328,7 @@ async function deleteKey(id) {
 }
 
 async function addUser(form) {
+    event.preventDefault();
     const fd = new FormData(form);
     const resp = await fetch(form.action, { method: 'POST', body: fd });
     const data = await resp.json();
@@ -341,10 +342,10 @@ async function addUser(form) {
         msg.style.color = '#c62828';
         msg.textContent = data.error || 'Error al crear usuario';
     }
-    return false;
 }
 
 async function toggleReg(form) {
+    event.preventDefault();
     const fd = new FormData(form);
     const resp = await fetch(form.action, { method: 'POST', body: fd });
     const data = await resp.json();
@@ -357,7 +358,6 @@ async function toggleReg(form) {
         msg.style.color = '#c62828';
         msg.textContent = data.error || 'Error';
     }
-    return false;
 }
 </script>
 <?php require __DIR__ . '/templates/footer.php'; ?>
