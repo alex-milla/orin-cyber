@@ -6,18 +6,21 @@ require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/functions.php';
 require_once __DIR__ . '/auth.php';
 
-requireApiKey();
+$keyRow = requireApiKey();
 
-// Rate limiting específico para API del worker (más permisivo que frontend)
+// Rate limiting específico para API del worker
 $ip = $_SERVER['REMOTE_ADDR'] ?? 'cli';
-$key = 'api_rate_' . md5($ip);
+$rateKey = 'api_rate_' . md5($ip);
 $now = time();
-$lockFile = DATA_DIR . '/.' . $key . '.tmp';
+$lockFile = DATA_DIR . '/.' . $rateKey . '.tmp';
 $lastTime = file_exists($lockFile) ? (int)file_get_contents($lockFile) : 0;
 if (($now - $lastTime) < 1) {
     jsonResponse(['error' => 'Rate limit exceeded'], 429);
 }
 file_put_contents($lockFile, (string)$now);
+
+// Actualizar last_used de la API key
+Database::query("UPDATE api_keys SET last_used = ? WHERE id = ?", [date('Y-m-d H:i:s'), $keyRow['id']]);
 
 $action = $_GET['action'] ?? '';
 

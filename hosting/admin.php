@@ -96,22 +96,55 @@ require __DIR__ . '/templates/header.php';
     <?php else: ?>
     <h3>Configuración del sistema</h3>
     <?php
-    $apiKeyRow = Database::fetchOne("SELECT value FROM config WHERE key = 'api_key'");
-    $apiKey = $apiKeyRow['value'] ?? 'No configurada';
+    $apiKeys = Database::fetchAll("SELECT id, name, api_key, is_active, last_used, created_at FROM api_keys ORDER BY created_at DESC");
     $regRow = Database::fetchOne("SELECT value FROM config WHERE key = 'allow_registration'");
     $regEnabled = !$regRow || $regRow['value'] === '1';
     ?>
-    <h3>API Key del worker</h3>
-    <p class="small">Esta clave autentica a los workers y sistemas externos que se conectan a la API.</p>
-    <div style="display:flex; gap:.5rem; align-items:center;">
-        <input type="password" id="apikey-field" value="<?php echo htmlspecialchars($apiKey); ?>" readonly style="flex:1; font-family:monospace;">
-        <button type="button" class="secondary" onclick="toggleApiKey()">👁️ Mostrar</button>
-    </div>
-    <form method="POST" action="ajax_admin.php?action=regenerate_api_key" onsubmit="return regenerateKey(this);" style="margin-top:.5rem;">
+
+    <h3>🔑 API Keys — Workers conectados</h3>
+    <p class="small">Cada worker o sistema externo debe usar su propia API key. Puedes revocar una key sin afectar a los demás.</p>
+
+    <table style="width:100%; border-collapse:collapse; margin-bottom:1rem;">
+        <thead><tr style="border-bottom:2px solid #ddd;">
+            <th style="text-align:left; padding:.5rem;">Nombre</th>
+            <th style="text-align:left; padding:.5rem;">Key</th>
+            <th style="text-align:left; padding:.5rem;">Estado</th>
+            <th style="text-align:left; padding:.5rem;">Último uso</th>
+            <th style="text-align:left; padding:.5rem;">Acciones</th>
+        </tr></thead>
+        <tbody>
+        <?php foreach ($apiKeys as $k): ?>
+        <tr style="border-bottom:1px solid #eee;">
+            <td style="padding:.5rem;"><?php echo htmlspecialchars($k['name']); ?></td>
+            <td style="padding:.5rem; font-family:monospace; font-size:.85rem;">
+                <span id="key-<?php echo $k['id']; ?>" style="filter:blur(4px); cursor:pointer;" onclick="this.style.filter='none'" title="Clic para revelar"><?php echo htmlspecialchars(substr($k['api_key'], 0, 8) . '...' . substr($k['api_key'], -8)); ?></span>
+            </td>
+            <td style="padding:.5rem;"><?php echo $k['is_active'] ? '<span style="color:#388e3c;">Activa</span>' : '<span style="color:#c62828;">Revocada</span>'; ?></td>
+            <td style="padding:.5rem;" class="small"><?php echo $k['last_used'] ? htmlspecialchars($k['last_used']) : 'Nunca'; ?></td>
+            <td style="padding:.5rem;">
+                <?php if ($k['is_active']): ?>
+                    <button class="secondary" onclick="revokeKey(<?php echo $k['id']; ?>)">🚫 Revocar</button>
+                <?php else: ?>
+                    <button class="secondary" onclick="activateKey(<?php echo $k['id']; ?>)">✅ Activar</button>
+                <?php endif; ?>
+                <button class="secondary" onclick="regenKey(<?php echo $k['id']; ?>)">🔄 Regenerar</button>
+                <button class="secondary" onclick="deleteKey(<?php echo $k['id']; ?>)">🗑️ Eliminar</button>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+
+    <h4>Añadir nuevo worker</h4>
+    <form method="POST" action="ajax_admin.php?action=add_api_key" onsubmit="return addKey(this);" style="display:flex; gap:.5rem; align-items:flex-end;">
         <?php echo csrfInput(); ?>
-        <button type="submit" class="secondary">🔄 Regenerar API Key</button>
-        <p id="key-msg" class="small"></p>
+        <div style="flex:1;">
+            <label class="small">Nombre del worker</label>
+            <input type="text" name="name" placeholder="Ej: Orin Nano 2, VPS Frankfurt..." required maxlength="100" style="width:100%;">
+        </div>
+        <button type="submit">➕ Añadir key</button>
     </form>
+    <p id="key-msg" class="small" style="margin-top:.5rem;"></p>
     
     <h3 style="margin-top:2rem;">Registro de usuarios</h3>
     <p>Estado: <strong><?php echo $regEnabled ? 'Abierto' : 'Cerrado'; ?></strong></p>
@@ -213,33 +246,55 @@ async function doRollback(file) {
     else { log('✅ Restaurado. Recargando...'); setTimeout(() => location.reload(), 2000); }
 }
 
-function toggleApiKey() {
-    const field = document.getElementById('apikey-field');
-    const btn = event.target;
-    if (field.type === 'password') {
-        field.type = 'text';
-        btn.textContent = '🙈 Ocultar';
-    } else {
-        field.type = 'password';
-        btn.textContent = '👁️ Mostrar';
-    }
-}
-
-async function regenerateKey(form) {
-    if (!confirm('¿Regenerar API Key? Los workers con la clave antigua dejarán de funcionar hasta que actualices worker/config.ini.')) return false;
+async function addKey(form) {
     const fd = new FormData(form);
     const resp = await fetch(form.action, { method: 'POST', body: fd });
     const data = await resp.json();
     const msg = document.getElementById('key-msg');
     if (data.success) {
-        document.getElementById('apikey-field').value = data.api_key;
         msg.style.color = '#2e7d32';
-        msg.textContent = 'API Key regenerada. Actualiza worker/config.ini.';
+        msg.textContent = 'Nueva API key creada: ' + data.api_key;
+        setTimeout(() => location.reload(), 2000);
     } else {
         msg.style.color = '#c62828';
         msg.textContent = data.error || 'Error';
     }
     return false;
+}
+
+async function revokeKey(id) {
+    if (!confirm('¿Revocar esta API key? El worker dejará de funcionar inmediatamente.')) return;
+    const resp = await fetch('ajax_admin.php?action=revoke_api_key&id=' + id + '&csrf_token=' + encodeURIComponent(csrfToken), { method: 'POST' });
+    const data = await resp.json();
+    if (data.success) location.reload();
+    else alert(data.error || 'Error');
+}
+
+async function activateKey(id) {
+    const resp = await fetch('ajax_admin.php?action=activate_api_key&id=' + id + '&csrf_token=' + encodeURIComponent(csrfToken), { method: 'POST' });
+    const data = await resp.json();
+    if (data.success) location.reload();
+    else alert(data.error || 'Error');
+}
+
+async function regenKey(id) {
+    if (!confirm('¿Regenerar esta API key? El worker dejará de funcionar hasta que actualices su config.ini.')) return;
+    const resp = await fetch('ajax_admin.php?action=regenerate_api_key&id=' + id + '&csrf_token=' + encodeURIComponent(csrfToken), { method: 'POST' });
+    const data = await resp.json();
+    if (data.success) {
+        alert('Nueva key: ' + data.api_key + '\nActualiza el worker.');
+        location.reload();
+    } else {
+        alert(data.error || 'Error');
+    }
+}
+
+async function deleteKey(id) {
+    if (!confirm('¿Eliminar permanentemente esta API key? No se puede deshacer.')) return;
+    const resp = await fetch('ajax_admin.php?action=delete_api_key&id=' + id + '&csrf_token=' + encodeURIComponent(csrfToken), { method: 'POST' });
+    const data = await resp.json();
+    if (data.success) location.reload();
+    else alert(data.error || 'Error');
 }
 
 async function addUser(form) {

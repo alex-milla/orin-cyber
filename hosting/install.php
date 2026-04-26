@@ -84,9 +84,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 value TEXT NOT NULL
             )");
 
-            // Generar API key inicial (se gestiona desde panel admin)
-            $db->prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)")
-               ->execute(['api_key', generateSecureToken(32)]);
+            $db->exec("CREATE TABLE IF NOT EXISTS api_keys (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                api_key TEXT UNIQUE NOT NULL,
+                is_active INTEGER DEFAULT 1,
+                last_used DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
+
+            // Insertar API key inicial para el primer worker
+            $db->prepare("INSERT INTO api_keys (name, api_key) VALUES (?, ?)")
+               ->execute(['Worker principal (Orin Nano)', generateSecureToken(32)]);
 
             $version = '0.1.0';
             $db->prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)")
@@ -107,7 +116,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
-?>
 ?>
 <!DOCTYPE html>
 <html lang="es">

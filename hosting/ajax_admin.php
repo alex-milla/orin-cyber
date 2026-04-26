@@ -10,7 +10,7 @@ requireAdmin();
 
 $action = $_GET['action'] ?? '';
 
-// Verificar CSRF para acciones destructivas
+// Verificar CSRF para todas las acciones
 $token = $_POST['csrf_token'] ?? ($_GET['csrf_token'] ?? '');
 if (!hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
     jsonResponse(['error' => 'Token CSRF inválido'], 403);
@@ -43,10 +43,47 @@ switch ($action) {
         jsonResponse(['success' => true, 'enabled' => $newValue === '1']);
         break;
 
-    case 'regenerate_api_key':
+    case 'add_api_key':
+        $name = validateInput($_POST['name'] ?? '', 100);
+        if (!$name || strlen($name) < 2) {
+            jsonResponse(['error' => 'Nombre inválido'], 400);
+        }
         $newKey = generateSecureToken(32);
-        Database::query("INSERT OR REPLACE INTO config (key, value) VALUES ('api_key', ?)", [$newKey]);
+        try {
+            Database::insert('api_keys', ['name' => $name, 'api_key' => $newKey]);
+            jsonResponse(['success' => true, 'api_key' => $newKey]);
+        } catch (PDOException $e) {
+            jsonResponse(['error' => 'No se pudo crear la API key'], 500);
+        }
+        break;
+
+    case 'revoke_api_key':
+        $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        if (!$id) jsonResponse(['error' => 'ID inválido'], 400);
+        Database::update('api_keys', ['is_active' => 0], 'id = ?', [$id]);
+        jsonResponse(['success' => true]);
+        break;
+
+    case 'activate_api_key':
+        $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        if (!$id) jsonResponse(['error' => 'ID inválido'], 400);
+        Database::update('api_keys', ['is_active' => 1], 'id = ?', [$id]);
+        jsonResponse(['success' => true]);
+        break;
+
+    case 'regenerate_api_key':
+        $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        if (!$id) jsonResponse(['error' => 'ID inválido'], 400);
+        $newKey = generateSecureToken(32);
+        Database::update('api_keys', ['api_key' => $newKey], 'id = ?', [$id]);
         jsonResponse(['success' => true, 'api_key' => $newKey]);
+        break;
+
+    case 'delete_api_key':
+        $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        if (!$id) jsonResponse(['error' => 'ID inválido'], 400);
+        Database::query("DELETE FROM api_keys WHERE id = ?", [$id]);
+        jsonResponse(['success' => true]);
         break;
 
     default:
