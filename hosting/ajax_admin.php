@@ -36,6 +36,13 @@ switch ($action) {
         }
         break;
 
+    case 'toggle_registration':
+        $current = Database::fetchOne("SELECT value FROM config WHERE key = 'allow_registration'");
+        $newValue = ($current && $current['value'] === '1') ? '0' : '1';
+        Database::query("INSERT OR REPLACE INTO config (key, value) VALUES ('allow_registration', ?)", [$newValue]);
+        jsonResponse(['success' => true, 'enabled' => $newValue === '1']);
+        break;
+
     default:
         jsonResponse(['error' => 'Acción no válida'], 400);
 }

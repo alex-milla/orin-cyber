@@ -98,10 +98,21 @@ require __DIR__ . '/templates/header.php';
     <?php
     $apiKeyRow = Database::fetchOne("SELECT value FROM config WHERE key = 'api_key'");
     $apiKey = $apiKeyRow['value'] ?? 'No configurada';
+    $regRow = Database::fetchOne("SELECT value FROM config WHERE key = 'allow_registration'");
+    $regEnabled = !$regRow || $regRow['value'] === '1';
     ?>
     <p><strong>API Key del worker:</strong></p>
     <code style="display:block; background:#f5f5f5; padding:1rem; word-break:break-all;"><?php echo htmlspecialchars($apiKey); ?></code>
     <p class="small">Esta clave debe configurarse en <code>worker/config.ini</code> del Orin Nano.</p>
+    
+    <h3 style="margin-top:2rem;">Registro de usuarios</h3>
+    <p>Estado: <strong><?php echo $regEnabled ? 'Abierto' : 'Cerrado'; ?></strong></p>
+    <form method="POST" action="ajax_admin.php?action=toggle_registration" onsubmit="return toggleReg(this);">
+        <?php echo csrfInput(); ?>
+        <button type="submit"><?php echo $regEnabled ? '🔒 Cerrar registro' : '🔓 Abrir registro'; ?></button>
+        <p id="reg-msg" style="margin-top:.5rem;"></p>
+    </form>
+    <p class="small">Si el registro está cerrado, solo los administradores pueden crear cuentas.</p>
     <?php endif; ?>
 </div>
 
@@ -207,6 +218,22 @@ async function addUser(form) {
     } else {
         msg.style.color = '#c62828';
         msg.textContent = data.error || 'Error al crear usuario';
+    }
+    return false;
+}
+
+async function toggleReg(form) {
+    const fd = new FormData(form);
+    const resp = await fetch(form.action, { method: 'POST', body: fd });
+    const data = await resp.json();
+    const msg = document.getElementById('reg-msg');
+    if (data.success) {
+        msg.style.color = '#2e7d32';
+        msg.textContent = data.enabled ? 'Registro abierto.' : 'Registro cerrado.';
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        msg.style.color = '#c62828';
+        msg.textContent = data.error || 'Error';
     }
     return false;
 }
