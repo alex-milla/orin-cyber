@@ -50,10 +50,10 @@ $worker = null;
 $workerOnline = false;
 try {
     $worker = Database::fetchOne(
-        "SELECT * FROM worker_heartbeats ORDER BY timestamp DESC LIMIT 1"
+        "SELECT * FROM worker_heartbeats ORDER BY created_at DESC LIMIT 1"
     );
-    if ($worker && !empty($worker['timestamp'])) {
-        $workerOnline = (time() - strtotime($worker['timestamp'])) < 90;
+    if ($worker && !empty($worker['created_at'])) {
+        $workerOnline = (time() - strtotime($worker['created_at'])) < 180;
     }
 } catch (Exception $e) {
     $worker = null;
@@ -177,15 +177,15 @@ require __DIR__ . '/templates/header.php';
                 </div>
                 <div class="metric">
                     <div class="metric-label">CPU</div>
-                    <div><?php echo htmlspecialchars($worker['cpu_percent'] ?? '—'); ?>%</div>
+                    <div><?php echo $worker['cpu_percent'] !== null ? round($worker['cpu_percent'], 1) . '%' : '—'; ?></div>
                 </div>
                 <div class="metric">
                     <div class="metric-label">RAM</div>
-                    <div><?php echo htmlspecialchars($worker['ram_percent'] ?? '—'); ?>%</div>
+                    <div><?php echo $worker['memory_percent'] !== null ? round($worker['memory_percent'], 1) . '%' : '—'; ?></div>
                 </div>
                 <div class="metric">
                     <div class="metric-label">Último heartbeat</div>
-                    <div class="small"><?php echo htmlspecialchars($worker['timestamp'] ?? '—'); ?></div>
+                    <div class="small"><?php echo htmlspecialchars($worker['created_at'] ?? '—'); ?></div>
                 </div>
             </div>
             <p class="small mt-1"><a href="admin.php?tab=workers">Ver detalles del worker →</a></p>
