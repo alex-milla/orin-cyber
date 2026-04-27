@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.7.5] — 2026-04-28
+
+### Added
+- **Panel de logs en tiempo real** en `admin.php` → Workers:
+  - Nueva columna "📜 Logs" en la tabla de workers. Al hacer clic, se expande un panel con las últimas líneas del log del worker (equivalente a `journalctl -u orinsec-worker -f`).
+  - El panel se actualiza automáticamente cada 5 segundos vía polling AJAX.
+  - El worker envía las últimas 30 líneas de su archivo de log en cada heartbeat.
+  - Cleanup automático de heartbeats antiguos: ahora se conservan **7 días** (antes solo 50 registros).
+
+### Changed
+- `hosting/api/v1/heartbeat.php`: recibe y almacena campo `recent_logs`; cambiado el cleanup a retención de 7 días.
+- `worker/worker.py`: función `_tail_log_file()` lee las últimas N líneas del log y las adjunta al heartbeat.
+
+---
+
 ## [v0.7.4] — 2026-04-27
 
 ### Fixed

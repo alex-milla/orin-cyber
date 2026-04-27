@@ -516,6 +516,15 @@ def apply_command(config_path: str, command: dict, api: ApiClient, logger: loggi
     return False
 
 
+def _tail_log_file(path: str, lines: int = 30) -> str:
+    """Lee las últimas N líneas de un archivo de texto."""
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            return "".join(deque(f, maxlen=lines))
+    except Exception:
+        return ""
+
+
 def main(config_path: Optional[str] = None) -> None:
     config = configparser.ConfigParser()
     config.read(config_path or DEFAULT_CONFIG)
@@ -575,6 +584,12 @@ def main(config_path: Optional[str] = None) -> None:
                     metrics["model_loaded"] = last_model
                     metrics["status"] = "online"
                     metrics["available_models"] = get_available_models(_resolved_models_dir)
+                    # Adjuntar últimas líneas del log para el panel de admin
+                    try:
+                        log_file = config.get("worker", "log_file", fallback="/var/log/orinsec_worker.log")
+                        metrics["recent_logs"] = _tail_log_file(log_file, lines=30)
+                    except Exception:
+                        metrics["recent_logs"] = ""
                     if api.send_heartbeat(metrics):
                         logger.debug("Heartbeat enviado")
                         last_heartbeat = now

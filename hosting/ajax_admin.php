@@ -141,6 +141,21 @@ switch ($action) {
         ]);
         break;
 
+    case 'worker_logs':
+        $apiKeyId = filter_input(INPUT_GET, 'api_key_id', FILTER_VALIDATE_INT);
+        if (!$apiKeyId) {
+            jsonResponse(['error' => 'api_key_id requerido'], 400);
+        }
+        $hb = Database::fetchOne(
+            "SELECT recent_logs FROM worker_heartbeats WHERE api_key_id = ? ORDER BY created_at DESC LIMIT 1",
+            [$apiKeyId]
+        );
+        jsonResponse([
+            'success' => true,
+            'recent_logs' => $hb['recent_logs'] ?? '',
+        ]);
+        break;
+
     case 'cancel_task':
         $taskId = filter_input(INPUT_POST, 'task_id', FILTER_VALIDATE_INT);
         $result = cancelTaskById($taskId);

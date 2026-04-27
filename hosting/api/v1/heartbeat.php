@@ -35,8 +35,8 @@ if (isset($data['available_models']) && is_array($data['available_models'])) {
 Database::query(
     "INSERT INTO worker_heartbeats
      (api_key_id, hostname, ip_address, cpu_percent, memory_percent, memory_total_mb, memory_used_mb,
-      gpu_info, temperature_c, disk_percent, model_loaded, available_models, uptime_seconds, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      gpu_info, temperature_c, disk_percent, model_loaded, available_models, uptime_seconds, status, recent_logs)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     [
         $apiKeyId,
         $hostname,
@@ -52,15 +52,14 @@ Database::query(
         $availableModels,
         filter_int($data['uptime_seconds'] ?? null),
         validateInput($data['status'] ?? 'online', 20) ?? 'online',
+        $recentLogs,
     ]
 );
 
-// Limpiar heartbeats antiguos (mantener 50 por worker)
+// Limpiar heartbeats antiguos (mantener 7 días)
 Database::query(
-    "DELETE FROM worker_heartbeats WHERE id NOT IN (
-        SELECT id FROM worker_heartbeats WHERE api_key_id = ? ORDER BY created_at DESC LIMIT 50
-    ) AND api_key_id = ?",
-    [$apiKeyId, $apiKeyId]
+    "DELETE FROM worker_heartbeats WHERE created_at < datetime('now', '-7 days') AND api_key_id = ?",
+    [$apiKeyId]
 );
 
 jsonResponse(['success' => true]);

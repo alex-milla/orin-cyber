@@ -168,6 +168,7 @@ require __DIR__ . '/templates/header.php';
             <th>Modelo</th>
             <th>Uptime</th>
             <th>Último heartbeat</th>
+            <th>Logs</th>
         </tr></thead>
         <tbody>
         <?php foreach ($workers as $w):
@@ -187,10 +188,23 @@ require __DIR__ . '/templates/header.php';
             <td id="model-cell-<?php echo (int)$w['api_key_id']; ?>"><code><?php echo htmlspecialchars($w['model_loaded'] ?? '—'); ?></code></td>
             <td><?php echo htmlspecialchars($uptime); ?></td>
             <td class="small"><?php echo htmlspecialchars($w['created_at']); ?></td>
+            <td><button type="button" class="btn secondary small" onclick="toggleWorkerLogs(<?php echo (int)$w['api_key_id']; ?>)">📜</button></td>
         </tr>
         <?php endforeach; ?>
         </tbody>
     </table>
+
+    <?php foreach ($workers as $w): ?>
+    <div id="logs-panel-<?php echo (int)$w['api_key_id']; ?>" class="hidden" style="margin-bottom:1rem;">
+        <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:1rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+                <strong>Logs — <?php echo htmlspecialchars($w['worker_name']); ?></strong>
+                <span class="small" style="color:var(--text-muted)">Actualiza con cada heartbeat (~30s)</span>
+            </div>
+            <pre id="logs-pre-<?php echo (int)$w['api_key_id']; ?>" style="max-height:300px;overflow:auto;background:#0d1117;color:#c9d1d9;padding:.75rem;border-radius:6px;font-size:12px;line-height:1.4;margin:0;"></pre>
+        </div>
+    </div>
+    <?php endforeach; ?>
     <?php endif; ?>
 
     <h3 class="mt-4">📡 Enviar comando a worker</h3>
@@ -790,6 +804,43 @@ async function sendWorkerCmd(form) {
         msg.textContent = data.error || 'Error';
         progress.classList.add('hidden');
     }
+}
+
+const _LOG_POLLERS = {};
+
+function toggleWorkerLogs(apiKeyId) {
+    const panel = document.getElementById('logs-panel-' + apiKeyId);
+    if (!panel) return;
+    if (panel.classList.contains('hidden')) {
+        panel.classList.remove('hidden');
+        pollWorkerLogs(apiKeyId);
+    } else {
+        panel.classList.add('hidden');
+        if (_LOG_POLLERS[apiKeyId]) {
+            clearInterval(_LOG_POLLERS[apiKeyId]);
+            delete _LOG_POLLERS[apiKeyId];
+        }
+    }
+}
+
+function pollWorkerLogs(apiKeyId) {
+    if (_LOG_POLLERS[apiKeyId]) clearInterval(_LOG_POLLERS[apiKeyId]);
+    const pre = document.getElementById('logs-pre-' + apiKeyId);
+    if (!pre) return;
+    const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
+    const fetchLogs = async () => {
+        try {
+            const resp = await fetch('ajax_admin.php?action=worker_logs&api_key_id=' + apiKeyId + '&csrf_token=' + encodeURIComponent(csrf));
+            const data = await resp.json();
+            if (data.success && data.recent_logs !== undefined) {
+                pre.textContent = data.recent_logs || '(sin logs recientes)';
+            }
+        } catch (e) {
+            // ignorar errores de red en el polling
+        }
+    };
+    fetchLogs();
+    _LOG_POLLERS[apiKeyId] = setInterval(fetchLogs, 5000);
 }
 
 async function pollCommandStatus(cmdId, apiKeyId, modelName) {

@@ -92,6 +92,7 @@ class Database {
             available_models TEXT,
             uptime_seconds INTEGER,
             status TEXT DEFAULT 'online',
+            recent_logs TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )");
 
@@ -169,6 +170,7 @@ class Database {
         self::_addColumnIfNotExists('worker_commands', 'status', 'TEXT');
         self::_addColumnIfNotExists('worker_commands', 'status_message', 'TEXT');
         self::_addColumnIfNotExists('worker_commands', 'status_updated_at', 'TEXT');
+        self::_addColumnIfNotExists('worker_heartbeats', 'recent_logs', 'TEXT');
     }
 
     private static function _addColumnIfNotExists(string $table, string $column, string $type): void {
