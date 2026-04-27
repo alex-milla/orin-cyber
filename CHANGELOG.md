@@ -1,5 +1,24 @@
 # Changelog
 
+## [v0.6.1] — 2026-04-27
+
+### Added
+- **Sistema de Alertas (Fase C)**:
+  - Tablas `alert_subscriptions` y `alerts` con índices SQLite.
+  - API endpoint `api/v1/alerts.php`: GET subscriptions (worker), POST batch create (worker), GET list, POST mark_read.
+  - Worker `AlertScanTask`: busca CVEs recientes en NVD (últimas 48h), filtra por suscripciones activas, enriquece con EPSS/CISA KEV/OSV, y envía alertas coincidentes al hosting vía API.
+  - `ApiClient.send_alerts()` y `ApiClient.get_alert_subscriptions()` para comunicación worker→hosting.
+  - Página `alerts.php`: listado con filtros (no leídas, severidad), marcar leídas individualmente o en batch.
+  - Badge de alertas no leídas en el header de navegación.
+  - Pestaña "Alertas" en `admin.php`: gestión de suscripciones (producto, vendor, keyword, severidad) con umbral de severidad.
+  - Migración: `hosting/dev/migrate_alerts.php`.
+
+### Changed
+- NVD scraper: nueva función `get_recent_cves(hours, max_results)` para búsqueda por rango de fecha.
+- Worker task registry: añadido `alert_scan` junto a `cve_search`.
+
+---
+
 ## [v0.6.0] — 2026-04-27
 
 ### Added
