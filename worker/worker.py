@@ -150,47 +150,111 @@ def _read_llama_server_output(proc: subprocess.Popen) -> None:
             pass
 
 
-def _restart_llama_server(config: configparser.ConfigParser, model: str, logger: logging.Logger) -> bool:
-    """Asegura que llama-server esté corriendo con el modelo indicado.
+def _build_llama_args(config: configparser.ConfigParser, model: str, logger: logging.Logger) -> tuple[list[str], str, str]:
+    """Construye los argumentos para llama-server y resuelve paths.
+    Retorna (args_list, host, port).
+    """
+    exe = config.get("llama_server", "executable_path", fallback="llama-server")
+    models_dir = config.get("llama_server", "models_dir", fallback="./models/")
+    ctx = config.get("llama_server", "context_size", fallback="8192")
+    host = config.get("llama_server", "host", fallback="0.0.0.0")
+    port = config.get("llama_server", "port", fallback="8080")
+    extra = config.get("llama_server", "extra_args", fallback="")
 
-    Si ya hay un proceso cargando, espera hasta 120s sin matarlo.
-    Solo reinicia si no hay proceso o si no responde después de 120s.
+    # Buscar config específica del modelo
+    model_name = os.path.splitext(model)[0]
+    model_section = f"model_{model_name}"
+    if model_section in config.sections():
+        ctx = config.get(model_section, "context_size", fallback=ctx)
+        extra = config.get(model_section, "extra_args", fallback=extra)
+        logger.info("Usando config específica del modelo: %s (ctx=%s)", model_section, ctx)
+
+    # Resolve executable path
+    if not os.path.isabs(exe):
+        resolved = shutil.which(exe)
+        if resolved:
+            exe = resolved
+        elif os.path.exists(os.path.join(BASE_DIR, exe)):
+            exe = os.path.join(BASE_DIR, exe)
+
+    model_path = os.path.join(models_dir, model)
+    if not os.path.isabs(model_path):
+        model_path = os.path.join(BASE_DIR, model_path)
+
+    args = [exe, "-m", model_path, "-c", ctx, "--host", host, "--port", port]
+    if extra:
+        args.extend(extra.split())
+
+    return args, host, port
+
+
+def _wait_for_llama_ready(host: str, port: str, max_wait_s: int = 120, logger: logging.Logger = None) -> bool:
+    """Polling adaptativo hasta que llama-server responda.
+    Rápido al principio, se relaja después.
+    """
+    delays = [0.5, 0.5, 0.5, 0.5, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0]
+    elapsed = 0.0
+    i = 0
+    while elapsed < max_wait_s:
+        delay = delays[i] if i < len(delays) else 3.0
+        time.sleep(delay)
+        elapsed += delay
+        i += 1
+        if _llama_server_is_ready(host, port):
+            if logger:
+                logger.info("llama-server listo tras %.1fs (%d intentos)", elapsed, i)
+            return True
+        if logger and int(elapsed) % 20 == 0 and elapsed > 10:
+            logger.info("Esperando llama-server... (%.0fs/%ds)", elapsed, max_wait_s)
+    return False
+
+
+def _start_llama_server(config: configparser.ConfigParser, model: str, logger: logging.Logger) -> bool:
+    """Arranca un llama-server fresco con el modelo dado y espera a que responda.
+    Función interna compartida.
+    """
+    global _LLAMA_SERVER_READER_THREAD
+
+    args, host, port = _build_llama_args(config, model, logger)
+    model_path = args[2]  # el path del modelo está en args[2]
+
+    if not os.path.exists(model_path):
+        logger.error("Modelo no encontrado: %s", model_path)
+        return False
+
+    # Build args
+    logger.info("Iniciando llama-server: %s", " ".join(args))
+    proc = subprocess.Popen(
+        args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+
+    # Lanzar thread lector de logs
+    _LLAMA_SERVER_LOG_BUFFER.clear()
+    reader = threading.Thread(target=_read_llama_server_output, args=(proc,), daemon=True)
+    reader.start()
+    _LLAMA_SERVER_READER_THREAD = reader
+
+    # Wait for server to be ready
+    logger.info("Esperando a que llama-server esté listo...")
+    if _wait_for_llama_ready(host, port, max_wait_s=120, logger=logger):
+        return True
+
+    # No respondió: volcar últimas líneas del buffer al log principal para diagnóstico
+    logger.error("llama-server no respondió después de 120s. Últimas líneas de log:")
+    for line in list(_LLAMA_SERVER_LOG_BUFFER):
+        logger.error("[llama-server] %s", line)
+    return False
+
+
+def ensure_llama_server_running(config: configparser.ConfigParser, model: str, logger: logging.Logger) -> bool:
+    """Modo 'arranque': si ya hay uno corriendo y responde, lo reutiliza.
+    Si no hay, lo arranca. Si hay pero no responde en 120s, lo reinicia.
     """
     try:
-        exe = config.get("llama_server", "executable_path", fallback="llama-server")
-        models_dir = config.get("llama_server", "models_dir", fallback="./models/")
-        ctx = config.get("llama_server", "context_size", fallback="8192")
-        host = config.get("llama_server", "host", fallback="0.0.0.0")
-        port = config.get("llama_server", "port", fallback="8080")
-        extra = config.get("llama_server", "extra_args", fallback="")
-
-        # Buscar config específica del modelo
-        model_name = os.path.splitext(model)[0]
-        model_section = f"model_{model_name}"
-        if model_section in config.sections():
-            ctx = config.get(model_section, "context_size", fallback=ctx)
-            extra = config.get(model_section, "extra_args", fallback=extra)
-            logger.info("Usando config específica del modelo: %s (ctx=%s)", model_section, ctx)
-
-        # Resolve executable path
-        if not os.path.isabs(exe):
-            resolved = shutil.which(exe)
-            if resolved:
-                exe = resolved
-            elif os.path.exists(os.path.join(BASE_DIR, exe)):
-                exe = os.path.join(BASE_DIR, exe)
-
-        model_path = os.path.join(models_dir, model)
-        if not os.path.isabs(model_path):
-            model_path = os.path.join(BASE_DIR, model_path)
-
-        if not os.path.exists(model_path):
-            logger.error("Modelo no encontrado: %s", model_path)
-            return False
-
-        global _LLAMA_SERVER_READER_THREAD
-
-        # Verificar si ya hay un proceso corriendo
+        args, host, port = _build_llama_args(config, model, logger)
         existing_pid = _llama_server_pid()
         if existing_pid:
             logger.info("llama-server ya está corriendo (PID %d). Verificando que responda...", existing_pid)
@@ -204,51 +268,38 @@ def _restart_llama_server(config: configparser.ConfigParser, model: str, logger:
             logger.warning("llama-server no responde después de 120s. Reiniciando...")
             subprocess.run(["pkill", "-9", "-f", "llama-server"], capture_output=True)
             time.sleep(2)
-            # Esperar a que el thread lector anterior termine
+            global _LLAMA_SERVER_READER_THREAD
             if _LLAMA_SERVER_READER_THREAD is not None and _LLAMA_SERVER_READER_THREAD.is_alive():
                 _LLAMA_SERVER_READER_THREAD.join(timeout=2)
             _LLAMA_SERVER_READER_THREAD = None
         else:
             logger.info("No hay llama-server corriendo. Iniciando...")
 
-        # Build args
-        args = [exe, "-m", model_path, "-c", ctx, "--host", host, "--port", port]
-        if extra:
-            args.extend(extra.split())
-
-        # Start new llama-server con PIPE para capturar logs
-        logger.info("Iniciando llama-server: %s", " ".join(args))
-        proc = subprocess.Popen(
-            args,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-
-        # Lanzar thread lector de logs
-        _LLAMA_SERVER_LOG_BUFFER.clear()
-        reader = threading.Thread(target=_read_llama_server_output, args=(proc,), daemon=True)
-        reader.start()
-        _LLAMA_SERVER_READER_THREAD = reader
-
-        # Wait for server to be ready (poll every 2s, up to 120s)
-        logger.info("Esperando a que llama-server esté listo...")
-        for attempt in range(1, 61):
-            time.sleep(2)
-            if _llama_server_is_ready(host, port):
-                logger.info("llama-server listo y respondiendo después de %ds.", attempt * 2)
-                return True
-            if attempt % 10 == 0:
-                logger.info("Esperando llama-server... (%d/60)", attempt)
-
-        # No respondió: volcar últimas líneas del buffer al log principal para diagnóstico
-        logger.error("llama-server no respondió después de 120s. Últimas líneas de log:")
-        for line in list(_LLAMA_SERVER_LOG_BUFFER):
-            logger.error("[llama-server] %s", line)
-        return True
-
+        return _start_llama_server(config, model, logger)
     except Exception as exc:
-        logger.exception("Error reiniciando llama-server: %s", exc)
+        logger.exception("Error en ensure_llama_server_running: %s", exc)
+        return False
+
+
+def restart_llama_server_with(config: configparser.ConfigParser, model: str, logger: logging.Logger) -> bool:
+    """Modo 'cambio explícito': mata el proceso actual sin preguntar y arranca el nuevo.
+    """
+    try:
+        existing_pid = _llama_server_pid()
+        if existing_pid:
+            logger.info("Matando llama-server actual (PID %d) para cambio de modelo", existing_pid)
+            subprocess.run(["pkill", "-9", "-f", "llama-server"], capture_output=True)
+            time.sleep(2)
+            global _LLAMA_SERVER_READER_THREAD
+            if _LLAMA_SERVER_READER_THREAD is not None and _LLAMA_SERVER_READER_THREAD.is_alive():
+                _LLAMA_SERVER_READER_THREAD.join(timeout=2)
+            _LLAMA_SERVER_READER_THREAD = None
+        else:
+            logger.info("No hay llama-server corriendo. Iniciando nuevo modelo...")
+
+        return _start_llama_server(config, model, logger)
+    except Exception as exc:
+        logger.exception("Error en restart_llama_server_with: %s", exc)
         return False
 
 
@@ -283,7 +334,7 @@ def apply_command(config_path: str, command: dict, logger: logging.Logger) -> bo
         logger.info("Modelo cambiado en config: %s → %s", old_model, model)
 
         # Restart llama-server with new model (no reiniciar el worker)
-        if _restart_llama_server(config, model, logger):
+        if restart_llama_server_with(config, model, logger):
             logger.info("llama-server reiniciado con nuevo modelo. Worker continúa.")
         else:
             logger.error("No se pudo reiniciar llama-server con el nuevo modelo.")
@@ -314,7 +365,7 @@ def main(config_path: Optional[str] = None) -> None:
     current_model = _load_current_model(config)
     if not _llama_server_is_ready(host, port):
         logger.warning("llama-server no responde. Intentando iniciar automáticamente...")
-        if _restart_llama_server(config, current_model, logger):
+        if ensure_llama_server_running(config, current_model, logger):
             logger.info("llama-server iniciado correctamente al arranque del worker.")
         else:
             logger.error("No se pudo iniciar llama-server automáticamente. Las tareas de LLM fallarán.")
@@ -385,7 +436,7 @@ def main(config_path: Optional[str] = None) -> None:
                 # Verificar llama-server antes de cada tarea (protege contra OOM/crash)
                 if not _llama_server_is_ready(host, port):
                     logger.warning("llama-server no responde antes de tarea %s. Reiniciando...", task_id)
-                    if not _restart_llama_server(config, last_model, logger):
+                    if not ensure_llama_server_running(config, last_model, logger):
                         logger.error("No se pudo reiniciar llama-server. Saltando tarea %s.", task_id)
                         continue
 
