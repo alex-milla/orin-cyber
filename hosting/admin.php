@@ -211,6 +211,7 @@ require __DIR__ . '/templates/header.php';
             <label>Modelo</label>
             <select id="model-select" onchange="updatePayload()">
                 <option value="Qwen3.5-4B-Q4_K_M.gguf">Qwen 3.5 — 4B (calidad alta, lento)</option>
+                <option value="Qwen3.5-9B-Q4_K_M.gguf">Qwen 3.5 — 9B (mejor calidad, más lento, ~6GB)</option>
                 <option value="Phi-4-mini-instruct-Q4_K_M.gguf">Phi-4 Mini — 3.8B (rápido, español decente)</option>
                 <option value="gemma-4-E2B-it-Q4_K_M.gguf">Gemma 2B — 2B (muy rápido, español mediocre)</option>
                 <option value="GLM-4.6V-Flash-Q4_K_M.gguf">GLM-4.6V Flash — 4.6B (contexto corto 4K, ~5.8GB)</option>
