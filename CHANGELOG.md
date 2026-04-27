@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.7.1] — 2026-04-27
+
+### Fixed
+- **Fase 4 hotfixes** — correcciones críticas tras el release v0.7.0:
+  - `gguf_reader.py`: usar `field.contents()` para extraer valores GGUF correctamente; normalizar tipos numpy (`np.int64`, etc.) a Python nativos para JSON serializable.
+  - `gguf_reader.py`: asignar `file_size_mb` antes de su uso en `_model_entry_from_metadata()`.
+  - `gguf_reader.py`: mejorar regex de `size_label` para capturar variantes `[BbMm]`; priorizar extracción desde filename sobre heurística por archivo.
+  - `model_catalog.py`: eliminar inyección automática de `--chat-template` (conflictaba con `--jinja` de llama.cpp build b8932).
+  - `worker.py`: robustecer startup de llama-server tras Fase 4 (`shlex.split()` para args con comillas, rollback de config si `change_model` falla, detectar subprocess muerto durante wait).
+
+### Changed
+- **Configuración por modelo simplificada** (`config.ini`): todas las secciones `[model_*]` reducidas a `-ngl XX` únicamente. Elimina flags agresivos (`-fa on`, `--cache-type-k q8_0`, `--batch-size`, `--threads`, etc.) que causaban crash (`ggml_reshape_2d` → `llm_build_phi3`) al cargar **Phi-4-mini-instruct** en build b8932. Se mantiene `context_size` por modelo.
+
+---
+
 ## [v0.7.0] — 2026-04-27
 
 ### Added
