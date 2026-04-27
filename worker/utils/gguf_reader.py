@@ -103,10 +103,21 @@ def read_gguf_metadata(path: str) -> Optional[Dict[str, Any]]:
             size_label = f"{billions * 1000:.0f}M"
         else:
             size_label = f"{param_count:.0e}"
-    elif basename:
-        m = re.search(r'(\d+(?:\.\d+)?)\s?([BM])', basename)
-        if m:
-            size_label = f"{m.group(1)}{m.group(2)}"
+    # Fallback: extraer del filename o basename
+    if not size_label:
+        for src in [basename, os.path.basename(path)]:
+            if src:
+                m = re.search(r'(\d+(?:\.\d+)?)\s?([BM])', src)
+                if m:
+                    size_label = f"{m.group(1)}{m.group(2)}"
+                    break
+    # Último fallback: estimar desde tamaño de archivo (Q4_K_M ≈ 0.6 GB/B params)
+    if not size_label and file_size_mb:
+        est_b = file_size_mb / 600  # aproximación empírica para Q4_K_M
+        if est_b >= 1:
+            size_label = f"{est_b:.1f}B".replace(".0B", "B")
+        else:
+            size_label = f"{est_b * 1000:.0f}M"
 
     file_size_mb = os.path.getsize(path) / (1024 * 1024)
 
