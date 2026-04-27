@@ -58,7 +58,7 @@ class CveSearchTask(BaseTask):
 
         # ── Modo búsqueda por CVE ID ──────────────────────────────────────
         if cve_id:
-            logger.info("CVE lookup by ID: %s", cve_id)
+            logger.debug("CVE lookup by ID: %s", cve_id)
             cve_data = get_cve_by_id(cve_id)
             if not cve_data:
                 return {
@@ -67,7 +67,7 @@ class CveSearchTask(BaseTask):
                 }
             cves = [cve_data]
         else:
-            logger.info("CVE search: product=%s version=%s year=%s severity=%s", product, version, year, severity)
+            logger.debug("CVE search: product=%s version=%s year=%s severity=%s", product, version, year, severity)
             cves = search_cves(
                 keyword=product,
                 version=version,
@@ -129,9 +129,9 @@ class CveSearchTask(BaseTask):
             if match:
                 lines = [l.strip() for l in match.group(1).splitlines() if l.strip()]
                 desc_translated = " ".join(lines[:3])
-                logger.info("Extracted Spanish description (%s chars)", len(desc_translated))
+                logger.debug("Extracted Spanish description (%s chars)", len(desc_translated))
             else:
-                logger.info("No CONTEXTO section found in LLM output")
+                logger.debug("No CONTEXTO section found in LLM output")
 
         # Guardar traducción en el dict del CVE para el formatter
         if desc_translated:
