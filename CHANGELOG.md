@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.7.6] — 2026-04-28
+
+### Fixed
+- **Worker**: acumular logs en memoria (`_DequeLogHandler`) para enviar al panel de admin, en lugar de leer el archivo de log desde disco (que podía fallar por permisos o rutas).
+- **Hosting heartbeat.php**: variable `$recentLogs` no estaba definida, por lo que se guardaba siempre `NULL` en la base de datos. Ahora se lee y valida correctamente del JSON del worker.
+
+---
+
 ## [v0.7.5] — 2026-04-28
 
 ### Added
