@@ -4,31 +4,28 @@ Extrae información del header de archivos .gguf para auto-configuración.
 Requiere: pip install gguf>=0.10
 """
 import os
+import re
 from typing import Dict, Any, Optional
 
 
 def _get_field(reader, key: str, default: Any = None) -> Any:
-    """Extrae un campo del header GGUF de forma segura.
+    """Extrae un campo del header GGUF de forma segura usando field.contents().
 
-    gguf>=0.18 puede devolver numpy.str_ en lugar de str nativo.
-    Forzamos str() cuando el default es string para evitar
-    'memmap/ndarray object has no attribute .lower()'.
+    gguf>=0.18 almacena los datos en field.parts con índices en field.data.
+    field.contents() maneja strings, scalars y arrays correctamente.
     """
     try:
         field = reader.get_field(key)
         if field is None:
             return default
-        # Los valores pueden ser escalares o listas
-        val = field.parts[0] if field.parts else default
+        val = field.contents()
         if val is None:
             return default
         # Normalizar tipos numpy -> Python nativos
-        if isinstance(default, str):
-            return str(val)
-        if isinstance(default, int):
-            return int(val)
-        if isinstance(default, float):
-            return float(val)
+        if hasattr(val, "item") and callable(getattr(val, "item")) and not isinstance(val, (str, bytes)):
+            return val.item()
+        if isinstance(val, bytes):
+            return val.decode("utf-8")
         return val
     except Exception:
         return default
@@ -86,16 +83,10 @@ def read_gguf_metadata(path: str) -> Optional[Dict[str, Any]]:
     # Estimar parámetros si el header no lo tiene directamente
     param_count = _get_field(reader, "general.parameter_count", None)
     if param_count is None and block_count and embedding_length:
-        # Heurística estándar transformer: ~12 * n_layers * d_model^2 / (1024^3) en miles de millones
-        # Simplificación: 2 * vocab_size * d_model + 12 * n_layers * d_model^2
-        # Usamos una aproximación más ligera:
-        # ~2 * n_layers * d_model^2  (cuenta parámetros de attention + FFN)
         try:
             d_model = int(embedding_length)
             n_layers = int(block_count)
-            # Aproximación razonable para la mayoría de arquitecturas
             estimated = 2 * n_layers * d_model * d_model
-            # Ajuste para vocab embedding
             if vocab_size:
                 estimated += int(vocab_size) * d_model
             param_count = estimated
@@ -113,8 +104,6 @@ def read_gguf_metadata(path: str) -> Optional[Dict[str, Any]]:
         else:
             size_label = f"{param_count:.0e}"
     elif basename:
-        # Fallback: extraer número + B/M del nombre del archivo
-        import re
         m = re.search(r'(\d+(?:\.\d+)?)\s?([BM])', basename)
         if m:
             size_label = f"{m.group(1)}{m.group(2)}"
