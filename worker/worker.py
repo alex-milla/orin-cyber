@@ -19,7 +19,7 @@ from collections import deque
 from typing import Optional
 
 from utils.api_client import ApiClient
-from utils.monitoring import get_metrics
+from utils.monitoring import get_metrics, get_available_models
 from tasks.cve_search import CveSearchTask
 from tasks.alert_scan import AlertScanTask
 
@@ -339,6 +339,8 @@ def main(config_path: Optional[str] = None) -> None:
                     metrics = get_metrics()
                     metrics["model_loaded"] = last_model
                     metrics["status"] = "online"
+                    models_dir = config.get("llama_server", "models_dir", fallback="./models/")
+                    metrics["available_models"] = get_available_models(models_dir)
                     if api.send_heartbeat(metrics):
                         logger.debug("Heartbeat enviado")
                         last_heartbeat = now

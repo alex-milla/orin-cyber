@@ -27,11 +27,16 @@ if (!is_array($data)) {
 $hostname = validateInput($data['hostname'] ?? '', 100) ?? 'unknown';
 
 // Insertar heartbeat
+$availableModels = null;
+if (isset($data['available_models']) && is_array($data['available_models'])) {
+    $availableModels = json_encode($data['available_models']);
+}
+
 Database::query(
     "INSERT INTO worker_heartbeats
      (api_key_id, hostname, ip_address, cpu_percent, memory_percent, memory_total_mb, memory_used_mb,
-      gpu_info, temperature_c, disk_percent, model_loaded, uptime_seconds, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      gpu_info, temperature_c, disk_percent, model_loaded, available_models, uptime_seconds, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     [
         $apiKeyId,
         $hostname,
@@ -44,6 +49,7 @@ Database::query(
         filter_float($data['temperature_c'] ?? null),
         filter_float($data['disk_percent'] ?? null),
         validateInput($data['model_loaded'] ?? '', 100),
+        $availableModels,
         filter_int($data['uptime_seconds'] ?? null),
         validateInput($data['status'] ?? 'online', 20) ?? 'online',
     ]

@@ -119,6 +119,21 @@ def _safe_boot_time() -> float:
     return 0.0
 
 
+def get_available_models(models_dir: str) -> list[str]:
+    """Lista archivos .gguf en el directorio de modelos."""
+    try:
+        if not os.path.isdir(models_dir):
+            return []
+        files = sorted(
+            f for f in os.listdir(models_dir)
+            if f.endswith(".gguf") and os.path.isfile(os.path.join(models_dir, f))
+        )
+        return files
+    except Exception as exc:
+        logger.debug("Failed to list models: %s", exc)
+        return []
+
+
 def get_metrics() -> dict[str, Any]:
     """Devuelve dict con métricas del sistema. Cada métrica falla de forma aislada."""
     metrics: dict[str, Any] = {

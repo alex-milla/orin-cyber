@@ -89,6 +89,7 @@ class Database {
             temperature_c REAL,
             disk_percent REAL,
             model_loaded TEXT,
+            available_models TEXT,
             uptime_seconds INTEGER,
             status TEXT DEFAULT 'online',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
