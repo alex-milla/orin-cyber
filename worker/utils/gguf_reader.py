@@ -80,22 +80,21 @@ def read_gguf_metadata(path: str) -> Optional[Dict[str, Any]]:
     if vocab_size is None:
         vocab_size = _get_field(reader, "llama.vocab_size", None)
 
-    # Estimar parámetros si el header no lo tiene directamente
+    # Leer param_count del header (si existe); NO estimar por heurística
+    # porque las fórmulas simplificadas subestiman modelos modernos con GQA.
     param_count = _get_field(reader, "general.parameter_count", None)
-    if param_count is None and block_count and embedding_length:
-        try:
-            d_model = int(embedding_length)
-            n_layers = int(block_count)
-            estimated = 2 * n_layers * d_model * d_model
-            if vocab_size:
-                estimated += int(vocab_size) * d_model
-            param_count = estimated
-        except Exception:
-            param_count = None
 
-    # Determinar size_label (ej. "4B") a partir del param_count
+    # Determinar size_label: prioridad 1 = regex del filename (muy fiable)
     size_label = ""
-    if param_count:
+    for src in [basename, os.path.basename(path)]:
+        if src:
+            m = re.search(r'(\d+(?:\.\d+)?)\s?([BM])', src)
+            if m:
+                size_label = f"{m.group(1)}{m.group(2)}"
+                break
+
+    # Fallback 2: param_count explícito del header
+    if not size_label and param_count:
         billions = param_count / 1e9
         if billions >= 1:
             size_label = f"{billions:.1f}B".replace(".0B", "B")
@@ -103,15 +102,8 @@ def read_gguf_metadata(path: str) -> Optional[Dict[str, Any]]:
             size_label = f"{billions * 1000:.0f}M"
         else:
             size_label = f"{param_count:.0e}"
-    # Fallback: extraer del filename o basename
-    if not size_label:
-        for src in [basename, os.path.basename(path)]:
-            if src:
-                m = re.search(r'(\d+(?:\.\d+)?)\s?([BM])', src)
-                if m:
-                    size_label = f"{m.group(1)}{m.group(2)}"
-                    break
-    # Último fallback: estimar desde tamaño de archivo (Q4_K_M ≈ 0.6 GB/B params)
+
+    # Fallback 3: estimar desde tamaño de archivo (Q4_K_M ≈ 0.6 GB/B params)
     if not size_label and file_size_mb:
         est_b = file_size_mb / 600  # aproximación empírica para Q4_K_M
         if est_b >= 1:
