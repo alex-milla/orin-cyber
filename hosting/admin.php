@@ -209,12 +209,23 @@ require __DIR__ . '/templates/header.php';
         </select>
         <div id="model-select-wrap">
             <label>Modelo</label>
-            <select id="model-select" onchange="updatePayload()">
+            <div id="model-input-wrap">
+                <input type="text" id="model-input" list="model-datalist" oninput="updatePayload()" placeholder="Nombre del archivo .gguf" style="width:100%;">
+                <datalist id="model-datalist">
+                    <option value="Qwen3.5-4B-Q4_K_M.gguf">
+                    <option value="Qwen3.5-9B-Q4_K_M.gguf">
+                    <option value="Phi-4-mini-instruct-Q4_K_M.gguf">
+                    <option value="gemma-4-E2B-it-Q4_K_M.gguf">
+                    <option value="GLM-4.6V-Flash-Q4_K_M.gguf">
+                    <option value="DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf">
+                </datalist>
+            </div>
+            <select id="model-select" onchange="updatePayload()" style="display:none;width:100%;">
                 <option value="">Selecciona un worker primero...</option>
             </select>
             <p class="small" style="color:var(--warning);">⚠️ Este comando solo edita el config.ini del worker. <strong>Tenés que reiniciar manualmente llama-server</strong> en el Orin Nano para cargar el nuevo modelo.</p>
         </div>
-        <input type="hidden" name="payload" id="cmd-payload" value='{"model":""}'>
+        <input type="hidden" name="payload" id="cmd-payload" value='{"model":"Qwen3.5-4B-Q4_K_M.gguf"}'>
         <button type="submit" class="mt-2">📤 Enviar comando</button>
     </form>
     <p id="cmd-msg" class="mt-1"></p>
@@ -230,20 +241,25 @@ require __DIR__ . '/templates/header.php';
         wrap.style.display = cmd === 'change_model' ? 'block' : 'none';
     }
     function updatePayload() {
-        const model = document.getElementById('model-select').value;
+        const select = document.getElementById('model-select');
+        const input = document.getElementById('model-input');
+        const model = select.style.display !== 'none' ? select.value : input.value;
         document.getElementById('cmd-payload').value = JSON.stringify({model: model});
     }
     function updateModelSelect() {
         const workerId = document.getElementById('worker-select').value;
         const select = document.getElementById('model-select');
-        select.innerHTML = '';
+        const inputWrap = document.getElementById('model-input-wrap');
         const models = WORKER_MODELS[workerId] || [];
         if (models.length === 0) {
-            const opt = document.createElement('option');
-            opt.value = '';
-            opt.textContent = 'No hay modelos reportados (worker offline o sin .gguf)';
-            select.appendChild(opt);
+            // Fallback a input de texto
+            select.style.display = 'none';
+            inputWrap.style.display = 'block';
         } else {
+            // Mostrar select con modelos detectados
+            inputWrap.style.display = 'none';
+            select.style.display = 'block';
+            select.innerHTML = '';
             models.forEach(function(m) {
                 const opt = document.createElement('option');
                 opt.value = m;
