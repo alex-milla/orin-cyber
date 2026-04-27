@@ -8,11 +8,14 @@ y devuelve los resultados. Todo el tráfico es saliente (Orin → Hosting).
 import configparser
 import json
 import logging
+import logging.handlers
 import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
+from collections import deque
 from typing import Optional
 
 from utils.api_client import ApiClient
@@ -22,6 +25,11 @@ from tasks.cve_search import CveSearchTask
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CONFIG = os.path.join(BASE_DIR, "config.ini")
 CURRENT_MODEL_FILE = os.path.join(BASE_DIR, ".current_model")
+LOGS_DIR = os.path.join(BASE_DIR, "logs")
+
+# Buffer circular en memoria con las últimas líneas de llama-server
+_LLAMA_SERVER_LOG_BUFFER: deque[str] = deque(maxlen=100)
+_LLAMA_SERVER_READER_THREAD: Optional[threading.Thread] = None
 
 # Registry de tareas disponibles
 TASK_REGISTRY = {
@@ -35,14 +43,34 @@ def setup_logging(config: configparser.ConfigParser) -> None:
     if log_dir and not os.path.exists(log_dir):
         os.makedirs(log_dir, exist_ok=True)
 
+    # Asegurar directorio de logs de llama-server
+    if not os.path.exists(LOGS_DIR):
+        os.makedirs(LOGS_DIR, exist_ok=True)
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         handlers=[
-            logging.FileHandler(log_file, encoding="utf-8"),
+            logging.handlers.RotatingFileHandler(
+                log_file, maxBytes=10_000_000, backupCount=4, encoding="utf-8"
+            ),
             logging.StreamHandler(sys.stdout),
         ],
     )
+
+    # Logger dedicado para stdout/stderr de llama-server
+    llama_logger = logging.getLogger("llama_server")
+    llama_logger.setLevel(logging.INFO)
+    llama_handler = logging.handlers.RotatingFileHandler(
+        os.path.join(LOGS_DIR, "llama-server.log"),
+        maxBytes=10_000_000,
+        backupCount=4,
+        encoding="utf-8",
+    )
+    llama_handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+    # Evitar propagación al logger raíz para no duplicar en consola del worker
+    llama_logger.propagate = False
+    llama_logger.addHandler(llama_handler)
 
 
 def _save_current_model(model: str) -> None:
@@ -94,6 +122,32 @@ def _llama_server_pid() -> Optional[int]:
     return None
 
 
+def _read_llama_server_output(proc: subprocess.Popen) -> None:
+    """Thread daemon que lee stdout de llama-server línea a línea.
+
+    Escribe cada línea al logger 'llama_server' y mantiene un buffer
+    circular en memoria para diagnóstico rápido ante fallos.
+    """
+    llama_logger = logging.getLogger("llama_server")
+    try:
+        if proc.stdout is None:
+            return
+        for raw_line in iter(proc.stdout.readline, b""):
+            if not raw_line:
+                break
+            line = raw_line.decode("utf-8", errors="replace").rstrip()
+            if line:
+                llama_logger.info(line)
+                _LLAMA_SERVER_LOG_BUFFER.append(line)
+    except Exception:
+        pass
+    finally:
+        try:
+            proc.stdout.close()
+        except Exception:
+            pass
+
+
 def _restart_llama_server(config: configparser.ConfigParser, model: str, logger: logging.Logger) -> bool:
     """Asegura que llama-server esté corriendo con el modelo indicado.
 
@@ -132,6 +186,8 @@ def _restart_llama_server(config: configparser.ConfigParser, model: str, logger:
             logger.error("Modelo no encontrado: %s", model_path)
             return False
 
+        global _LLAMA_SERVER_READER_THREAD
+
         # Verificar si ya hay un proceso corriendo
         existing_pid = _llama_server_pid()
         if existing_pid:
@@ -146,6 +202,10 @@ def _restart_llama_server(config: configparser.ConfigParser, model: str, logger:
             logger.warning("llama-server no responde después de 120s. Reiniciando...")
             subprocess.run(["pkill", "-9", "-f", "llama-server"], capture_output=True)
             time.sleep(2)
+            # Esperar a que el thread lector anterior termine
+            if _LLAMA_SERVER_READER_THREAD is not None and _LLAMA_SERVER_READER_THREAD.is_alive():
+                _LLAMA_SERVER_READER_THREAD.join(timeout=2)
+            _LLAMA_SERVER_READER_THREAD = None
         else:
             logger.info("No hay llama-server corriendo. Iniciando...")
 
@@ -154,14 +214,20 @@ def _restart_llama_server(config: configparser.ConfigParser, model: str, logger:
         if extra:
             args.extend(extra.split())
 
-        # Start new llama-server
+        # Start new llama-server con PIPE para capturar logs
         logger.info("Iniciando llama-server: %s", " ".join(args))
-        subprocess.Popen(
+        proc = subprocess.Popen(
             args,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             start_new_session=True,
         )
+
+        # Lanzar thread lector de logs
+        _LLAMA_SERVER_LOG_BUFFER.clear()
+        reader = threading.Thread(target=_read_llama_server_output, args=(proc,), daemon=True)
+        reader.start()
+        _LLAMA_SERVER_READER_THREAD = reader
 
         # Wait for server to be ready (poll every 2s, up to 120s)
         logger.info("Esperando a que llama-server esté listo...")
@@ -173,7 +239,10 @@ def _restart_llama_server(config: configparser.ConfigParser, model: str, logger:
             if attempt % 10 == 0:
                 logger.info("Esperando llama-server... (%d/60)", attempt)
 
-        logger.warning("llama-server iniciado pero no responde después de 120s.")
+        # No respondió: volcar últimas líneas del buffer al log principal para diagnóstico
+        logger.error("llama-server no respondió después de 120s. Últimas líneas de log:")
+        for line in list(_LLAMA_SERVER_LOG_BUFFER):
+            logger.error("[llama-server] %s", line)
         return True
 
     except Exception as exc:
