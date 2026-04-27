@@ -27,12 +27,29 @@ def _load_catalog(data_dir: str = "./data") -> Dict[str, Any]:
     return {"version": 1, "generated_at": None, "models": {}}
 
 
+def _to_native(obj: Any) -> Any:
+    """Convierte valores numpy a tipos nativos de Python recursivamente.
+
+    gguf>=0.18 devuelve np.str_, np.int64, etc. json.dump no los soporta.
+    Usamos duck-typing (.item() / .tolist()) para no depender de numpy.
+    """
+    if hasattr(obj, "item") and callable(getattr(obj, "item")):
+        return obj.item()
+    if hasattr(obj, "tolist") and callable(getattr(obj, "tolist")):
+        return obj.tolist()
+    if isinstance(obj, dict):
+        return {k: _to_native(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_to_native(v) for v in obj]
+    return obj
+
+
 def _save_catalog(catalog: Dict[str, Any], data_dir: str = "./data") -> None:
     path = _catalog_path(data_dir)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     catalog["generated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(catalog, f, indent=2, ensure_ascii=False)
+        json.dump(_to_native(catalog), f, indent=2, ensure_ascii=False)
 
 
 def _recommended_context(file_size_mb: float, max_context: Optional[int]) -> int:
