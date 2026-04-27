@@ -32,6 +32,9 @@ LOGS_DIR = os.path.join(BASE_DIR, "logs")
 
 # Buffer circular en memoria con las últimas líneas de llama-server
 _LLAMA_SERVER_LOG_BUFFER: deque[str] = deque(maxlen=100)
+
+# Buffer circular con las últimas líneas del propio log del worker (para panel de admin)
+_WORKER_LOG_BUFFER: deque[str] = deque(maxlen=50)
 _LLAMA_SERVER_READER_THREAD: Optional[threading.Thread] = None
 
 # Registry de tareas disponibles
@@ -39,6 +42,20 @@ TASK_REGISTRY = {
     "cve_search": CveSearchTask,
     "alert_scan": AlertScanTask,
 }
+
+
+class _DequeLogHandler(logging.Handler):
+    """Handler que guarda las últimas N líneas de log en un deque global."""
+    def __init__(self, target_deque: deque[str]):
+        super().__init__()
+        self._target = target_deque
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            msg = self.format(record)
+            self._target.append(msg)
+        except Exception:
+            pass
 
 
 def setup_logging(config: configparser.ConfigParser) -> None:
@@ -51,15 +68,22 @@ def setup_logging(config: configparser.ConfigParser) -> None:
     if not os.path.exists(LOGS_DIR):
         os.makedirs(LOGS_DIR, exist_ok=True)
 
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
+    handlers: list[logging.Handler] = [
+        logging.handlers.RotatingFileHandler(
+            log_file, maxBytes=10_000_000, backupCount=4, encoding="utf-8"
+        ),
+        logging.StreamHandler(sys.stdout),
+        _DequeLogHandler(_WORKER_LOG_BUFFER),
+    ]
+    for h in handlers:
+        h.setFormatter(formatter)
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        handlers=[
-            logging.handlers.RotatingFileHandler(
-                log_file, maxBytes=10_000_000, backupCount=4, encoding="utf-8"
-            ),
-            logging.StreamHandler(sys.stdout),
-        ],
+        handlers=handlers,
     )
 
     # Logger dedicado para stdout/stderr de llama-server
@@ -586,8 +610,7 @@ def main(config_path: Optional[str] = None) -> None:
                     metrics["available_models"] = get_available_models(_resolved_models_dir)
                     # Adjuntar últimas líneas del log para el panel de admin
                     try:
-                        log_file = config.get("worker", "log_file", fallback="/var/log/orinsec_worker.log")
-                        metrics["recent_logs"] = _tail_log_file(log_file, lines=30)
+                        metrics["recent_logs"] = "\n".join(_WORKER_LOG_BUFFER)
                     except Exception:
                         metrics["recent_logs"] = ""
                     if api.send_heartbeat(metrics):
