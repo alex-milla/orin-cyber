@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.7.4] — 2026-04-27
+
+### Fixed
+- **Worker**: `_free_jetson_memory()` ahora se ejecuta también en el **arranque inicial** del worker (no solo en cambios de modelo). Esto evita que tras un reinicio del sistema el primer arranque falle por fragmentación de memoria.
+- **Hosting (admin.php)**: el polling JS de `change_model` ahora es robusto. Pasa el nombre del modelo como parámetro en lugar de leerlo del DOM (evita errores si el usuario interactúa mientras carga). Verifica que los elementos existen antes de modificarlos y detiene el spinner correctamente al recibir `ready`/`error`.
+
+### Added
+- `worker/config.ini.example`: plantilla de configuración conservadora con todos los flags y contextos recomendados para el bug JetPack r36.4.7. El `config.ini` real sigue ignorado por git (seguridad de API keys).
+
+---
+
 ## [v0.7.3] — 2026-04-27
 
 ### Fixed
