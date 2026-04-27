@@ -76,11 +76,26 @@ function checkRateLimit(int $seconds = 1): void {
     $key = 'rate_limit_' . md5($ip);
     $now = time();
     $lockFile = DATA_DIR . '/.' . $key . '.tmp';
-    $lastTime = file_exists($lockFile) ? (int)file_get_contents($lockFile) : 0;
+
+    $fp = fopen($lockFile, 'c+');
+    if (!$fp) return;
+    if (!flock($fp, LOCK_EX)) { fclose($fp); return; }
+
+    $content = stream_get_contents($fp);
+    $lastTime = $content !== false && $content !== '' ? (int)$content : 0;
+
     if (($now - $lastTime) < $seconds) {
+        flock($fp, LOCK_UN);
+        fclose($fp);
         jsonResponse(['error' => 'Rate limit exceeded'], 429);
     }
-    file_put_contents($lockFile, (string)$now);
+
+    ftruncate($fp, 0);
+    rewind($fp);
+    fwrite($fp, (string)$now);
+    fflush($fp);
+    flock($fp, LOCK_UN);
+    fclose($fp);
 }
 
 /* ================================================================
@@ -93,20 +108,32 @@ function checkBruteForce(string $identifier, int $maxAttempts = 5, int $windowSe
     $lockFile = DATA_DIR . '/.' . $key . '.json';
     $now = time();
 
+    $fp = fopen($lockFile, 'c+');
+    if (!$fp) return true; // fail open: no bloquear login si no se puede escribir
+    if (!flock($fp, LOCK_EX)) { fclose($fp); return true; }
+
+    $content = stream_get_contents($fp);
     $attempts = [];
-    if (file_exists($lockFile)) {
-        $data = json_decode(file_get_contents($lockFile), true);
+    if ($content !== false && $content !== '') {
+        $data = json_decode($content, true);
         if (is_array($data)) {
             $attempts = array_filter($data, fn($t) => ($now - $t) < $windowSeconds);
         }
     }
 
     if (count($attempts) >= $maxAttempts) {
+        flock($fp, LOCK_UN);
+        fclose($fp);
         return false; // bloqueado
     }
 
     $attempts[] = $now;
-    file_put_contents($lockFile, json_encode($attempts));
+    ftruncate($fp, 0);
+    rewind($fp);
+    fwrite($fp, json_encode($attempts));
+    fflush($fp);
+    flock($fp, LOCK_UN);
+    fclose($fp);
     return true;
 }
 
