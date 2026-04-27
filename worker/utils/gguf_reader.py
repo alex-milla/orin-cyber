@@ -8,14 +8,28 @@ from typing import Dict, Any, Optional
 
 
 def _get_field(reader, key: str, default: Any = None) -> Any:
-    """Extrae un campo del header GGUF de forma segura."""
+    """Extrae un campo del header GGUF de forma segura.
+
+    gguf>=0.18 puede devolver numpy.str_ en lugar de str nativo.
+    Forzamos str() cuando el default es string para evitar
+    'memmap/ndarray object has no attribute .lower()'.
+    """
     try:
         field = reader.get_field(key)
         if field is None:
             return default
         # Los valores pueden ser escalares o listas
         val = field.parts[0] if field.parts else default
-        return val if val is not None else default
+        if val is None:
+            return default
+        # Normalizar tipos numpy -> Python nativos
+        if isinstance(default, str):
+            return str(val)
+        if isinstance(default, int):
+            return int(val)
+        if isinstance(default, float):
+            return float(val)
+        return val
     except Exception:
         return default
 
