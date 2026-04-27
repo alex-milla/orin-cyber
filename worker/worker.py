@@ -20,6 +20,7 @@ from typing import Optional
 
 from utils.api_client import ApiClient
 from utils.monitoring import get_metrics, get_available_models
+from utils.model_catalog import scan_and_update_catalog, get_model_info
 from tasks.cve_search import CveSearchTask
 from tasks.alert_scan import AlertScanTask
 
@@ -150,9 +151,19 @@ def _read_llama_server_output(proc: subprocess.Popen) -> None:
             pass
 
 
-def _build_llama_args(config: configparser.ConfigParser, model: str, logger: logging.Logger) -> tuple[list[str], str, str]:
+def _build_llama_args(
+    config: configparser.ConfigParser,
+    model: str,
+    logger: logging.Logger,
+    catalog_entry: Optional[dict] = None,
+) -> tuple[list[str], str, str]:
     """Construye los argumentos para llama-server y resuelve paths.
     Retorna (args_list, host, port).
+
+    Prioridad de parámetros (de mayor a menor):
+      1. Sección [model_<name>] en config.ini
+      2. Catálogo auto-detectado (models.json)
+      3. Valores globales de config.ini
     """
     exe = config.get("llama_server", "executable_path", fallback="llama-server")
     models_dir = config.get("llama_server", "models_dir", fallback="./models/")
@@ -161,7 +172,14 @@ def _build_llama_args(config: configparser.ConfigParser, model: str, logger: log
     port = config.get("llama_server", "port", fallback="8080")
     extra = config.get("llama_server", "extra_args", fallback="")
 
-    # Buscar config específica del modelo
+    # Fallback al catálogo auto-detectado
+    if catalog_entry:
+        ctx = str(catalog_entry.get("recommended_context", ctx))
+        catalog_extra = catalog_entry.get("extra_args", "")
+        if catalog_extra:
+            extra = f"{catalog_extra} {extra}".strip()
+
+    # Override manual: sección [model_<name>] en config.ini
     model_name = os.path.splitext(model)[0]
     model_section = f"model_{model_name}"
     if model_section in config.sections():
@@ -212,15 +230,32 @@ def _wait_for_llama_ready(host: str, port: str, max_wait_s: int = 120, logger: l
 def _start_llama_server(config: configparser.ConfigParser, model: str, logger: logging.Logger) -> bool:
     """Arranca un llama-server fresco con el modelo dado y espera a que responda.
     Función interna compartida.
+    Lee el catálogo auto-generado para ajustar contexto y tiempo de espera.
     """
     global _LLAMA_SERVER_READER_THREAD
 
-    args, host, port = _build_llama_args(config, model, logger)
+    # Cargar catálogo para parámetros auto-detectados
+    catalog_entry = get_model_info(model, data_dir=os.path.join(BASE_DIR, "data"))
+    if catalog_entry and logger:
+        logger.info(
+            "Catálogo: %s (%s, ctx=%d, ~%ds carga)",
+            model,
+            catalog_entry.get("size_label", "?"),
+            catalog_entry.get("recommended_context", "?"),
+            catalog_entry.get("expected_load_seconds", "?"),
+        )
+
+    args, host, port = _build_llama_args(config, model, logger, catalog_entry)
     model_path = args[2]  # el path del modelo está en args[2]
 
     if not os.path.exists(model_path):
         logger.error("Modelo no encontrado: %s", model_path)
         return False
+
+    # Calcular tiempo de espera según tamaño del modelo
+    max_wait = 120
+    if catalog_entry:
+        max_wait = max(60, min(300, catalog_entry.get("expected_load_seconds", 120) * 2))
 
     # Build args
     logger.info("Iniciando llama-server: %s", " ".join(args))
@@ -238,12 +273,12 @@ def _start_llama_server(config: configparser.ConfigParser, model: str, logger: l
     _LLAMA_SERVER_READER_THREAD = reader
 
     # Wait for server to be ready
-    logger.info("Esperando a que llama-server esté listo...")
-    if _wait_for_llama_ready(host, port, max_wait_s=120, logger=logger):
+    logger.info("Esperando a que llama-server esté listo (timeout=%ds)...", max_wait)
+    if _wait_for_llama_ready(host, port, max_wait_s=max_wait, logger=logger):
         return True
 
     # No respondió: volcar últimas líneas del buffer al log principal para diagnóstico
-    logger.error("llama-server no respondió después de 120s. Últimas líneas de log:")
+    logger.error("llama-server no respondió después de %ds. Últimas líneas de log:", max_wait)
     for line in list(_LLAMA_SERVER_LOG_BUFFER):
         logger.error("[llama-server] %s", line)
     return False
@@ -391,6 +426,14 @@ def main(config_path: Optional[str] = None) -> None:
     # Contador para heartbeat (no enviamos en cada poll)
     last_heartbeat = 0.0
     last_model = current_model
+    heartbeat_count = 0
+
+    # Escanear catálogo de modelos al arranque
+    try:
+        models_dir = config.get("llama_server", "models_dir", fallback="./models/")
+        scan_and_update_catalog(models_dir, data_dir=os.path.join(BASE_DIR, "data"), logger=logger)
+    except Exception as exc:
+        logger.warning("Error escaneando catálogo de modelos al arranque: %s", exc)
 
     while True:
         try:
@@ -406,6 +449,13 @@ def main(config_path: Optional[str] = None) -> None:
                     if api.send_heartbeat(metrics):
                         logger.debug("Heartbeat enviado")
                         last_heartbeat = now
+                        heartbeat_count += 1
+                        # Re-escanear catálogo cada 10 heartbeats (~5 min si interval=30s)
+                        if heartbeat_count % 10 == 0:
+                            try:
+                                scan_and_update_catalog(models_dir, data_dir=os.path.join(BASE_DIR, "data"), logger=logger)
+                            except Exception as exc:
+                                logger.warning("Error re-escaneando catálogo: %s", exc)
                     else:
                         logger.warning("Heartbeat rechazado por el hosting")
                 except Exception as exc:

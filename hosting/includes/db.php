@@ -140,6 +140,30 @@ class Database {
         $db->exec("CREATE INDEX IF NOT EXISTS idx_alerts_read ON alerts(read_at)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_subs_user ON alert_subscriptions(user_id, active)");
 
+        // Catálogo de modelos (etiquetas legibles) — Fase 4
+        $db->exec("CREATE TABLE IF NOT EXISTS model_catalog (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pattern TEXT NOT NULL UNIQUE,
+            label TEXT NOT NULL,
+            tier TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_modelcatalog_pattern ON model_catalog(pattern)");
+
+        // Inserts iniciales (idempotentes: IGNORE en UNIQUE conflict)
+        $defaults = [
+            ['*qwen*4*', 'Qwen 4B', 'small'],
+            ['*qwen*9*', 'Qwen 9B', 'large'],
+            ['*phi*4*', 'Phi-4', 'small'],
+            ['*gemma*2*', 'Gemma 2B', 'small'],
+            ['*glm*', 'GLM-4.6V', 'large'],
+            ['*deepseek*7*', 'DeepSeek 7B', 'medium'],
+        ];
+        $stmt = $db->prepare("INSERT OR IGNORE INTO model_catalog (pattern, label, tier) VALUES (?, ?, ?)");
+        foreach ($defaults as $row) {
+            $stmt->execute($row);
+        }
+
         // Migraciones de columnas para tablas existentes
         self::_addColumnIfNotExists('worker_heartbeats', 'available_models', 'TEXT');
         self::_addColumnIfNotExists('worker_commands', 'status', 'TEXT');

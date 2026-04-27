@@ -45,6 +45,13 @@ try {
     $alertSubs = [];
 }
 
+// Catálogo de modelos para etiquetas legibles — Fase 4
+try {
+    $modelCatalog = Database::fetchAll("SELECT pattern, label, tier FROM model_catalog ORDER BY id");
+} catch (Throwable $e) {
+    $modelCatalog = [];
+}
+
 try {
     $workers = Database::fetchAll(
         "SELECT h.*, k.name as worker_name, k.api_key,
@@ -225,6 +232,7 @@ require __DIR__ . '/templates/header.php';
         $carry[$w['api_key_id']] = json_decode($w['available_models'] ?? '[]', true) ?: [];
         return $carry;
     }, []), JSON_UNESCAPED_UNICODE); ?>;
+    const MODEL_CATALOG = <?php echo json_encode($modelCatalog, JSON_UNESCAPED_UNICODE); ?>;
 
     function toggleModelSelect() {
         const cmd = document.getElementById('cmd-select').value;
@@ -234,6 +242,19 @@ require __DIR__ . '/templates/header.php';
     function updatePayload() {
         const model = document.getElementById('model-select').value;
         document.getElementById('cmd-payload').value = JSON.stringify({model: model});
+    }
+    // Convierte patrón glob simple (* → .*) a regex
+    function globToRegex(pattern) {
+        const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+        return new RegExp('^' + escaped.replace(/\*/g, '.*') + '$', 'i');
+    }
+    function resolveModelLabel(filename) {
+        for (const entry of MODEL_CATALOG) {
+            if (globToRegex(entry.pattern).test(filename)) {
+                return entry.label + (entry.tier ? ' (' + entry.tier + ')' : '');
+            }
+        }
+        return filename;
     }
     function populateModels() {
         const workerId = document.getElementById('worker-select').value;
@@ -256,7 +277,7 @@ require __DIR__ . '/templates/header.php';
         models.forEach(function(m) {
             const opt = document.createElement('option');
             opt.value = m;
-            opt.textContent = m;
+            opt.textContent = resolveModelLabel(m);
             modelSelect.appendChild(opt);
         });
         hint.textContent = models.length + ' modelo(s) disponible(s) en este worker.';
