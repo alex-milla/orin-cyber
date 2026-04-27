@@ -1,5 +1,26 @@
 # Changelog
 
+## [v0.5.8] — 2026-04-27
+
+### Security
+- **Scripts de diagnóstico protegidos**: `diagnose.php`, `emergency_fix.php` y `migrate_010_to_020.php` movidos a `hosting/dev/` con bloqueo vía `.htaccess` (`Require all denied`) y `requireAdmin()` como defense in depth.
+- **Cookies Secure automáticas**: `session.cookie_secure` se activa automáticamente cuando se detecta HTTPS (incluyendo proxies con `X-Forwarded-Proto`).
+- **Sanitización de informes HTML**: nueva función `sanitizeReportHtml()` elimina atributos `on*` (event handlers) y URLs `javascript:` del HTML generado por el worker. Aplicada tanto en `task_result.php` como en `ajax_check_status.php`.
+
+### Fixed
+- **Race condition en rate limiting**: `checkRateLimit()` y `checkBruteForce()` ahora usan `flock` en vez de `file_get_contents`/`file_put_contents` directos, evitando que peticiones simultáneas se salten el límite.
+- **Duplicación de cancelación de tareas**: código idéntico en 3 rutas (`ajax_admin.php`, `api/v1/tasks.php`, `api/v1/task_cancel.php`) centralizado en `cancelTaskById()` en `functions.php`. Eliminado `task_cancel.php` (obsoleto desde v0.5.3).
+
+### Performance
+- **Índices SQLite faltantes**: añadidos 4 índices (`tasks/status+created`, `api_keys/key+active`, `worker_heartbeats/api_key+created`, `worker_commands/api_key+executed`) para acelerar las queries más frecuentes. Incluido script `dev/migrate_indexes.php` para instalaciones existentes.
+
+### Changed
+- **Refactor parser NVD**: eliminada duplicación masiva entre `search_cves()` y `get_cve_by_id()`. Extraídos `_parse_cve_item()` y `_query_nvd()` como funciones compartidas.
+- **Limpieza de código muerto**: eliminado `LlmClient.translate()` (sin uso desde v0.4.0).
+- **Logs verbosos reducidos a DEBUG**: logs que contenían datos de entrada del usuario (CVE IDs, productos, versiones) pasan a nivel `DEBUG`. Solo eventos del sistema quedan en `INFO`, reduciendo retención de PII.
+
+---
+
 ## [v0.5.7] — 2026-04-27
 
 ### Added
