@@ -1,5 +1,23 @@
 # Changelog
 
+## [v0.7.0] — 2026-04-27
+
+### Added
+- **Gestión dinámica de modelos LLM (Fases 1-4)**:
+  - **Fase 1 — Dropdown dinámico**: `admin.php` popula el selector de modelos desde `worker_heartbeats.available_models` (heartbeat del worker). Nuevos `.gguf` aparecen automáticamente en ≤30s.
+  - **Fase 2 — Latencia de change_model optimizada**: `restart_llama_server_with()` mata el proceso inmediatamente (~2s) y arranca el nuevo modelo. `ensure_llama_server_running()` reutiliza proceso sano en arranque/tareas. Polling adaptativo `[0.5×4, 1×3, 2×3, luego 3s]`.
+  - **Fase 3 — Feedback de progreso en tiempo real**: columnas `status`, `status_message`, `status_updated_at` en `worker_commands`. El worker reporta fases (`executing` → `loading` → `ready`/`error`). El frontend hace polling cada 2s mostrando spinner y mensaje de estado.
+  - **Fase 4 — Auto-configuración desde headers GGUF**:
+    - `worker/utils/gguf_reader.py`: lee metadatos GGUF (arquitectura, contexto, cuantización, parámetros estimados).
+    - `worker/utils/model_catalog.py`: genera `worker/data/models.json` con heurísticas de contexto recomendado, tiempo de carga estimado y `extra_args` (chat-template) según arquitectura. Cache por `mtime`.
+    - `worker.py` integra el catálogo: prioridad `[model_<name>]` en config.ini > catálogo > config global. Ajusta `max_wait_s` dinámicamente según tamaño del modelo.
+    - Hosting: tabla `model_catalog` con patrones glob, etiquetas legibles y tier. `admin.php` resuelve etiquetas vía glob-to-regex en JS.
+
+### Changed
+- `worker/requirements.txt`: añadida dependencia `gguf>=0.10`.
+
+---
+
 ## [v0.6.2] — 2026-04-27
 
 ### Fixed
