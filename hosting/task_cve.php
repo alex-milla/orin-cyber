@@ -78,20 +78,13 @@ $worker = null;
 $workerOnline = false;
 try {
     $worker = Database::fetchOne(
-        "SELECT * FROM worker_heartbeats ORDER BY created_at DESC LIMIT 1"
+        "SELECT *, CASE WHEN created_at > datetime('now', '-3 minutes') THEN 1 ELSE 0 END as is_online
+         FROM worker_heartbeats ORDER BY created_at DESC LIMIT 1"
     );
-    if ($worker && !empty($worker['created_at'])) {
-        // SQLite stores CURRENT_TIMESTAMP in UTC; force UTC comparison
-        try {
-            $heartbeatTime = new DateTime($worker['created_at'], new DateTimeZone('UTC'));
-            $now = new DateTime('now', new DateTimeZone('UTC'));
-            $workerOnline = ($now->getTimestamp() - $heartbeatTime->getTimestamp()) < 180;
-        } catch (Exception $e) {
-            $workerOnline = false;
-        }
-    }
+    $workerOnline = $worker && !empty($worker['is_online']);
 } catch (Exception $e) {
     $worker = null;
+    $workerOnline = false;
 }
 
 // --- CVE search history ---

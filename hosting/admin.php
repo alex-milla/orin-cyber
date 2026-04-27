@@ -47,7 +47,8 @@ try {
 
 try {
     $workers = Database::fetchAll(
-        "SELECT h.*, k.name as worker_name, k.api_key
+        "SELECT h.*, k.name as worker_name, k.api_key,
+            CASE WHEN h.created_at > datetime('now', '-2 minutes') THEN 1 ELSE 0 END as is_online
          FROM worker_heartbeats h
          INNER JOIN api_keys k ON k.id = h.api_key_id
          WHERE h.created_at = (
@@ -163,13 +164,7 @@ require __DIR__ . '/templates/header.php';
         </tr></thead>
         <tbody>
         <?php foreach ($workers as $w):
-            try {
-                $hbTime = new DateTime($w['created_at'], new DateTimeZone('UTC'));
-                $now = new DateTime('now', new DateTimeZone('UTC'));
-                $isOnline = ($now->getTimestamp() - $hbTime->getTimestamp()) < 120;
-            } catch (Exception $e) {
-                $isOnline = false;
-            }
+            $isOnline = !empty($w['is_online']);
             $gpuInfo = $w['gpu_info'] ? json_decode($w['gpu_info'], true) : null;
             $gpuText = $gpuInfo ? ($gpuInfo['name'] ?? 'GPU') . ' ' . ($gpuInfo['load_percent'] ?? '?') . '%' : '—';
             $uptime = $w['uptime_seconds'] ? gmdate('H:i:s', $w['uptime_seconds']) : '—';

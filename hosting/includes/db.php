@@ -139,7 +139,22 @@ class Database {
         $db->exec("CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at DESC)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_alerts_read ON alerts(read_at)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_subs_user ON alert_subscriptions(user_id, active)");
+
+        // Migraciones de columnas para tablas existentes
+        self::_addColumnIfNotExists('worker_heartbeats', 'available_models', 'TEXT');
     }
+
+    private static function _addColumnIfNotExists(string $table, string $column, string $type): void {
+        $db = self::$instance;
+        if (!$db) return;
+        try {
+            $cols = $db->query("PRAGMA table_info({$table})")->fetchAll(PDO::FETCH_COLUMN, 1);
+            if (!in_array($column, $cols, true)) {
+                $db->exec("ALTER TABLE {$table} ADD COLUMN {$column} {$type}");
+            }
+        } catch (PDOException $e) {
+            // Ignorar si la tabla no existe todavía
+        }
 
     public static function query(string $sql, array $params = []): PDOStatement {
         $db = self::getInstance();
