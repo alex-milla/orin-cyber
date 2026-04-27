@@ -128,9 +128,12 @@ class ApiClient:
                     "message": message,
                 },
             )
-            return data is not None and data.get("success", False)
+            if data is not None and data.get("success", False):
+                return True
+            logger.warning("Report command status rejected: %s", data)
+            return False
         except requests.RequestException as exc:
-            logger.debug("Report command status failed: %s", exc)
+            logger.warning("Report command status failed: %s", exc)
         return False
 
     def get_alert_subscriptions(self) -> list:

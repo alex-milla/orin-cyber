@@ -135,7 +135,7 @@ switch ($action) {
         }
         jsonResponse([
             'success' => true,
-            'status' => $cmd['status'] ?? 'pending',
+            'status' => $cmd['status'] ?: 'pending',
             'message' => $cmd['status_message'] ?? '',
             'updated_at' => $cmd['status_updated_at'] ?? '',
         ]);

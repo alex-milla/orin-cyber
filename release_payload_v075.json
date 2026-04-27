@@ -1,0 +1,7 @@
+{
+  "tag_name": "v0.7.5",
+  "name": "v0.7.5 — Panel de logs en tiempo real + retención 7 días",
+  "body": "## [v0.7.5] — 2026-04-28\n\n### Added\n- **Panel de logs en tiempo real** en `admin.php` → Workers:\n  - Nueva columna \"📜 Logs\" en la tabla de workers. Al hacer clic, se expande un panel con las últimas líneas del log del worker (equivalente a `journalctl -u orinsec-worker -f`).\n  - El panel se actualiza automáticamente cada 5 segundos vía polling AJAX.\n  - El worker envía las últimas 30 líneas de su archivo de log en cada heartbeat.\n  - Cleanup automático de heartbeats antiguos: ahora se conservan **7 días** (antes solo 50 registros).\n\n### Changed\n- `hosting/api/v1/heartbeat.php`: recibe y almacena campo `recent_logs`; cambiado el cleanup a retención de 7 días.\n- `worker/worker.py`: función `_tail_log_file()` lee las últimas N líneas del log y las adjunta al heartbeat.",
+  "draft": false,
+  "prerelease": false
+}

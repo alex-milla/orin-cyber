@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.7.8] — 2026-04-28
+
+### Fixed
+- **Hosting commands.php**: `validateInput` en el `message` del comando rechazaba caracteres especiales (`(`, `)`, `/`, etc.), guardando mensajes vacíos. Ahora usa `substr` sin filtrado.
+- **Hosting ajax_admin.php**: el endpoint `command_status` devolvía `null` cuando el status de la BD era NULL, en lugar de `'pending'`. El JS no coincidía con `'ready'`/`'error'` y se quedaba en timeout. Cambiado `??` por `?:`.
+- **Worker api_client.py**: `report_command_status` ahora loggea a **WARNING** (visible en el panel de logs) cuando el hosting rechaza o falla al reportar estado.
+
+---
+
 ## [v0.7.7] — 2026-04-28
 
 ### Fixed

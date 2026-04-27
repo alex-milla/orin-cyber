@@ -22,7 +22,7 @@ if ($action === 'update_status') {
     $data = getJsonInput();
     $cmdId = filter_var($data['command_id'] ?? 0, FILTER_VALIDATE_INT);
     $status = validateInput($data['status'] ?? '', 20) ?? '';
-    $message = validateInput($data['message'] ?? '', 255) ?? '';
+    $message = isset($data['message']) ? substr((string)$data['message'], 0, 500) : '';
 
     $allowed = ['pending', 'executing', 'loading', 'ready', 'error'];
     if (!in_array($status, $allowed, true)) {
