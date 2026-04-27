@@ -6,11 +6,15 @@ require_once __DIR__ . '/functions.php';
 
 // Configurar cookies de sesión ANTES de session_start()
 if (session_status() === PHP_SESSION_NONE) {
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
+            || (($_SERVER['SERVER_PORT'] ?? '') == 443);
+
     ini_set('session.cookie_httponly', '1');
     ini_set('session.cookie_samesite', 'Strict');
     ini_set('session.use_strict_mode', '1');
-    // Solo forzar Secure si hay HTTPS activo (descomentar en producción con SSL)
-    // ini_set('session.cookie_secure', '1');
+    ini_set('session.cookie_secure', $isHttps ? '1' : '0');
+
     session_start();
 }
 
