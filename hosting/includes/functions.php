@@ -67,6 +67,19 @@ function getJsonInput(): array {
     return $data;
 }
 
+function sanitizeReportHtml(?string $html): string {
+    if (!$html) return '';
+    $allowedTags = '<p><br><hr><h1><h2><h3><h4><h5><h6><ul><ol><li>'
+                 . '<strong><em><b><i><a><code><pre><blockquote>'
+                 . '<div><span><table><thead><tbody><tr><th><td>';
+    $html = strip_tags($html, $allowedTags);
+    $html = preg_replace('/\s*on[a-z]+\s*=\s*"[^"]*"/i', '', $html);
+    $html = preg_replace("/\s*on[a-z]+\s*=\s*'[^']*'/i", '', $html);
+    $html = preg_replace('/\s*on[a-z]+\s*=\s*[^\s>]+/i', '', $html);
+    $html = preg_replace('/(href|src)\s*=\s*["\']?\s*javascript:/i', '$1="#"', $html);
+    return $html;
+}
+
 /* ================================================================
    RATE LIMITING (general)
    ================================================================ */

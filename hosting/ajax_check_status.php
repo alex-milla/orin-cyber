@@ -29,7 +29,7 @@ if (!$task) {
 jsonResponse([
     'id' => $task['id'],
     'status' => $task['status'],
-    'result_html' => $task['result_html'],
+    'result_html' => sanitizeReportHtml($task['result_html'] ?? ''),
     'result_text' => $task['result_text'],
     'error_message' => $task['error_message'],
     'created_at' => $task['created_at'],

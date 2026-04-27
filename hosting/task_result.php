@@ -23,9 +23,7 @@ if (!$task) {
     exit;
 }
 
-// Sanitizar HTML del resultado: lista blanca de etiquetas seguras
-$allowedTags = '<p><br><hr><h1><h2><h3><h4><h5><h6><ul><ol><li><strong><em><b><i><a><code><pre><blockquote><div><span><table><thead><tbody><tr><th><td>';
-$safeHtml = strip_tags($task['result_html'] ?? '', $allowedTags);
+$safeHtml = sanitizeReportHtml($task['result_html'] ?? '');
 
 $pageTitle = 'Resultado #' . $taskId . ' — OrinSec';
 require __DIR__ . '/templates/header.php';
