@@ -1,0 +1,48 @@
+[hosting]
+url = https://orin.cyberintelligence.dev
+api_key = c4d507776e4933ca6699a042684cf8ca
+
+[llm]
+server_url = http://localhost:8080
+model = DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf
+max_tokens = 2048
+temperature = 0.3
+
+[llama_server]
+executable_path = /home/alex/llama.cpp/build/bin/llama-server
+models_dir = /home/alex/llama.cpp/models/
+context_size = 4096
+host = 0.0.0.0
+port = 8080
+extra_args = -fa on --cache-type-k q8_0 --cache-type-v q8_0 --batch-size 256 --ubatch-size 256 --no-mmap --mlock
+
+[model_Qwen3.5-4B-Q4_K_M]
+context_size = 4096
+extra_args = -ngl 20 -fa on --cache-type-k q8_0 --cache-type-v q8_0 --batch-size 256 --ubatch-size 256 --no-mmap --mlock
+
+[model_Qwen3.5-9B-Q4_K_M]
+context_size = 2048
+extra_args = -ngl 5 -fa on --cache-type-k q8_0 --cache-type-v q8_0 --batch-size 256 --ubatch-size 256 --no-mmap --mlock
+
+[model_Phi-4-mini-instruct-Q4_K_M]
+context_size = 4096
+extra_args = -ngl 18 --cache-type-k q8_0 --cache-type-v q8_0 --batch-size 256 --ubatch-size 256 --no-mmap --mlock
+
+[model_gemma-4-E2B-it-Q4_K_M]
+context_size = 4096
+extra_args = -ngl 28 -fa on --cache-type-k q8_0 --cache-type-v q8_0 --batch-size 256 --ubatch-size 256 --no-mmap --mlock
+
+[model_GLM-4.6V-Flash-Q4_K_M]
+context_size = 1536
+extra_args = -ngl 0 --cache-type-k q8_0 --cache-type-v q8_0 --batch-size 128 --ubatch-size 128 --no-mmap --mlock
+
+[model_DeepSeek-R1-Distill-Qwen-7B-Q4_K_M]
+context_size = 2048
+extra_args = -ngl 8 -fa on --cache-type-k q8_0 --cache-type-v q8_0 --batch-size 256 --ubatch-size 256 --no-mmap --mlock
+
+[worker]
+poll_interval = 15
+max_retries = 3
+log_file = /home/alex/orinsec_worker.log
+task_timeout = 120
+heartbeat_interval = 30
