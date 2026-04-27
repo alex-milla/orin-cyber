@@ -214,6 +214,12 @@ require __DIR__ . '/templates/header.php';
         <button type="submit" class="mt-2">📤 Enviar comando</button>
     </form>
     <p id="cmd-msg" class="mt-1"></p>
+    <div id="cmd-progress" class="mt-1 hidden">
+        <div style="display:flex;align-items:center;gap:.5rem;">
+            <div class="spinner" style="width:16px;height:16px;border-width:2px;"></div>
+            <span id="cmd-status-text" class="small"></span>
+        </div>
+    </div>
     <script>
     const WORKERS_MODELS = <?php echo json_encode(array_reduce($workers, function($carry, $w) {
         $carry[$w['api_key_id']] = json_decode($w['available_models'] ?? '[]', true) ?: [];
@@ -744,14 +750,54 @@ async function sendWorkerCmd(form) {
     const resp = await fetch(form.action, { method: 'POST', body: fd });
     const data = await resp.json();
     const msg = document.getElementById('cmd-msg');
+    const progress = document.getElementById('cmd-progress');
+    const statusText = document.getElementById('cmd-status-text');
     if (data.success) {
         msg.className = 'alert alert-success mt-1';
         msg.textContent = 'Comando enviado. El worker lo ejecutará en su próximo ciclo.';
-        form.reset();
+        if (data.command_id && fd.get('command') === 'change_model') {
+            progress.classList.remove('hidden');
+            pollCommandStatus(data.command_id);
+        }
     } else {
         msg.className = 'alert alert-error mt-1';
         msg.textContent = data.error || 'Error';
+        progress.classList.add('hidden');
     }
+}
+
+async function pollCommandStatus(cmdId) {
+    const progress = document.getElementById('cmd-progress');
+    const statusText = document.getElementById('cmd-status-text');
+    const msg = document.getElementById('cmd-msg');
+    const maxAttempts = 60; // ~2 min
+    for (let i = 0; i < maxAttempts; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        try {
+            const resp = await fetch('ajax_admin.php?action=command_status&id=' + cmdId);
+            const data = await resp.json();
+            if (!data.success) continue;
+            const status = data.status;
+            statusText.textContent = data.message || status;
+            if (status === 'ready') {
+                progress.classList.add('hidden');
+                msg.className = 'alert alert-success mt-1';
+                msg.textContent = data.message || 'Modelo cargado correctamente';
+                return;
+            }
+            if (status === 'error') {
+                progress.classList.add('hidden');
+                msg.className = 'alert alert-error mt-1';
+                msg.textContent = data.message || 'Error al cargar el modelo';
+                return;
+            }
+        } catch (e) {
+            // ignorar errores de red en el polling
+        }
+    }
+    progress.classList.add('hidden');
+    msg.className = 'alert alert-warning mt-1';
+    msg.textContent = 'Timeout esperando confirmación del worker. Revisa el estado manualmente.';
 }
 
 async function deleteBackup(file) {

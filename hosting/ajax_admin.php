@@ -113,12 +113,32 @@ switch ($action) {
             jsonResponse(['error' => 'Payload JSON inválido'], 400);
         }
 
-        Database::insert('worker_commands', [
+        $cmdId = Database::insert('worker_commands', [
             'api_key_id' => $apiKeyId,
             'command' => $command,
             'payload' => $payload !== '' ? $payload : null,
         ]);
-        jsonResponse(['success' => true]);
+        jsonResponse(['success' => true, 'command_id' => $cmdId]);
+        break;
+
+    case 'command_status':
+        $cmdId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        if (!$cmdId) {
+            jsonResponse(['error' => 'ID requerido'], 400);
+        }
+        $cmd = Database::fetchOne(
+            "SELECT status, status_message, status_updated_at FROM worker_commands WHERE id = ?",
+            [$cmdId]
+        );
+        if (!$cmd) {
+            jsonResponse(['error' => 'Comando no encontrado'], 404);
+        }
+        jsonResponse([
+            'success' => true,
+            'status' => $cmd['status'] ?? 'pending',
+            'message' => $cmd['status_message'] ?? '',
+            'updated_at' => $cmd['status_updated_at'] ?? '',
+        ]);
         break;
 
     case 'cancel_task':

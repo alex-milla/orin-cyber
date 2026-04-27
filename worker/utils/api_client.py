@@ -117,6 +117,22 @@ class ApiClient:
             logger.debug("Commands poll failed: %s", exc)
         return []
 
+    def report_command_status(self, command_id: int, status: str, message: str = "") -> bool:
+        """Reporta el estado de un comando en ejecución al hosting."""
+        try:
+            data = self._request(
+                "POST", "/api/v1/commands.php?action=update_status",
+                json={
+                    "command_id": command_id,
+                    "status": status,
+                    "message": message,
+                },
+            )
+            return data is not None and data.get("success", False)
+        except requests.RequestException as exc:
+            logger.debug("Report command status failed: %s", exc)
+        return False
+
     def get_alert_subscriptions(self) -> list:
         """Obtiene suscripciones de alertas activas."""
         try:

@@ -303,7 +303,7 @@ def restart_llama_server_with(config: configparser.ConfigParser, model: str, log
         return False
 
 
-def apply_command(config_path: str, command: dict, logger: logging.Logger) -> bool:
+def apply_command(config_path: str, command: dict, api: ApiClient, logger: logging.Logger) -> bool:
     """Procesa un comando recibido del hosting.
 
     Retorna True solo si el worker completo debe reiniciarse (systemd).
@@ -311,6 +311,11 @@ def apply_command(config_path: str, command: dict, logger: logging.Logger) -> bo
     """
     cmd = command.get("command")
     payload = command.get("payload") or {}
+    cmd_id = command.get("id")
+
+    def _report(status: str, message: str = "") -> None:
+        if cmd_id is not None:
+            api.report_command_status(cmd_id, status, message)
 
     if cmd == "restart":
         logger.info("Comando recibido: restart. Saliendo para reinicio por systemd.")
@@ -320,6 +325,7 @@ def apply_command(config_path: str, command: dict, logger: logging.Logger) -> bo
         model = payload.get("model") if payload else None
         if not model:
             logger.warning("Comando change_model sin payload válido")
+            _report("error", "Payload inválido: falta modelo")
             return False
 
         config = configparser.ConfigParser()
@@ -332,15 +338,20 @@ def apply_command(config_path: str, command: dict, logger: logging.Logger) -> bo
 
         _save_current_model(model)
         logger.info("Modelo cambiado en config: %s → %s", old_model, model)
+        _report("executing", f"Cambiando modelo: {old_model} → {model}")
 
         # Restart llama-server with new model (no reiniciar el worker)
+        _report("loading", f"Cargando {model}...")
         if restart_llama_server_with(config, model, logger):
             logger.info("llama-server reiniciado con nuevo modelo. Worker continúa.")
+            _report("ready", f"Modelo {model} cargado correctamente")
         else:
             logger.error("No se pudo reiniciar llama-server con el nuevo modelo.")
+            _report("error", f"Error al cargar {model}. Revisa los logs del worker.")
         return False
 
     logger.warning("Comando desconocido: %s", cmd)
+    _report("error", f"Comando desconocido: {cmd}")
     return False
 
 
@@ -404,7 +415,7 @@ def main(config_path: Optional[str] = None) -> None:
             try:
                 commands = api.get_commands()
                 for cmd in commands:
-                    if apply_command(config_path or DEFAULT_CONFIG, cmd, logger):
+                    if apply_command(config_path or DEFAULT_CONFIG, cmd, api, logger):
                         # Reinicio controlado: systemd levantará el proceso nuevo
                         sys.exit(0)
                 # Releer config por si cambió el modelo (change_model no reinicia worker)

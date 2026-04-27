@@ -142,6 +142,9 @@ class Database {
 
         // Migraciones de columnas para tablas existentes
         self::_addColumnIfNotExists('worker_heartbeats', 'available_models', 'TEXT');
+        self::_addColumnIfNotExists('worker_commands', 'status', 'TEXT');
+        self::_addColumnIfNotExists('worker_commands', 'status_message', 'TEXT');
+        self::_addColumnIfNotExists('worker_commands', 'status_updated_at', 'TEXT');
     }
 
     private static function _addColumnIfNotExists(string $table, string $column, string $type): void {
