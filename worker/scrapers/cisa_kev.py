@@ -5,22 +5,20 @@ from typing import Optional
 
 import requests
 
+from utils.cache import get as cache_get, set as cache_set
+
 logger = logging.getLogger(__name__)
 
 CISA_KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 
-# Cache en memoria del catálogo completo (se refresca al reiniciar el worker)
-_kev_cache: Optional[dict] = None
-_kev_load_failed = False
+KEV_CACHE_KEY = "cisa:kev:catalog"
 
 
 def _load_catalog() -> dict:
-    """Carga el catálogo CISA KEV completo."""
-    global _kev_cache, _kev_load_failed
-    if _kev_cache is not None:
-        return _kev_cache
-    if _kev_load_failed:
-        return {"vulnerabilities": []}
+    """Carga el catálogo CISA KEV completo con cache en disco (TTL 4h)."""
+    cached = cache_get(KEV_CACHE_KEY)
+    if cached is not None:
+        return cached
 
     try:
         resp = requests.get(
@@ -30,14 +28,12 @@ def _load_catalog() -> dict:
         )
         resp.raise_for_status()
         data = resp.json()
-        _kev_cache = data
-        logger.info("CISA KEV catalog loaded: %s entries", len(data.get("vulnerabilities", [])))
+        cache_set(KEV_CACHE_KEY, data, ttl_seconds=4 * 3600)  # 4h
+        logger.info("CISA KEV catalog refreshed: %s entries", len(data.get("vulnerabilities", [])))
         return data
     except Exception as exc:
         logger.warning("CISA KEV catalog load failed: %s", exc)
-        _kev_load_failed = True
-        _kev_cache = {"vulnerabilities": []}
-        return _kev_cache
+        return {"vulnerabilities": []}
 
 
 def get_kev(cve_id: str) -> Optional[dict]:

@@ -6,6 +6,8 @@ from typing import Any
 
 import requests
 
+from utils.cache import get as cache_get, set as cache_set
+
 logger = logging.getLogger(__name__)
 
 NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
@@ -104,10 +106,17 @@ def search_cves(
 
 def get_cve_by_id(cve_id: str) -> dict | None:
     """Busca un CVE específico por su ID (ej: CVE-2024-3393)."""
+    key = f"nvd:cve:{cve_id.upper()}"
+    cached = cache_get(key)
+    if cached is not None:
+        logger.info("NVD cache hit for %s", cve_id)
+        return cached
+
     logger.info("NVD query by ID: %s", cve_id)
     items = _query_nvd({"cveId": cve_id.upper()})
     if not items:
         return None
     parsed = _parse_cve_item(items[0])
     parsed["references"] = parsed["references"][:10]
+    cache_set(key, parsed, ttl_seconds=24 * 3600)  # 24h
     return parsed

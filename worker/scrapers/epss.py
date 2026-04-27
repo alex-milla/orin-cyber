@@ -5,6 +5,8 @@ from typing import Optional
 
 import requests
 
+from utils.cache import get as cache_get, set as cache_set
+
 logger = logging.getLogger(__name__)
 
 EPSS_API_URL = "https://api.first.org/data/v1/epss"
@@ -15,6 +17,11 @@ def get_epss(cve_id: str) -> Optional[dict]:
     Consulta el EPSS score para un CVE.
     Retorna dict con 'score' (0-1) y 'percentile' (0-1) o None si no existe.
     """
+    key = f"epss:{cve_id.upper()}"
+    cached = cache_get(key)
+    if cached is not None:
+        return cached
+
     try:
         resp = requests.get(
             EPSS_API_URL,
@@ -34,12 +41,14 @@ def get_epss(cve_id: str) -> Optional[dict]:
         score = float(entry.get("epss", 0))
         percentile = float(entry.get("percentile", 0))
 
-        return {
+        result = {
             "score": score,
             "percentile": percentile,
             "score_percent": round(score * 100, 2),
             "percentile_percent": round(percentile * 100, 2),
         }
+        cache_set(key, result, ttl_seconds=12 * 3600)  # 12h
+        return result
     except Exception as exc:
         logger.warning("EPSS query failed for %s: %s", cve_id, exc)
         return None
