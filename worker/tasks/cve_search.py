@@ -13,7 +13,7 @@ from scrapers.cisa_kev import get_kev
 from scrapers.github_exploits import find_exploits
 from scrapers.osv import query_osv
 from utils.llm_client import LlmClient
-from utils.formatter import render_cve_report
+from utils.formatter import render_cve_report, render_cve_report_batch
 
 logger = logging.getLogger(__name__)
 
@@ -167,40 +167,49 @@ class CveSearchTask(BaseTask):
         else:
             # ── Preparar datos para el LLM (modo individual) ──────────────
             context = json.dumps(enriched, indent=2, ensure_ascii=False)
-            report_text = self.llm.chat(
+            llm_analysis = self.llm.chat_json(
                 system_prompt=self.prompt_template,
                 user_prompt=(
-                    "Analiza los siguientes datos de CVEs. Primero traduce la descripción al español, "
-                    f"luego genera el informe estructurado.\n\nDatos estructurados:\n{context}"
+                    "Analiza los siguientes datos de CVEs y responde ÚNICAMENTE con el JSON solicitado. "
+                    f"Datos estructurados:\n{context}"
                 ),
             )
 
-            # Extraer traducción del output del LLM (sección CONTEXTO)
-            import re
             first_enriched = enriched[0] if enriched else {}
             cve_data = first_enriched.get("cve", {})
-            desc_translated = None
-            if report_text:
-                match = re.search(r'CONTEXTO\s*\n+((?:.+\n){1,3})', report_text, re.IGNORECASE)
-                if match:
-                    lines = [l.strip() for l in match.group(1).splitlines() if l.strip()]
-                    desc_translated = " ".join(lines[:3])
-                    logger.debug("Extracted Spanish description (%s chars)", len(desc_translated))
-                else:
-                    logger.debug("No CONTEXTO section found in LLM output")
 
-            if desc_translated:
-                cve_data["description_es"] = desc_translated
+            if llm_analysis and isinstance(llm_analysis, dict):
+                # Extraer traducción para el formatter
+                desc_translated = llm_analysis.get("contexto_es", "").strip()
+                if desc_translated:
+                    cve_data["description_es"] = desc_translated
 
-            # Fallback si el LLM retorna vacío
-            if not report_text or not report_text.strip():
-                logger.warning("LLM returned empty response, generating fallback analysis")
+                # Construir report_text desde JSON estructurado
+                lines = [f"## ANÁLISIS DE RIESGO — {cve_data.get('cve_id', 'Unknown')}", ""]
+                lines.append(f"**Contexto:** {desc_translated or cve_data.get('description', 'No disponible')}")
+                lines.append("")
+                impacto = llm_analysis.get("impacto", "").strip()
+                if impacto:
+                    lines.append(f"**Impacto:** {impacto}")
+                    lines.append("")
+                recs = llm_analysis.get("recomendaciones", [])
+                if recs:
+                    lines.append("**Recomendaciones:**")
+                    for r in recs:
+                        lines.append(f"- {r}")
+                    lines.append("")
+                notas = llm_analysis.get("notas", "").strip()
+                if notas:
+                    lines.append(f"**Notas:** {notas}")
+                report_text = "\n".join(lines)
+                logger.info("LLM JSON analysis parsed successfully")
+            else:
+                logger.warning("LLM did not return valid JSON, generating fallback analysis")
                 report_text = self._build_fallback_text(enriched)
 
         # ── Formatear salida HTML ─────────────────────────────────────────
         try:
             if batch_mode:
-                from utils.formatter import render_cve_report_batch
                 result_html = render_cve_report_batch(enriched)
             else:
                 result_html = render_cve_report(enriched, report_text)

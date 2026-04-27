@@ -56,3 +56,35 @@ class LlmClient:
 
         logger.error("Unexpected LLM response: %s", data)
         raise RuntimeError("Respuesta inesperada del LLM")
+
+    def chat_json(self, system_prompt: str, user_prompt: str) -> dict | None:
+        """Envía chat completion y parsea la respuesta como JSON.
+
+        Retorna el dict parseado o None si no es JSON válido.
+        Soporta bloques markdown ```json ... ``` y JSON raw.
+        """
+        raw = self.chat(system_prompt, user_prompt)
+        if not raw:
+            return None
+
+        # Extraer de bloque markdown si existe
+        content = raw
+        if "```json" in content:
+            parts = content.split("```json", 1)
+            if len(parts) == 2:
+                content = parts[1].split("```", 1)[0]
+        elif "```" in content:
+            parts = content.split("```", 1)
+            if len(parts) == 2:
+                content = parts[1].split("```", 1)[0]
+
+        content = content.strip()
+        try:
+            parsed = json.loads(content)
+            if isinstance(parsed, dict):
+                logger.debug("LLM JSON parsed successfully (%s keys)", len(parsed))
+                return parsed
+            logger.warning("LLM JSON parsed but is not a dict: %s", type(parsed))
+        except json.JSONDecodeError as exc:
+            logger.warning("LLM JSON parse failed: %s — falling back to plain text", exc)
+        return None
