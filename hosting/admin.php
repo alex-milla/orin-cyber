@@ -343,6 +343,19 @@ require __DIR__ . '/templates/header.php';
 let remoteInfo = null;
 const csrfToken = <?php echo json_encode(csrfToken()); ?>;
 
+function compareSemver(a, b) {
+    const parse = s => s.replace(/^v/, '').split('.').map(Number);
+    const av = parse(a);
+    const bv = parse(b);
+    for (let i = 0; i < Math.max(av.length, bv.length); i++) {
+        const avi = av[i] || 0;
+        const bvi = bv[i] || 0;
+        if (avi > bvi) return 1;
+        if (avi < bvi) return -1;
+    }
+    return 0;
+}
+
 function log(msg, type = 'info') {
     const el = document.getElementById('update-log');
     el.classList.add('visible');
@@ -382,8 +395,13 @@ async function checkUpdate() {
         }
 
         const current = document.getElementById('current-version').textContent;
-        if (current !== data.tag) {
+        const cmp = compareSemver(current, data.tag);
+        if (cmp < 0) {
+            // Remota es mayor → mostrar botón
             document.getElementById('btn-update').classList.remove('hidden');
+        } else if (cmp > 0) {
+            // Instalada es más reciente que la remota → inconsistencia o release antigua
+            document.getElementById('remote-message').textContent += ' — ⚠️ La versión instalada (' + current + ') es más reciente que la release remota (' + data.tag + '). No se permite downgrade.';
         } else {
             document.getElementById('remote-message').textContent += ' — ✅ Estás en la última versión.';
         }

@@ -28,6 +28,10 @@ function validateBackupName(string $name): ?string {
     return $name;
 }
 
+function isRemoteNewer(string $current, string $remote): bool {
+    return version_compare(ltrim($remote, 'v'), ltrim($current, 'v'), '>');
+}
+
 switch ($action) {
     case 'check':
         $remote = $updater->getRemoteVersion();
@@ -56,6 +60,10 @@ switch ($action) {
                 if (isset($remote['error'])) {
                     jsonResponse(['error' => $remote['error']], 500);
                 }
+            }
+            $currentVersion = $updater->getCurrentVersion();
+            if (!isRemoteNewer($currentVersion, $remote['tag'])) {
+                jsonResponse(['error' => 'La versión remota (' . $remote['tag'] . ') no es más reciente que la instalada (' . $currentVersion . '). No se permite downgrade.'], 400);
             }
             $zipFile = $updater->downloadUpdate($remote['zip_url']);
             $_SESSION['update_state']['zip'] = $zipFile;
@@ -92,8 +100,12 @@ switch ($action) {
             if (!$valid) {
                 jsonResponse(['error' => 'Nombre de backup inválido'], 400);
             }
-            $backupFile = DATA_DIR . '/backups/' . $valid;
+            $currentVersion = $updater->getCurrentVersion();
             $newVersion = $remote['tag'] ?? date('Y.m.d');
+            if (!isRemoteNewer($currentVersion, $newVersion)) {
+                jsonResponse(['error' => 'La versión remota (' . $newVersion . ') no es más reciente que la instalada (' . $currentVersion . '). No se permite downgrade.'], 400);
+            }
+            $backupFile = DATA_DIR . '/backups/' . $valid;
             $updater->applyUpdate($sourceDir, $backupFile, $newVersion);
             $updater->cleanup();
             unset($_SESSION['update_state']);
