@@ -191,7 +191,7 @@ require __DIR__ . '/templates/header.php';
     <form method="POST" action="ajax_admin.php?action=send_worker_command" onsubmit="return sendWorkerCmd(this);" id="worker-cmd-form">
         <?php echo csrfInput(); ?>
         <label>Worker</label>
-        <select name="api_key_id" required>
+        <select name="api_key_id" required id="worker-select" onchange="populateModels()">
             <option value="">Selecciona un worker...</option>
             <?php foreach ($apiKeys as $k): ?>
             <option value="<?php echo $k['id']; ?>"><?php echo htmlspecialchars($k['name']); ?></option>
@@ -205,20 +205,21 @@ require __DIR__ . '/templates/header.php';
         <div id="model-select-wrap">
             <label>Modelo</label>
             <select id="model-select" onchange="updatePayload()">
-                <option value="Qwen3.5-4B-Q4_K_M.gguf">Qwen 3.5 — 4B (calidad alta, lento)</option>
-                <option value="Qwen3.5-9B-Q4_K_M.gguf">Qwen 3.5 — 9B (mejor calidad, más lento, ~6GB)</option>
-                <option value="Phi-4-mini-instruct-Q4_K_M.gguf">Phi-4 Mini — 3.8B (rápido, español decente)</option>
-                <option value="gemma-4-E2B-it-Q4_K_M.gguf">Gemma 2B — 2B (muy rápido, español mediocre)</option>
-                <option value="GLM-4.6V-Flash-Q4_K_M.gguf">GLM-4.6V Flash — 4.6B (contexto corto 4K, ~5.8GB)</option>
-                <option value="DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf">DeepSeek R1 Distill Qwen — 7B (reasoning, ~4.5GB)</option>
+                <option value="">— Selecciona un worker primero —</option>
             </select>
-            <p class="small" style="color:var(--warning);">⚠️ Este comando solo edita el config.ini del worker. <strong>Tenés que reiniciar manualmente llama-server</strong> en el Orin Nano para cargar el nuevo modelo.</p>
+            <p id="model-hint" class="small"></p>
+            <p class="small" style="color:var(--warning);">⚠️ Este comando edita el config.ini del worker y reinicia llama-server automáticamente.</p>
         </div>
-        <input type="hidden" name="payload" id="cmd-payload" value='{"model":"Qwen3.5-4B-Q4_K_M.gguf"}'>
+        <input type="hidden" name="payload" id="cmd-payload" value='{"model":""}'>
         <button type="submit" class="mt-2">📤 Enviar comando</button>
     </form>
     <p id="cmd-msg" class="mt-1"></p>
     <script>
+    const WORKERS_MODELS = <?php echo json_encode(array_reduce($workers, function($carry, $w) {
+        $carry[$w['api_key_id']] = json_decode($w['available_models'] ?? '[]', true) ?: [];
+        return $carry;
+    }, []), JSON_UNESCAPED_UNICODE); ?>;
+
     function toggleModelSelect() {
         const cmd = document.getElementById('cmd-select').value;
         const wrap = document.getElementById('model-select-wrap');
@@ -228,7 +229,35 @@ require __DIR__ . '/templates/header.php';
         const model = document.getElementById('model-select').value;
         document.getElementById('cmd-payload').value = JSON.stringify({model: model});
     }
+    function populateModels() {
+        const workerId = document.getElementById('worker-select').value;
+        const modelSelect = document.getElementById('model-select');
+        const hint = document.getElementById('model-hint');
+        modelSelect.innerHTML = '';
+        if (!workerId) {
+            modelSelect.innerHTML = '<option value="">— Selecciona un worker primero —</option>';
+            hint.textContent = '';
+            updatePayload();
+            return;
+        }
+        const models = WORKERS_MODELS[workerId] || [];
+        if (!models.length) {
+            modelSelect.innerHTML = '<option value="">— Sin datos del worker —</option>';
+            hint.textContent = 'El worker aún no ha reportado modelos disponibles. Espera al primer heartbeat.';
+            updatePayload();
+            return;
+        }
+        models.forEach(function(m) {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            modelSelect.appendChild(opt);
+        });
+        hint.textContent = models.length + ' modelo(s) disponible(s) en este worker.';
+        updatePayload();
+    }
     toggleModelSelect();
+    populateModels();
     </script>
 
     <?php elseif ($tab === 'users'): ?>
