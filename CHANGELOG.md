@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.7.9] — 2026-04-28
+
+### Changed
+- `hosting/admin.php`: añadidos `console.log` / `console.warn` / `console.error` en `pollCommandStatus` para permitir diagnóstico en tiempo real desde la consola del navegador (F12). Esto ayudará a identificar por qué el polling no detecta el estado `ready` cuando el modelo ya ha cargado.
+
+---
+
 ## [v0.7.8] — 2026-04-28
 
 ### Fixed
