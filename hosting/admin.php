@@ -196,7 +196,7 @@ require __DIR__ . '/templates/header.php';
     <form method="POST" action="ajax_admin.php?action=send_worker_command" onsubmit="return sendWorkerCmd(this);" id="worker-cmd-form">
         <?php echo csrfInput(); ?>
         <label>Worker</label>
-        <select name="api_key_id" required id="worker-select" onchange="updateModelSelect()">
+        <select name="api_key_id" required>
             <option value="">Selecciona un worker...</option>
             <?php foreach ($apiKeys as $k): ?>
             <option value="<?php echo $k['id']; ?>"><?php echo htmlspecialchars($k['name']); ?></option>
@@ -209,19 +209,13 @@ require __DIR__ . '/templates/header.php';
         </select>
         <div id="model-select-wrap">
             <label>Modelo</label>
-            <div id="model-input-wrap">
-                <input type="text" id="model-input" list="model-datalist" oninput="updatePayload()" placeholder="Nombre del archivo .gguf" style="width:100%;">
-                <datalist id="model-datalist">
-                    <option value="Qwen3.5-4B-Q4_K_M.gguf">
-                    <option value="Qwen3.5-9B-Q4_K_M.gguf">
-                    <option value="Phi-4-mini-instruct-Q4_K_M.gguf">
-                    <option value="gemma-4-E2B-it-Q4_K_M.gguf">
-                    <option value="GLM-4.6V-Flash-Q4_K_M.gguf">
-                    <option value="DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf">
-                </datalist>
-            </div>
-            <select id="model-select" onchange="updatePayload()" style="display:none;width:100%;">
-                <option value="">Selecciona un worker primero...</option>
+            <select id="model-select" onchange="updatePayload()">
+                <option value="Qwen3.5-4B-Q4_K_M.gguf">Qwen 3.5 — 4B (calidad alta, lento)</option>
+                <option value="Qwen3.5-9B-Q4_K_M.gguf">Qwen 3.5 — 9B (mejor calidad, más lento, ~6GB)</option>
+                <option value="Phi-4-mini-instruct-Q4_K_M.gguf">Phi-4 Mini — 3.8B (rápido, español decente)</option>
+                <option value="gemma-4-E2B-it-Q4_K_M.gguf">Gemma 2B — 2B (muy rápido, español mediocre)</option>
+                <option value="GLM-4.6V-Flash-Q4_K_M.gguf">GLM-4.6V Flash — 4.6B (contexto corto 4K, ~5.8GB)</option>
+                <option value="DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf">DeepSeek R1 Distill Qwen — 7B (reasoning, ~4.5GB)</option>
             </select>
             <p class="small" style="color:var(--warning);">⚠️ Este comando solo edita el config.ini del worker. <strong>Tenés que reiniciar manualmente llama-server</strong> en el Orin Nano para cargar el nuevo modelo.</p>
         </div>
@@ -230,44 +224,14 @@ require __DIR__ . '/templates/header.php';
     </form>
     <p id="cmd-msg" class="mt-1"></p>
     <script>
-    const WORKER_MODELS = <?php echo json_encode(array_reduce($workers, function($carry, $w) {
-        $carry[$w['api_key_id']] = json_decode($w['available_models'] ?? '[]', true) ?: [];
-        return $carry;
-    }, []), JSON_UNESCAPED_UNICODE); ?>;
-
     function toggleModelSelect() {
         const cmd = document.getElementById('cmd-select').value;
         const wrap = document.getElementById('model-select-wrap');
         wrap.style.display = cmd === 'change_model' ? 'block' : 'none';
     }
     function updatePayload() {
-        const select = document.getElementById('model-select');
-        const input = document.getElementById('model-input');
-        const model = select.style.display !== 'none' ? select.value : input.value;
+        const model = document.getElementById('model-select').value;
         document.getElementById('cmd-payload').value = JSON.stringify({model: model});
-    }
-    function updateModelSelect() {
-        const workerId = document.getElementById('worker-select').value;
-        const select = document.getElementById('model-select');
-        const inputWrap = document.getElementById('model-input-wrap');
-        const models = WORKER_MODELS[workerId] || [];
-        if (models.length === 0) {
-            // Fallback a input de texto
-            select.style.display = 'none';
-            inputWrap.style.display = 'block';
-        } else {
-            // Mostrar select con modelos detectados
-            inputWrap.style.display = 'none';
-            select.style.display = 'block';
-            select.innerHTML = '';
-            models.forEach(function(m) {
-                const opt = document.createElement('option');
-                opt.value = m;
-                opt.textContent = m;
-                select.appendChild(opt);
-            });
-        }
-        updatePayload();
     }
     toggleModelSelect();
     </script>
