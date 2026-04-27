@@ -847,23 +847,18 @@ async function pollCommandStatus(cmdId, apiKeyId, modelName) {
     const progress = document.getElementById('cmd-progress');
     const statusText = document.getElementById('cmd-status-text');
     const msg = document.getElementById('cmd-msg');
+    const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
     const maxAttempts = 180; // ~6 min
     for (let i = 0; i < maxAttempts; i++) {
         await new Promise(r => setTimeout(r, 2000));
         try {
-            const resp = await fetch('ajax_admin.php?action=command_status&id=' + cmdId);
+            const resp = await fetch('ajax_admin.php?action=command_status&id=' + cmdId + '&csrf_token=' + encodeURIComponent(csrfToken));
             const data = await resp.json();
-            console.log('pollCommandStatus iter=' + i, data);
-            if (!data.success) {
-                console.warn('pollCommandStatus success=false', data);
-                continue;
-            }
+            if (!data.success) continue;
             const status = data.status;
-            console.log('pollCommandStatus status=', status, 'type=', typeof status);
             if (statusText) statusText.textContent = data.message || status;
 
             if (status === 'ready' || status === 'error') {
-                console.log('pollCommandStatus FINAL', status);
                 if (progress) progress.classList.add('hidden');
                 if (msg) {
                     msg.className = status === 'ready' ? 'alert alert-success mt-1' : 'alert alert-error mt-1';
@@ -878,10 +873,9 @@ async function pollCommandStatus(cmdId, apiKeyId, modelName) {
                 return;
             }
         } catch (e) {
-            console.error('pollCommandStatus error', e);
+            // ignorar errores de red en el polling
         }
     }
-    console.warn('pollCommandStatus TIMEOUT');
     if (progress) progress.classList.add('hidden');
     if (msg) {
         msg.className = 'alert alert-warning mt-1';
