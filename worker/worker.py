@@ -350,6 +350,8 @@ def restart_llama_server_with(config: configparser.ConfigParser, model: str, log
             if _LLAMA_SERVER_READER_THREAD is not None and _LLAMA_SERVER_READER_THREAD.is_alive():
                 _LLAMA_SERVER_READER_THREAD.join(timeout=2)
             _LLAMA_SERVER_READER_THREAD = None
+            # En Jetson la memoria GPU se libera con delay; esperar antes de arrancar nuevo modelo
+            time.sleep(3)
         else:
             logger.info("No hay llama-server corriendo. Iniciando nuevo modelo...")
 

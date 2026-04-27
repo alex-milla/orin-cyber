@@ -184,7 +184,7 @@ require __DIR__ . '/templates/header.php';
             <td><?php echo htmlspecialchars($gpuText); ?></td>
             <td><?php echo $w['temperature_c'] !== null ? round($w['temperature_c'], 1) . '°C' : '—'; ?></td>
             <td><?php echo $w['disk_percent'] !== null ? round($w['disk_percent'], 1) . '%' : '—'; ?></td>
-            <td><code><?php echo htmlspecialchars($w['model_loaded'] ?? '—'); ?></code></td>
+            <td id="model-cell-<?php echo (int)$w['api_key_id']; ?>"><code><?php echo htmlspecialchars($w['model_loaded'] ?? '—'); ?></code></td>
             <td><?php echo htmlspecialchars($uptime); ?></td>
             <td class="small"><?php echo htmlspecialchars($w['created_at']); ?></td>
         </tr>
@@ -778,7 +778,7 @@ async function sendWorkerCmd(form) {
         msg.textContent = 'Comando enviado. El worker lo ejecutará en su próximo ciclo.';
         if (data.command_id && fd.get('command') === 'change_model') {
             progress.classList.remove('hidden');
-            pollCommandStatus(data.command_id);
+            pollCommandStatus(data.command_id, fd.get('api_key_id'));
         }
     } else {
         msg.className = 'alert alert-error mt-1';
@@ -787,11 +787,11 @@ async function sendWorkerCmd(form) {
     }
 }
 
-async function pollCommandStatus(cmdId) {
+async function pollCommandStatus(cmdId, apiKeyId) {
     const progress = document.getElementById('cmd-progress');
     const statusText = document.getElementById('cmd-status-text');
     const msg = document.getElementById('cmd-msg');
-    const maxAttempts = 60; // ~2 min
+    const maxAttempts = 180; // ~6 min
     for (let i = 0; i < maxAttempts; i++) {
         await new Promise(r => setTimeout(r, 2000));
         try {
@@ -804,6 +804,17 @@ async function pollCommandStatus(cmdId) {
                 progress.classList.add('hidden');
                 msg.className = 'alert alert-success mt-1';
                 msg.textContent = data.message || 'Modelo cargado correctamente';
+                // Actualizar celda del modelo en la tabla sin recargar
+                const modelCell = document.getElementById('model-cell-' + apiKeyId);
+                if (modelCell) {
+                    const payload = document.getElementById('cmd-payload').value;
+                    try {
+                        const p = JSON.parse(payload);
+                        if (p.model) {
+                            modelCell.innerHTML = '<code>' + p.model + '</code>';
+                        }
+                    } catch(e) {}
+                }
                 return;
             }
             if (status === 'error') {
