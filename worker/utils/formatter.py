@@ -102,6 +102,7 @@ def render_cve_report(enriched: list, llm_text: str) -> str:
     epss = first.get("epss")
     kev = first.get("kev")
     github = first.get("github")
+    osv = first.get("osv")
     priority = first.get("priority", "D")
 
     cve_id = cve.get("cve_id", "Unknown")
@@ -149,6 +150,24 @@ def render_cve_report(enriched: list, llm_text: str) -> str:
             gh_rows += f"<li><a href='{url}' target='_blank' rel='noopener' style='color:var(--primary);text-decoration:underline;'>{name}</a></li>"
         gh_rows += "</ul>"
         html += _section(f"💣 Public Exploits (Total: {len(github)})", gh_rows)
+
+    # ── OSV.dev ───────────────────────────────────────────────────────
+    if osv and osv.get("affected_packages"):
+        osv_rows = f"""
+          <div style="display:grid;grid-template-columns:120px 1fr;gap:.5rem;">
+            <div style="color:var(--text-muted);font-weight:600;">Paquetes:</div>
+            <div>{len(osv['affected_packages'])} ecosistemas afectados</div>
+            <div style="color:var(--text-muted);font-weight:600;">Fixed in:</div>
+            <div>{', '.join(osv['fixed_in']) if osv.get('fixed_in') else 'No especificado'}</div>
+          </div>
+          <ul style='margin:.5rem 0 0 1.2rem;padding:0;'>
+        """
+        for pkg in osv["affected_packages"]:
+            osv_rows += f"<li><code>{pkg.get('ecosystem','?')}</code> — <strong>{pkg.get('name','?')}</strong> (desde {pkg.get('introduced','?')})</li>"
+        osv_rows += "</ul>"
+        html += _section("📦 OSV.dev — Affected Packages", osv_rows)
+    else:
+        html += _section("📦 OSV.dev — Affected Packages", "<p class='small'>No hay datos de paquetes afectados en OSV.dev.</p>")
 
     # ── EPSS ────────────────────────────────────────────────────────────
     if epss:

@@ -11,6 +11,7 @@ from scrapers.nvd import search_cves, get_cve_by_id
 from scrapers.epss import get_epss
 from scrapers.cisa_kev import get_kev
 from scrapers.github_exploits import find_exploits
+from scrapers.osv import query_osv
 from utils.llm_client import LlmClient
 from utils.formatter import render_cve_report
 
@@ -94,6 +95,11 @@ class CveSearchTask(BaseTask):
             epss = get_epss(cid)
             kev = get_kev(cid)
             github = find_exploits(cid, max_results=5)
+            osv = query_osv(cid)
+
+            # Si OSV tiene severidad y NVD no, enriquecer
+            if osv and osv.get("severity") and not cve.get("severity"):
+                cve["severity"] = osv["severity"]
 
             priority = _calc_priority(
                 cve.get("score"),
@@ -106,6 +112,7 @@ class CveSearchTask(BaseTask):
                 "epss": epss,
                 "kev": kev,
                 "github": github,
+                "osv": osv,
                 "priority": priority,
             })
 
@@ -150,6 +157,7 @@ class CveSearchTask(BaseTask):
                 f"- CVSS: {cve_data.get('score', 'N/A')} ({cve_data.get('severity', 'N/A')})\n"
                 f"- EPSS: {epss['score_percent'] if epss else 'N/A'}% (percentil {epss['percentile_percent'] if epss else 'N/A'}%)\n"
                 f"- CISA KEV: {'SÍ — explotación activa confirmada' if kev else 'No listado'}\n"
+                f"- OSV.dev: {len(osv['affected_packages']) if osv else 'N/A'} paquetes afectados\n"
                 f"- Prioridad de parcheo: {priority}\n\n"
                 f"**Recomendaciones:**\n"
                 f"1. Verificar boletín oficial del fabricante para versión de parche exacta.\n"
