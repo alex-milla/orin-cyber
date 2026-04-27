@@ -122,6 +122,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 FOREIGN KEY (api_key_id) REFERENCES api_keys(id) ON DELETE CASCADE
             )");
 
+            $db->exec("CREATE INDEX IF NOT EXISTS idx_tasks_status_created ON tasks(status, created_at)");
+            $db->exec("CREATE INDEX IF NOT EXISTS idx_apikeys_key_active ON api_keys(api_key, is_active)");
+            $db->exec("CREATE INDEX IF NOT EXISTS idx_heartbeats_apikey_created ON worker_heartbeats(api_key_id, created_at DESC)");
+            $db->exec("CREATE INDEX IF NOT EXISTS idx_commands_pending ON worker_commands(api_key_id, executed_at)");
+
             // Insertar API key inicial para el primer worker
             $db->prepare("INSERT INTO api_keys (name, api_key) VALUES (?, ?)")
                ->execute(['Worker principal (Orin Nano)', generateSecureToken(32)]);
