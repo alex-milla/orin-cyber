@@ -778,7 +778,12 @@ async function sendWorkerCmd(form) {
         msg.textContent = 'Comando enviado. El worker lo ejecutará en su próximo ciclo.';
         if (data.command_id && fd.get('command') === 'change_model') {
             progress.classList.remove('hidden');
-            pollCommandStatus(data.command_id, fd.get('api_key_id'));
+            let modelName = '';
+            try {
+                const p = JSON.parse(fd.get('payload') || '{}');
+                modelName = p.model || '';
+            } catch(e) {}
+            pollCommandStatus(data.command_id, fd.get('api_key_id'), modelName);
         }
     } else {
         msg.className = 'alert alert-error mt-1';
@@ -787,7 +792,7 @@ async function sendWorkerCmd(form) {
     }
 }
 
-async function pollCommandStatus(cmdId, apiKeyId) {
+async function pollCommandStatus(cmdId, apiKeyId, modelName) {
     const progress = document.getElementById('cmd-progress');
     const statusText = document.getElementById('cmd-status-text');
     const msg = document.getElementById('cmd-msg');
@@ -799,37 +804,31 @@ async function pollCommandStatus(cmdId, apiKeyId) {
             const data = await resp.json();
             if (!data.success) continue;
             const status = data.status;
-            statusText.textContent = data.message || status;
-            if (status === 'ready') {
-                progress.classList.add('hidden');
-                msg.className = 'alert alert-success mt-1';
-                msg.textContent = data.message || 'Modelo cargado correctamente';
-                // Actualizar celda del modelo en la tabla sin recargar
-                const modelCell = document.getElementById('model-cell-' + apiKeyId);
-                if (modelCell) {
-                    const payload = document.getElementById('cmd-payload').value;
-                    try {
-                        const p = JSON.parse(payload);
-                        if (p.model) {
-                            modelCell.innerHTML = '<code>' + p.model + '</code>';
-                        }
-                    } catch(e) {}
+            if (statusText) statusText.textContent = data.message || status;
+
+            if (status === 'ready' || status === 'error') {
+                if (progress) progress.classList.add('hidden');
+                if (msg) {
+                    msg.className = status === 'ready' ? 'alert alert-success mt-1' : 'alert alert-error mt-1';
+                    msg.textContent = data.message || (status === 'ready' ? 'Modelo cargado correctamente' : 'Error al cargar el modelo');
                 }
-                return;
-            }
-            if (status === 'error') {
-                progress.classList.add('hidden');
-                msg.className = 'alert alert-error mt-1';
-                msg.textContent = data.message || 'Error al cargar el modelo';
+                if (status === 'ready' && modelName) {
+                    const modelCell = document.getElementById('model-cell-' + apiKeyId);
+                    if (modelCell) {
+                        modelCell.innerHTML = '<code>' + modelName + '</code>';
+                    }
+                }
                 return;
             }
         } catch (e) {
             // ignorar errores de red en el polling
         }
     }
-    progress.classList.add('hidden');
-    msg.className = 'alert alert-warning mt-1';
-    msg.textContent = 'Timeout esperando confirmación del worker. Revisa el estado manualmente.';
+    if (progress) progress.classList.add('hidden');
+    if (msg) {
+        msg.className = 'alert alert-warning mt-1';
+        msg.textContent = 'Timeout esperando confirmación del worker. Revisa el estado manualmente.';
+    }
 }
 
 async function deleteBackup(file) {
