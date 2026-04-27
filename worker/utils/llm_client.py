@@ -37,7 +37,7 @@ class LlmClient:
             "temperature": self.temperature,
         }
 
-        logger.info("LLM request: %s tokens max", self.max_tokens)
+        logger.debug("LLM request: %s tokens max", self.max_tokens)
         resp = requests.post(url, json=payload, timeout=300)
         resp.raise_for_status()
         data = resp.json()
@@ -56,35 +56,3 @@ class LlmClient:
 
         logger.error("Unexpected LLM response: %s", data)
         raise RuntimeError("Respuesta inesperada del LLM")
-
-    def translate(self, text: str, target_lang: str = "es", max_tokens: int = 256) -> str:
-        """Traduce texto técnico al idioma destino usando el LLM local."""
-        if not text or len(text.strip()) < 10:
-            return text
-        prompt = (
-            f"Traduce la siguiente descripción técnica de vulnerabilidad al {target_lang}. "
-            "Mantén términos técnicos en inglés si no hay equivalente claro. "
-            "Responde ÚNICAMENTE con la traducción, sin explicaciones ni formato adicional.\n\n"
-            f"{text.strip()}\n\nTraducción:"
-        )
-        url = f"{self.server_url}/v1/chat/completions"
-        payload = {
-            "model": self.model,
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": max_tokens,
-            "temperature": 0.1,
-        }
-        try:
-            resp = requests.post(url, json=payload, timeout=180)
-            resp.raise_for_status()
-            data = resp.json()
-            if isinstance(data, dict):
-                choices = data.get("choices")
-                if isinstance(choices, list) and len(choices) > 0:
-                    first = choices[0]
-                    if isinstance(first, dict):
-                        content = (first.get("message") or {}).get("content", "").strip()
-                        return content if content else text
-        except Exception as exc:
-            logger.warning("Translation failed, returning original: %s", exc)
-        return text
