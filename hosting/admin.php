@@ -853,11 +853,17 @@ async function pollCommandStatus(cmdId, apiKeyId, modelName) {
         try {
             const resp = await fetch('ajax_admin.php?action=command_status&id=' + cmdId);
             const data = await resp.json();
-            if (!data.success) continue;
+            console.log('pollCommandStatus iter=' + i, data);
+            if (!data.success) {
+                console.warn('pollCommandStatus success=false', data);
+                continue;
+            }
             const status = data.status;
+            console.log('pollCommandStatus status=', status, 'type=', typeof status);
             if (statusText) statusText.textContent = data.message || status;
 
             if (status === 'ready' || status === 'error') {
+                console.log('pollCommandStatus FINAL', status);
                 if (progress) progress.classList.add('hidden');
                 if (msg) {
                     msg.className = status === 'ready' ? 'alert alert-success mt-1' : 'alert alert-error mt-1';
@@ -872,9 +878,10 @@ async function pollCommandStatus(cmdId, apiKeyId, modelName) {
                 return;
             }
         } catch (e) {
-            // ignorar errores de red en el polling
+            console.error('pollCommandStatus error', e);
         }
     }
+    console.warn('pollCommandStatus TIMEOUT');
     if (progress) progress.classList.add('hidden');
     if (msg) {
         msg.className = 'alert alert-warning mt-1';
