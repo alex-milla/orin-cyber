@@ -229,6 +229,97 @@ def render_cve_report(enriched: list, llm_text: str) -> str:
     return html
 
 
+def render_cve_report_batch(enriched: list) -> str:
+    """Genera HTML comparativo para múltiples CVEs (modo batch)."""
+    if not enriched:
+        return "<p>No hay datos para mostrar.</p>"
+
+    html = '''<div class="cve-report" style="font-family:var(--font-base);color:var(--text);max-width:900px;margin:0 auto;">
+  <div style="text-align:center;margin-bottom:1.5rem;">
+    <div style="display:inline-block;border:2px solid var(--primary);padding:.75rem 2rem;border-radius:var(--radius);">
+      <span style="font-size:1.4rem;font-weight:700;color:var(--primary);">Batch CVE Report</span>
+    </div>
+    <p style="color:var(--text-muted);margin-top:.5rem;">''' + str(len(enriched)) + ''' CVEs analizados</p>
+  </div>
+'''
+
+    # Tabla comparativa
+    html += '''<div style="overflow-x:auto;margin-bottom:1.5rem;">
+  <table style="width:100%;border-collapse:collapse;font-size:.9rem;">
+    <thead>
+      <tr style="background:var(--surface);border-bottom:2px solid var(--primary);">
+        <th style="text-align:left;padding:.5rem;">CVE ID</th>
+        <th style="text-align:center;padding:.5rem;">CVSS</th>
+        <th style="text-align:center;padding:.5rem;">EPSS</th>
+        <th style="text-align:center;padding:.5rem;">CISA KEV</th>
+        <th style="text-align:center;padding:.5rem;">OSV Pkgs</th>
+        <th style="text-align:center;padding:.5rem;">Priority</th>
+      </tr>
+    </thead>
+    <tbody>
+'''
+    for entry in enriched:
+        cve = entry.get("cve", {})
+        epss = entry.get("epss")
+        kev = entry.get("kev")
+        osv = entry.get("osv")
+        priority = entry.get("priority", "D")
+        cid = cve.get("cve_id", "Unknown")
+        score = cve.get("score", "N/A")
+        sev = cve.get("severity", "N/A")
+        epss_pct = epss["score_percent"] if epss else "N/A"
+        kev_mark = "✅" if kev else "—"
+        osv_count = len(osv["affected_packages"]) if osv else 0
+        html += f'''      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:.5rem;font-weight:600;">{cid}</td>
+        <td style="padding:.5rem;text-align:center;">{score} {_severity_badge(sev)}</td>
+        <td style="padding:.5rem;text-align:center;">{epss_pct}%</td>
+        <td style="padding:.5rem;text-align:center;">{kev_mark}</td>
+        <td style="padding:.5rem;text-align:center;">{osv_count}</td>
+        <td style="padding:.5rem;text-align:center;">{_priority_badge(priority)}</td>
+      </tr>
+'''
+    html += '''    </tbody>
+  </table>
+</div>
+'''
+
+    # Detalle individual
+    for entry in enriched:
+        cve = entry.get("cve", {})
+        epss = entry.get("epss")
+        kev = entry.get("kev")
+        osv = entry.get("osv")
+        priority = entry.get("priority", "D")
+        cid = cve.get("cve_id", "Unknown")
+        desc = cve.get("description", "Sin descripción")
+        score = cve.get("score")
+        sev = cve.get("severity", "N/A")
+        published = cve.get("published", "")[:10]
+
+        rows = f"""
+          <div style="display:grid;grid-template-columns:120px 1fr;gap:.5rem;">
+            <div style="color:var(--text-muted);font-weight:600;">Publicado:</div>
+            <div>{published or 'Desconocido'}</div>
+            <div style="color:var(--text-muted);font-weight:600;">Base Score:</div>
+            <div>{score if score is not None else 'N/A'} {_severity_badge(sev)}</div>
+            <div style="color:var(--text-muted);font-weight:600;">EPSS:</div>
+            <div>{epss['score_percent'] if epss else 'N/A'}% (percentil {epss['percentile_percent'] if epss else 'N/A'}%)</div>
+          </div>
+          <div style="margin-top:.5rem;">{desc[:300]}{'...' if len(desc) > 300 else ''}</div>
+        """
+        if osv and osv.get("fixed_in"):
+            rows += f"<div style='margin-top:.5rem;color:var(--primary);font-weight:600;'>Fixed in: {', '.join(osv['fixed_in'])}</div>"
+        if kev:
+            rows += f"<div style='margin-top:.25rem;color:var(--error);font-weight:600;'>⚠️ Listado en CISA KEV — {kev.get('required_action', '')}</div>"
+        html += _section(f"🔍 {cid}", rows)
+
+    html += '''<p class="small" style="color:var(--text-muted);margin-top:1rem;">
+*Modo batch: datos objetivos de NVD, EPSS, CISA KEV y OSV.dev. El análisis detallado del LLM está disponible para búsquedas individuales.*
+</p></div>'''
+    return html
+
+
 def wrap_html_document(body_html: str, title: str = "Informe OrinSec") -> str:
     """Envuelve contenido HTML en un documento mínimo."""
     return f"""<div class="orin-report">

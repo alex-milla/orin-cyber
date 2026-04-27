@@ -16,19 +16,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
         $error = 'Token de seguridad inválido. Recarga la página.';
     } else {
-        $cveId = validateInput($_POST['cve_id'] ?? '', 50, '/^CVE-\d{4}-\d+$/i') ?: '';
+        $cveInput = trim($_POST['cve_id'] ?? '');
         $product = validateInput($_POST['product'] ?? '', 100);
         $version = validateInput($_POST['version'] ?? '', 50, '/^[\w\s\.\-+_\/]+$/u') ?: '';
         $year = validateInput($_POST['year'] ?? '', 4, '/^\d{0,4}$/') ?: '';
         $severity = validateInput($_POST['severity'] ?? '', 10, '/^(LOW|MEDIUM|HIGH|CRITICAL)?$/') ?: '';
         $maxResults = filter_input(INPUT_POST, 'max_results', FILTER_VALIDATE_INT) ?: 10;
         $maxResults = max(1, min($maxResults, 20));
-        
-        if (!$cveId && !$product) {
-            $error = 'Introduce un CVE ID o un producto/software.';
+
+        // Parsear múltiples CVE IDs (coma, salto de línea, espacio)
+        $cveList = [];
+        if ($cveInput) {
+            $parts = preg_split('/[\s,]+/', strtoupper($cveInput));
+            foreach ($parts as $part) {
+                if (preg_match('/^CVE-\d{4}-\d+$/i', $part)) {
+                    $cveList[] = $part;
+                }
+            }
+            $cveList = array_unique(array_slice($cveList, 0, 20));
+        }
+
+        $cveId = $cveList[0] ?? '';
+
+        if (empty($cveList) && !$product) {
+            $error = 'Introduce al menos un CVE ID o un producto/software.';
         } else {
             $input = json_encode([
                 'cve_id' => $cveId,
+                'cve_list' => $cveList,
                 'product' => $product,
                 'version' => $version,
                 'year' => $year,
@@ -138,9 +153,9 @@ require __DIR__ . '/templates/header.php';
         
         <form method="POST" class="form-cve-prominent">
             <?php echo csrfInput(); ?>
-            <label for="cve_id">CVE ID</label>
-            <input type="text" id="cve_id" name="cve_id" placeholder="Ej: CVE-2024-3393" maxlength="50" pattern="CVE-\d{4}-\d+" title="Formato: CVE-YYYY-NNNNN" value="<?php echo htmlspecialchars($prefillCve); ?>">
-            <p class="small">Introduce un CVE ID para búsqueda directa en NVD.</p>
+            <label for="cve_id">CVE ID(s)</label>
+            <textarea id="cve_id" name="cve_id" rows="3" maxlength="600" placeholder="Ej: CVE-2024-3393, CVE-2021-44228"><?php echo htmlspecialchars($prefillCve); ?></textarea>
+            <p class="small">Introduce uno o varios CVE IDs (máximo 20), separados por coma, espacio o salto de línea.</p>
             <button type="submit" class="mt-2">Buscar vulnerabilidad</button>
             
             <button type="button" class="advanced-toggle" onclick="document.getElementById('adv-fields').classList.toggle('open')">⚙️ Búsqueda avanzada ▾</button>
