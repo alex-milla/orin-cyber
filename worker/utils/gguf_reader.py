@@ -80,6 +80,9 @@ def read_gguf_metadata(path: str) -> Optional[Dict[str, Any]]:
     if vocab_size is None:
         vocab_size = _get_field(reader, "llama.vocab_size", None)
 
+    # Tamaño del archivo (lo necesitamos temprano para size_label y heurísticas)
+    file_size_mb = os.path.getsize(path) / (1024 * 1024)
+
     # Leer param_count del header (si existe); NO estimar por heurística
     # porque las fórmulas simplificadas subestiman modelos modernos con GQA.
     param_count = _get_field(reader, "general.parameter_count", None)
@@ -88,9 +91,10 @@ def read_gguf_metadata(path: str) -> Optional[Dict[str, Any]]:
     size_label = ""
     for src in [basename, os.path.basename(path)]:
         if src:
-            m = re.search(r'(\d+(?:\.\d+)?)\s?([BM])', src)
+            # Regex mas permisivo: captura 4B, 7B, 4.6, 9B, etc.
+            m = re.search(r'(\d+(?:\.\d+)?)\s?[BbMm]', src)
             if m:
-                size_label = f"{m.group(1)}{m.group(2)}"
+                size_label = f"{m.group(1)}{m.group(2).upper()}"
                 break
 
     # Fallback 2: param_count explícito del header
@@ -110,8 +114,6 @@ def read_gguf_metadata(path: str) -> Optional[Dict[str, Any]]:
             size_label = f"{est_b:.1f}B".replace(".0B", "B")
         else:
             size_label = f"{est_b * 1000:.0f}M"
-
-    file_size_mb = os.path.getsize(path) / (1024 * 1024)
 
     return {
         "architecture": arch,
