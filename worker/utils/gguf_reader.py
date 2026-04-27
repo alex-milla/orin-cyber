@@ -92,7 +92,7 @@ def read_gguf_metadata(path: str) -> Optional[Dict[str, Any]]:
     for src in [basename, os.path.basename(path)]:
         if src:
             # Regex mas permisivo: captura 4B, 7B, 4.6, 9B, etc.
-            m = re.search(r'(\d+(?:\.\d+)?)\s?[BbMm]', src)
+            m = re.search(r'(\d+(?:\.\d+)?)\s?([BbMm])', src)
             if m:
                 size_label = f"{m.group(1)}{m.group(2).upper()}"
                 break
