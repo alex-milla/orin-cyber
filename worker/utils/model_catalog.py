@@ -66,26 +66,27 @@ def _expected_load_seconds(file_size_mb: float) -> int:
 
 
 def _extra_args_for_arch(arch: str) -> str:
-    """Devuelve argumentos extra recomendados según arquitectura del modelo."""
+    """Devuelve argumentos extra recomendados según arquitectura del modelo.
+
+    Solo inyecta templates universalmente soportados por llama.cpp.
+    Templates no reconocidos harían fallar el arranque de llama-server.
+    """
     arch = (arch or "").lower()
+    # Lista conservadora: estos templates existen en prácticamente cualquier build reciente
     templates = {
         "qwen2": "--chat-template chatml",
         "qwen2.5": "--chat-template chatml",
         "gemma": "--chat-template gemma",
         "gemma2": "--chat-template gemma",
         "phi3": "--chat-template phi3",
-        "phi4": "--chat-template phi3",
         "llama": "--chat-template llama2",
         "llama3": "--chat-template llama3",
         "mistral": "--chat-template mistral",
         "mixtral": "--chat-template mistral",
-        "deepseek": "--chat-template deepseek2",
-        "deepseek2": "--chat-template deepseek2",
-        "deepseek3": "--chat-template deepseek3",
-        "glm": "--chat-template chatglm3",
-        "command-r": "--chat-template command-r",
-        "falcon": "--chat-template falcon",
     }
+    # No inyectamos templates específicos que pueden no existir en todas las builds:
+    # deepseek2/3, chatglm3, command-r, falcon, phi4...
+    # El usuario puede forzar cualquier template vía [model_<name>] extra_args en config.ini
     return templates.get(arch, "")
 
 

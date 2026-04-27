@@ -10,6 +10,7 @@ import json
 import logging
 import logging.handlers
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -201,14 +202,21 @@ def _build_llama_args(
 
     args = [exe, "-m", model_path, "-c", ctx, "--host", host, "--port", port]
     if extra:
-        args.extend(extra.split())
+        args.extend(shlex.split(extra))
 
     return args, host, port
 
 
-def _wait_for_llama_ready(host: str, port: str, max_wait_s: int = 120, logger: logging.Logger = None) -> bool:
+def _wait_for_llama_ready(
+    host: str,
+    port: str,
+    max_wait_s: int = 120,
+    logger: logging.Logger = None,
+    proc: subprocess.Popen = None,
+) -> bool:
     """Polling adaptativo hasta que llama-server responda.
     Rápido al principio, se relaja después.
+    Si se proporciona `proc`, detecta si el subproceso murió inmediatamente.
     """
     delays = [0.5, 0.5, 0.5, 0.5, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0]
     elapsed = 0.0
@@ -218,6 +226,12 @@ def _wait_for_llama_ready(host: str, port: str, max_wait_s: int = 120, logger: l
         time.sleep(delay)
         elapsed += delay
         i += 1
+        # Detectar si el proceso murió inmediatamente (malos args, OOM, modelo corrupto)
+        if proc is not None and proc.poll() is not None:
+            exit_code = proc.poll()
+            if logger:
+                logger.error("llama-server terminó inesperadamente (exit code %d) tras %.1fs", exit_code, elapsed)
+            return False
         if _llama_server_is_ready(host, port):
             if logger:
                 logger.info("llama-server listo tras %.1fs (%d intentos)", elapsed, i)
@@ -246,7 +260,14 @@ def _start_llama_server(config: configparser.ConfigParser, model: str, logger: l
         )
 
     args, host, port = _build_llama_args(config, model, logger, catalog_entry)
-    model_path = args[2]  # el path del modelo está en args[2]
+
+    # Resolver model_path de forma robusta (buscar flag -m)
+    try:
+        model_idx = args.index("-m") + 1
+        model_path = args[model_idx]
+    except (ValueError, IndexError):
+        logger.error("No se encontró el argumento -m en los args de llama-server: %s", args)
+        return False
 
     if not os.path.exists(model_path):
         logger.error("Modelo no encontrado: %s", model_path)
@@ -274,7 +295,7 @@ def _start_llama_server(config: configparser.ConfigParser, model: str, logger: l
 
     # Wait for server to be ready
     logger.info("Esperando a que llama-server esté listo (timeout=%ds)...", max_wait)
-    if _wait_for_llama_ready(host, port, max_wait_s=max_wait, logger=logger):
+    if _wait_for_llama_ready(host, port, max_wait_s=max_wait, logger=logger, proc=proc):
         return True
 
     # No respondió: volcar últimas líneas del buffer al log principal para diagnóstico
@@ -366,23 +387,24 @@ def apply_command(config_path: str, command: dict, api: ApiClient, logger: loggi
         config = configparser.ConfigParser()
         config.read(config_path)
         old_model = config.get("llm", "model", fallback="unknown")
-        config.set("llm", "model", model)
 
-        with open(config_path, "w", encoding="utf-8") as f:
-            config.write(f)
-
-        _save_current_model(model)
-        logger.info("Modelo cambiado en config: %s → %s", old_model, model)
         _report("executing", f"Cambiando modelo: {old_model} → {model}")
 
         # Restart llama-server with new model (no reiniciar el worker)
         _report("loading", f"Cargando {model}...")
         if restart_llama_server_with(config, model, logger):
+            # Solo persistir si el arranque tuvo éxito
+            config.set("llm", "model", model)
+            with open(config_path, "w", encoding="utf-8") as f:
+                config.write(f)
+            _save_current_model(model)
+            logger.info("Modelo cambiado en config: %s → %s", old_model, model)
             logger.info("llama-server reiniciado con nuevo modelo. Worker continúa.")
             _report("ready", f"Modelo {model} cargado correctamente")
         else:
             logger.error("No se pudo reiniciar llama-server con el nuevo modelo.")
             _report("error", f"Error al cargar {model}. Revisa los logs del worker.")
+            # Rollback: no tocamos config.ini ni .current_model
         return False
 
     logger.warning("Comando desconocido: %s", cmd)
@@ -428,10 +450,13 @@ def main(config_path: Optional[str] = None) -> None:
     last_model = current_model
     heartbeat_count = 0
 
+    # Resolver models_dir relativo a BASE_DIR para escaneos
+    _models_dir_raw = config.get("llama_server", "models_dir", fallback="./models/")
+    _resolved_models_dir = _models_dir_raw if os.path.isabs(_models_dir_raw) else os.path.join(BASE_DIR, _models_dir_raw)
+
     # Escanear catálogo de modelos al arranque
     try:
-        models_dir = config.get("llama_server", "models_dir", fallback="./models/")
-        scan_and_update_catalog(models_dir, data_dir=os.path.join(BASE_DIR, "data"), logger=logger)
+        scan_and_update_catalog(_resolved_models_dir, data_dir=os.path.join(BASE_DIR, "data"), logger=logger)
     except Exception as exc:
         logger.warning("Error escaneando catálogo de modelos al arranque: %s", exc)
 
@@ -444,8 +469,7 @@ def main(config_path: Optional[str] = None) -> None:
                     metrics = get_metrics()
                     metrics["model_loaded"] = last_model
                     metrics["status"] = "online"
-                    models_dir = config.get("llama_server", "models_dir", fallback="./models/")
-                    metrics["available_models"] = get_available_models(models_dir)
+                    metrics["available_models"] = get_available_models(_resolved_models_dir)
                     if api.send_heartbeat(metrics):
                         logger.debug("Heartbeat enviado")
                         last_heartbeat = now
@@ -453,7 +477,7 @@ def main(config_path: Optional[str] = None) -> None:
                         # Re-escanear catálogo cada 10 heartbeats (~5 min si interval=30s)
                         if heartbeat_count % 10 == 0:
                             try:
-                                scan_and_update_catalog(models_dir, data_dir=os.path.join(BASE_DIR, "data"), logger=logger)
+                                scan_and_update_catalog(_resolved_models_dir, data_dir=os.path.join(BASE_DIR, "data"), logger=logger)
                             except Exception as exc:
                                 logger.warning("Error re-escaneando catálogo: %s", exc)
                     else:
