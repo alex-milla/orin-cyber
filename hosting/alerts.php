@@ -46,7 +46,6 @@ if ($severityFilter && in_array($severityFilter, ['LOW','MEDIUM','HIGH','CRITICA
 $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 $alerts = [];
 $unreadCount = 0;
-$tableMissing = false;
 try {
     $alerts = Database::fetchAll(
         "SELECT * FROM alerts {$whereSql} ORDER BY created_at DESC LIMIT 100",
@@ -55,11 +54,7 @@ try {
     $unreadRow = Database::fetchOne("SELECT COUNT(*) as total FROM alerts WHERE read_at IS NULL");
     $unreadCount = (int)($unreadRow['total'] ?? 0);
 } catch (PDOException $e) {
-    if (str_contains($e->getMessage(), 'no such table') || str_contains($e->getMessage(), 'no existe')) {
-        $tableMissing = true;
-    } else {
-        $error = 'Error de base de datos: ' . $e->getMessage();
-    }
+    $error = 'Error de base de datos: ' . $e->getMessage();
 }
 
 $pageTitle = 'Alertas — OrinSec';
@@ -68,12 +63,6 @@ require __DIR__ . '/templates/header.php';
 <div class="card">
     <h2>🔔 Alertas <?php if ($unreadCount > 0): ?><span style="background:var(--error);color:#fff;border-radius:50%;padding:.15rem .5rem;font-size:.85rem;"><?php echo $unreadCount; ?></span><?php endif; ?></h2>
 
-    <?php if ($tableMissing): ?>
-        <p class="alert alert-warning">
-            ⚠️ El sistema de alertas no está inicializado. 
-            <a href="dev/migrate_alerts.php">Ejecutar migración →</a>
-        </p>
-    <?php endif; ?>
     <?php if ($error): ?><p class="alert alert-error"><?php echo htmlspecialchars($error); ?></p><?php endif; ?>
     <?php if ($success): ?><p class="alert alert-success"><?php echo htmlspecialchars($success); ?></p><?php endif; ?>
 

@@ -5,6 +5,7 @@ require_once __DIR__ . '/config.php';
 
 class Database {
     private static ?PDO $instance = null;
+    private static bool $migrated = false;
 
     public static function getInstance(): PDO {
         if (self::$instance === null) {
@@ -20,8 +21,123 @@ class Database {
             self::$instance->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             self::$instance->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
             self::$instance->exec('PRAGMA foreign_keys = ON;');
+            self::ensureSchema();
         }
         return self::$instance;
+    }
+
+    /**
+     * Auto-migración: asegura que todas las tablas e índices existan.
+     * Idempotente — puede llamarse en cada request sin riesgo.
+     */
+    private static function ensureSchema(): void {
+        if (self::$migrated) return;
+        self::$migrated = true;
+        $db = self::$instance;
+        if (!$db) return;
+
+        // Tabla de configuración
+        $db->exec("CREATE TABLE IF NOT EXISTS config (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )");
+
+        // Usuarios
+        $db->exec("CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            is_admin INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        // API keys
+        $db->exec("CREATE TABLE IF NOT EXISTS api_keys (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            api_key TEXT NOT NULL UNIQUE,
+            is_active INTEGER DEFAULT 1,
+            last_used TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        // Tareas
+        $db->exec("CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_type TEXT NOT NULL,
+            input_data TEXT,
+            status TEXT DEFAULT 'pending',
+            result_html TEXT,
+            result_text TEXT,
+            error_message TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            started_at TEXT,
+            completed_at TEXT
+        )");
+
+        // Heartbeats
+        $db->exec("CREATE TABLE IF NOT EXISTS worker_heartbeats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            api_key_id INTEGER NOT NULL,
+            hostname TEXT,
+            ip_address TEXT,
+            cpu_percent REAL,
+            memory_percent REAL,
+            memory_total_mb INTEGER,
+            memory_used_mb INTEGER,
+            gpu_info TEXT,
+            temperature_c REAL,
+            disk_percent REAL,
+            model_loaded TEXT,
+            uptime_seconds INTEGER,
+            status TEXT DEFAULT 'online',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        // Comandos
+        $db->exec("CREATE TABLE IF NOT EXISTS worker_commands (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            api_key_id INTEGER NOT NULL,
+            command TEXT NOT NULL,
+            payload TEXT,
+            executed_at TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        // Alertas — Fase C
+        $db->exec("CREATE TABLE IF NOT EXISTS alert_subscriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL DEFAULT 1,
+            type TEXT NOT NULL CHECK(type IN ('product','vendor','keyword','severity')),
+            value TEXT NOT NULL,
+            severity_threshold TEXT DEFAULT 'LOW',
+            active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cve_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            severity TEXT,
+            score REAL,
+            epss_score REAL,
+            kev INTEGER DEFAULT 0,
+            source TEXT DEFAULT 'NVD',
+            matched_subscription TEXT,
+            read_at TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        // Índices Fase A + C
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_tasks_status_created ON tasks(status, created_at)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_apikeys_key_active ON api_keys(api_key, is_active)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_workerhb_apikey_created ON worker_heartbeats(api_key_id, created_at)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_workercommands_apikey_executed ON worker_commands(api_key_id, executed_at)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_alerts_cve ON alerts(cve_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at DESC)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_alerts_read ON alerts(read_at)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_subs_user ON alert_subscriptions(user_id, active)");
     }
 
     public static function query(string $sql, array $params = []): PDOStatement {
