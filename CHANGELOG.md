@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.6.0] — 2026-04-27
+
+### Added
+- **OSV.dev scraper**: nueva fuente `worker/scrapers/osv.py` que consulta `api.osv.dev` para extraer paquetes afectados (ecosistema, nombre, versión introducida), versiones `fixed_in`, severidad y referencias. TTL 12h en caché SQLite.
+- **Caché SQLite persistente**: `worker/utils/cache.py` con tabla `cache(key, value, expires_at)`. Integrada en NVD (24h), EPSS (12h), CISA KEV (4h), GitHub exploits (1h) y OSV (12h). Reduce drásticamente las llamadas repetidas a APIs externas.
+- **Batch CVE lookup**: el formulario de `task_cve.php` acepta hasta 20 CVE IDs separados por coma, espacio o salto de línea. El worker enriquece todos y genera un informe comparativo con tabla resumen + tarjetas de detalle. En modo batch se omite la llamada al LLM para evitar exceso de tokens/tiempo.
+- **Respuesta JSON estructurada del LLM**: nuevo método `LlmClient.chat_json()` parsea bloques `\`\`\`json` o JSON raw con fallback a `None`. El prompt ahora exige JSON con campos `contexto_es`, `impacto`, `recomendaciones`, `notas`. El worker construye el informe desde el dict parseado, eliminando el regex frágil `CONTEXTO`.
+
+### Changed
+- **Prompt actualizado**: incluye referencia a datos de OSV.dev (`fixed_in`) y mantiene la regla de concisión (máx. 200 palabras).
+- **Cleanup de hosting**: eliminados `hosting/diagnose.php`, `hosting/emergency_fix.php` y `hosting/migrate_010_to_020.php` (ya migrados a `hosting/dev/` en v0.5.8).
+
+---
+
 ## [v0.5.8] — 2026-04-27
 
 ### Security
