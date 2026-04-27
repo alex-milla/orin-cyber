@@ -25,7 +25,7 @@ if (!is_array($data)) {
 
 // Validar campos obligatorios mínimos
 $hostname = validateInput($data['hostname'] ?? '', 100) ?? 'unknown';
-$recentLogs = validateInput($data['recent_logs'] ?? '', 20000);
+$recentLogs = isset($data['recent_logs']) ? substr((string)$data['recent_logs'], 0, 20000) : '';
 
 // Insertar heartbeat
 $availableModels = null;
