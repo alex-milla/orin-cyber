@@ -101,26 +101,10 @@ switch ($action) {
     case 'cancel':
         $data = getJsonInput();
         $taskId = filter_var($data['task_id'] ?? 0, FILTER_VALIDATE_INT);
-        
-        if ($taskId <= 0) {
-            jsonResponse(['error' => 'task_id requerido'], 400);
+        $result = cancelTaskById($taskId);
+        if (!$result['ok']) {
+            jsonResponse(['error' => $result['error']], $result['code']);
         }
-        
-        $updated = Database::update(
-            'tasks',
-            [
-                'status' => 'cancelled',
-                'completed_at' => date('Y-m-d H:i:s'),
-                'error_message' => 'Cancelada por el usuario'
-            ],
-            'id = ? AND status IN (?, ?)',
-            [$taskId, 'pending', 'processing']
-        );
-        
-        if ($updated === 0) {
-            jsonResponse(['error' => 'Tarea no encontrada o ya finalizada'], 409);
-        }
-        
         jsonResponse(['success' => true, 'message' => 'Tarea cancelada']);
         break;
 

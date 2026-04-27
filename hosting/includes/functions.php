@@ -137,6 +137,26 @@ function checkBruteForce(string $identifier, int $maxAttempts = 5, int $windowSe
     return true;
 }
 
+function cancelTaskById(int $taskId): array {
+    if ($taskId <= 0) {
+        return ['ok' => false, 'error' => 'task_id requerido', 'code' => 400];
+    }
+    $updated = Database::update(
+        'tasks',
+        [
+            'status' => 'cancelled',
+            'completed_at' => date('Y-m-d H:i:s'),
+            'error_message' => 'Cancelada por el usuario'
+        ],
+        'id = ? AND status IN (?, ?)',
+        [$taskId, 'pending', 'processing']
+    );
+    if ($updated === 0) {
+        return ['ok' => false, 'error' => 'Tarea no encontrada o ya finalizada', 'code' => 409];
+    }
+    return ['ok' => true];
+}
+
 function clearBruteForce(string $identifier): void {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'cli';
     $key = 'brute_' . md5($identifier . '_' . $ip);
