@@ -1,5 +1,22 @@
 # Changelog
 
+## [v0.7.3] — 2026-04-27
+
+### Fixed
+- **Mitigación OOM en Jetson Orin Nano** (bug JetPack r36.4.7 — fragmentación de memoria CUDA):
+  - `worker/config.ini`: restaurados flags conservadores globales y por modelo (`-fa on`, `--cache-type-k q8_0`, `--cache-type-v q8_0`, `--batch-size 256`, `--ubatch-size 256`, `--no-mmap`, `--mlock`). `context_size` reducido a valores seguros (4096/2048/1536).
+  - `worker/utils/model_catalog.py`: heurística `_recommended_context` dividida por la mitad para evitar reservas grandes de KV-cache en el kernel buggy. `_extra_args_for_arch` ahora inyecta flags conservadores automáticamente (sin `-fa` en arquitecturas `phi*` por compatibilidad b8932).
+  - `worker/worker.py`:
+    - `_free_jetson_memory()`: ejecuta `drop_caches` + `compact_memory` con sudo entre cambios de modelo para desfragmentar memoria física.
+    - `_retry_with_minimal_args()`: si el primer arranque falla, reintenta automáticamente con `-ngl 0 -c 1024 --cache-type-k/v q4_0 --batch-size 64` (CPU-only mínimo).
+    - `_classify_llama_failure()`: clasifica errores (`oom_cuda`, `oom_compute_buffers`, `oom_cuda_weights`, `shape_mismatch_likely_phi_fa`) y los reporta al hosting para diagnóstico visible en `admin.php`.
+    - `_build_llama_args()`: soporta `executable_path_cpu` en `config.ini` para modelos >5 GB (fallback a binario sin CUDA).
+    - Frecuencia de re-escaneo de catálogo reducida de 10 a 120 heartbeats (~1 h) para reducir I/O innecesaria.
+  - `worker/orinsec-worker.service`: añadidas variables de entorno `GGML_CUDA_NO_PINNED=1`, `GGML_SCHED_DEBUG=0`, `CUDA_LAUNCH_BLOCKING=0`.
+  - `worker/install-service.sh`: crea reglas `sudoers.d/orinsec` NOPASSWD para `drop_caches` y `compact_memory`.
+
+---
+
 ## [v0.7.1] — 2026-04-27
 
 ### Fixed

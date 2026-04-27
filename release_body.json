@@ -1,0 +1,5 @@
+{
+  "tag_name": "v0.7.2",
+  "name": "v0.7.2 - Fix OOM on Jetson Orin Nano + admin polling timeout",
+  "body": "### Fixed\n- **worker.py**: delay de 3s tras matar llama-server para liberar memoria CUDA en Jetson Orin Nano antes de cargar el nuevo modelo.\n- **admin.php**: timeout de polling aumentado de 2 min a 6 min (180 intentos) para modelos grandes.\n- **admin.php**: la celda del modelo en la tabla de workers se actualiza automáticamente cuando change_model finaliza con exito, sin necesidad de recargar la pagina.\n\n### Changed\n- **config.ini**: valores conservadores de -ngl para todos los modelos, evitando OOM en Orin Nano 8GB:\n  - Gemma-4-E2B: -ngl 999 (~2B params, cabe en GPU)\n  - Phi-4-mini: -ngl 18\n  - Qwen3.5-4B: -ngl 15\n  - DeepSeek 7B: -ngl 10\n  - GLM-4.6V: -ngl 5\n  - Qwen3.5-9B: -ngl 5"
+}

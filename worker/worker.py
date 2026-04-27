@@ -152,6 +152,95 @@ def _read_llama_server_output(proc: subprocess.Popen) -> None:
             pass
 
 
+def _classify_llama_failure(buffer: deque[str]) -> str:
+    """Devuelve un diagnóstico legible para el hosting."""
+    text = "\n".join(buffer).lower()
+    if "cudamalloc failed: out of memory" in text:
+        return "oom_cuda"
+    if "failed to allocate compute buffers" in text:
+        return "oom_compute_buffers"
+    if "ggml_reshape_2d" in text:
+        return "shape_mismatch_likely_phi_fa"
+    if "unable to allocate cuda0 buffer" in text:
+        return "oom_cuda_weights"
+    return "unknown"
+
+
+def _free_jetson_memory(logger: logging.Logger) -> None:
+    """Forzar liberación de memoria física entre modelos en Jetson."""
+    try:
+        subprocess.run(["pkill", "-9", "-f", "llama-server"], capture_output=True)
+        time.sleep(2)
+        # Vaciar pagecache, dentries e inodos. Reduce fragmentación.
+        subprocess.run(
+            ["sudo", "sh", "-c", "echo 3 > /proc/sys/vm/drop_caches"],
+            capture_output=True,
+        )
+        # Compactar memoria (kernel >= 5.x). Mueve páginas para crear contiguous blocks.
+        subprocess.run(
+            ["sudo", "sh", "-c", "echo 1 > /proc/sys/vm/compact_memory"],
+            capture_output=True,
+        )
+        time.sleep(3)
+        logger.info("Memoria Jetson liberada y compactada entre cambios de modelo.")
+    except Exception as exc:
+        logger.warning("No se pudo liberar/compacar memoria: %s", exc)
+
+
+def _retry_with_minimal_args(
+    config: configparser.ConfigParser,
+    model: str,
+    logger: logging.Logger,
+) -> bool:
+    """Último intento: -ngl 0 + ctx mínimo + cuantización máxima de KV."""
+    logger.warning("Reintentando carga con flags ultra-conservadores (CPU-only, ctx 1024)...")
+    exe = config.get("llama_server", "executable_path", fallback="llama-server")
+    models_dir = config.get("llama_server", "models_dir", fallback="./models/")
+    host = config.get("llama_server", "host", fallback="0.0.0.0")
+    port = config.get("llama_server", "port", fallback="8080")
+
+    # Fallback a binario CPU-only si está disponible
+    exe_cpu = config.get("llama_server", "executable_path_cpu", fallback="")
+    if exe_cpu:
+        exe = exe_cpu
+        logger.info("Usando binario CPU-only para retry: %s", exe)
+
+    if not os.path.isabs(exe):
+        resolved = shutil.which(exe)
+        if resolved:
+            exe = resolved
+        elif os.path.exists(os.path.join(BASE_DIR, exe)):
+            exe = os.path.join(BASE_DIR, exe)
+
+    model_path = os.path.join(models_dir, model)
+    if not os.path.isabs(model_path):
+        model_path = os.path.join(BASE_DIR, model_path)
+
+    minimal_extra = "-ngl 0 -c 1024 --cache-type-k q4_0 --cache-type-v q4_0 --batch-size 64 --ubatch-size 64 --no-mmap --mlock"
+    args = [exe, "-m", model_path, "-c", "1024", "--host", host, "--port", port]
+    args.extend(shlex.split(minimal_extra))
+
+    logger.info("Retry llama-server: %s", " ".join(args))
+    proc = subprocess.Popen(
+        args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+    _LLAMA_SERVER_LOG_BUFFER.clear()
+    reader = threading.Thread(target=_read_llama_server_output, args=(proc,), daemon=True)
+    reader.start()
+    global _LLAMA_SERVER_READER_THREAD
+    _LLAMA_SERVER_READER_THREAD = reader
+
+    max_wait = 120
+    if _wait_for_llama_ready(host, port, max_wait_s=max_wait, logger=logger, proc=proc):
+        logger.info("Retry exitoso con flags mínimos.")
+        return True
+    logger.error("Retry fallido también.")
+    return False
+
+
 def _build_llama_args(
     config: configparser.ConfigParser,
     model: str,
@@ -172,6 +261,14 @@ def _build_llama_args(
     host = config.get("llama_server", "host", fallback="0.0.0.0")
     port = config.get("llama_server", "port", fallback="8080")
     extra = config.get("llama_server", "extra_args", fallback="")
+
+    # Fallback a binario CPU-only para modelos grandes (>5 GB) si está configurado
+    file_size_mb = catalog_entry.get("file_size_mb", 0) if catalog_entry else 0
+    if file_size_mb > 5000:
+        exe_cpu = config.get("llama_server", "executable_path_cpu", fallback="")
+        if exe_cpu:
+            exe = exe_cpu
+            logger.info("Modelo grande detectado (>5GB). Usando binario CPU-only: %s", exe)
 
     # Fallback al catálogo auto-detectado
     if catalog_entry:
@@ -350,11 +447,8 @@ def restart_llama_server_with(config: configparser.ConfigParser, model: str, log
             if _LLAMA_SERVER_READER_THREAD is not None and _LLAMA_SERVER_READER_THREAD.is_alive():
                 _LLAMA_SERVER_READER_THREAD.join(timeout=2)
             _LLAMA_SERVER_READER_THREAD = None
-            # En Jetson la memoria GPU se libera con delay; esperar antes de arrancar nuevo modelo
-            time.sleep(3)
-        else:
-            logger.info("No hay llama-server corriendo. Iniciando nuevo modelo...")
 
+        _free_jetson_memory(logger)
         return _start_llama_server(config, model, logger)
     except Exception as exc:
         logger.exception("Error en restart_llama_server_with: %s", exc)
@@ -395,7 +489,6 @@ def apply_command(config_path: str, command: dict, api: ApiClient, logger: loggi
         # Restart llama-server with new model (no reiniciar el worker)
         _report("loading", f"Cargando {model}...")
         if restart_llama_server_with(config, model, logger):
-            # Solo persistir si el arranque tuvo éxito
             config.set("llm", "model", model)
             with open(config_path, "w", encoding="utf-8") as f:
                 config.write(f)
@@ -404,9 +497,18 @@ def apply_command(config_path: str, command: dict, api: ApiClient, logger: loggi
             logger.info("llama-server reiniciado con nuevo modelo. Worker continúa.")
             _report("ready", f"Modelo {model} cargado correctamente")
         else:
-            logger.error("No se pudo reiniciar llama-server con el nuevo modelo.")
-            _report("error", f"Error al cargar {model}. Revisa los logs del worker.")
-            # Rollback: no tocamos config.ini ni .current_model
+            logger.error("Primer intento de carga fallido. Reintentando con configuración mínima...")
+            if _retry_with_minimal_args(config, model, logger):
+                config.set("llm", "model", model)
+                with open(config_path, "w", encoding="utf-8") as f:
+                    config.write(f)
+                _save_current_model(model)
+                logger.info("Modelo cambiado en config (modo mínimo): %s → %s", old_model, model)
+                _report("ready", f"Modelo {model} cargado en modo CPU-only mínimo (bug NVIDIA JetPack).")
+            else:
+                failure_type = _classify_llama_failure(_LLAMA_SERVER_LOG_BUFFER)
+                logger.error("No se pudo reiniciar llama-server con el nuevo modelo. Diagnóstico: %s", failure_type)
+                _report("error", f"Error al cargar {model}. Diagnóstico: {failure_type}. Revisa los logs del worker.")
         return False
 
     logger.warning("Comando desconocido: %s", cmd)
@@ -476,8 +578,8 @@ def main(config_path: Optional[str] = None) -> None:
                         logger.debug("Heartbeat enviado")
                         last_heartbeat = now
                         heartbeat_count += 1
-                        # Re-escanear catálogo cada 10 heartbeats (~5 min si interval=30s)
-                        if heartbeat_count % 10 == 0:
+                        # Re-escanear catálogo cada 120 heartbeats (~1 h si interval=30s)
+                        if heartbeat_count % 120 == 0:
                             try:
                                 scan_and_update_catalog(_resolved_models_dir, data_dir=os.path.join(BASE_DIR, "data"), logger=logger)
                             except Exception as exc:

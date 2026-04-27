@@ -56,14 +56,14 @@ def _recommended_context(file_size_mb: float, max_context: Optional[int]) -> int
     """Heurística de contexto recomendado según tamaño del modelo y VRAM disponible.
 
     Jetson Orin Nano 8GB compartidos. Sistema usa ~1.5GB.
-    Regla conservadora: dejar margen para tareas concurrentes.
+    Regla conservadora para mitigar bug de fragmentación CUDA en JetPack r36.4.7.
     """
     if file_size_mb <= 3000:
-        ctx = 8192
-    elif file_size_mb <= 5000:
         ctx = 4096
-    else:
+    elif file_size_mb <= 5000:
         ctx = 2048
+    else:
+        ctx = 1536
 
     if max_context is not None:
         ctx = min(ctx, int(max_context))
@@ -85,11 +85,13 @@ def _expected_load_seconds(file_size_mb: float) -> int:
 def _extra_args_for_arch(arch: str) -> str:
     """Devuelve argumentos extra recomendados según arquitectura del modelo.
 
-    NO inyecta --chat-template porque el usuario ya maneja templates
-    via --jinja en config.ini. Inyectar templates built-in puede
-    conflictuar con --jinja y causar crashes en ciertas builds.
+    Flags conservadores para mitigar OOM/fragmentación en Jetson Orin Nano
+    con JetPack r36.4.7. Phi-3/Phi-4 crashea con flash attention en build b8932.
     """
-    return ""
+    base = "--cache-type-k q8_0 --cache-type-v q8_0 --batch-size 256 --ubatch-size 256 --no-mmap --mlock"
+    if arch.lower().startswith("phi"):
+        return base
+    return f"-fa on {base}"
 
 
 def _model_entry_from_metadata(meta: Dict[str, Any]) -> Dict[str, Any]:

@@ -10,6 +10,9 @@ Group=alex
 WorkingDirectory=/home/alex/orinsec/worker
 Environment=PYTHONUNBUFFERED=1
 Environment=PATH=/home/alex/orinsec/worker/venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=GGML_CUDA_NO_PINNED=1
+Environment=GGML_SCHED_DEBUG=0
+Environment=CUDA_LAUNCH_BLOCKING=0
 ExecStart=/home/alex/orinsec/worker/venv/bin/python /home/alex/orinsec/worker/worker.py
 Restart=always
 RestartSec=10

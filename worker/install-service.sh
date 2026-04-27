@@ -35,6 +35,17 @@ systemctl enable "$SERVICE_NAME"
 # Iniciar servicio
 systemctl restart "$SERVICE_NAME"
 
+# Crear reglas sudo NOPASSWD para liberación de memoria en Jetson
+SUDOERS_FILE="/etc/sudoers.d/orinsec"
+if [ ! -f "$SUDOERS_FILE" ]; then
+    echo "alex ALL=(ALL) NOPASSWD: /bin/sh -c echo 3 > /proc/sys/vm/drop_caches" > "$SUDOERS_FILE"
+    echo "alex ALL=(ALL) NOPASSWD: /bin/sh -c echo 1 > /proc/sys/vm/compact_memory" >> "$SUDOERS_FILE"
+    chmod 440 "$SUDOERS_FILE"
+    echo "✅ Permisos sudo creados para liberación de memoria en Jetson."
+else
+    echo "ℹ️  Permisos sudo ya existen."
+fi
+
 echo ""
 echo "✅ Servicio instalado y iniciado."
 echo ""
