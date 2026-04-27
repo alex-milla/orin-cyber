@@ -1,10 +1,51 @@
 # Changelog
 
+## [v0.5.7] — 2026-04-27
+
+### Added
+- **Captura de logs de llama-server**: stdout/stderr ya no van a `/dev/null`. Ahora se escriben a `logs/llama-server.log` con rotación automática.
+- **Rotación de logs**: `RotatingFileHandler` con 10 MB por archivo, máximo 4 backups = 50 MB total tanto para el worker como para llama-server.
+- **Buffer circular en memoria**: las últimas 100 líneas de llama-server se mantienen en RAM para diagnóstico inmediato.
+- **Diagnóstico automático ante fallo de carga**: si un modelo no responde en 120 s, el worker vuelca esas 100 líneas al log principal como `ERROR`.
+
+---
+
+## [v0.5.6] — 2026-04-27
+
+### Fixed
+- **Protección crítica al cambiar modelo**: `change_model` ya no reinicia el worker completo. Solo reinicia `llama-server`, evitando que systemd mate el proceso mientras carga un modelo grande.
+- **Espera de 120 s para modelos grandes**: antes de matar un `llama-server` existente, el worker espera hasta 120 s a que responda (algunos modelos de 4GB+ tardan 20-30 s en cargar).
+- **Verificación antes de cada tarea**: si `llama-server` no responde antes de ejecutar una tarea, se reinicia automáticamente.
+
+---
+
+## [v0.5.5] — 2026-04-27
+
+### Added
+- **Configuración por modelo**: sección `[model_<nombre>]` en `config.ini` permite `context_size` y `extra_args` específicos por modelo.
+- **Nuevos modelos en dropdown**: GLM-4.6V-Flash (4K context) y DeepSeek-R1-Distill-Qwen-7B.
+
+---
+
+## [v0.5.4] — 2026-04-27
+
+### Fixed
+- **Worker online status en admin**: comparación de timestamps forzada a UTC en `admin.php` para evitar falsos "Offline".
+
+---
+
+## [v0.5.3] — 2026-04-27
+
+### Fixed
+- **Cancelación de tareas en hosting**: movido el endpoint de cancelación a `ajax_admin.php` porque `task_cancel.php` no se incluía en los deploys ZIP.
+
+---
+
 ## [v0.5.2] — 2026-04-27
 
 ### Fixed
 - **Worker widget "Offline"**: comparación de timestamps ahora fuerza UTC (evita desfase de timezone entre hosting y Orin).
-- **llama-server no responde**: worker ahora hace polling durante 60s (cada 2s) en lugar de esperar 10s fijos. Los modelos de 2.7GB+ necesitan ~20-30s para cargar en Jetson Orin Nano.
+- **llama-server no responde**: worker ahora hace polling durante 60 s (cada 2 s) en lugar de esperar 10 s fijos. Los modelos de 2.7GB+ necesitan ~20-30 s para cargar en Jetson Orin Nano.
 - **Tareas atascadas en "processing"**: endpoint `tasks.php?action=pending` ahora marca automáticamente como `error` las tareas que llevan >15 min sin respuesta del worker.
 - **Rate limit 429**: causado por dos instancias de worker corriendo simultáneamente (manual + systemd).
 
