@@ -2,6 +2,9 @@
 
 ## [v0.6.1] — 2026-04-27
 
+### Fixed
+- **Auto-migración en bootstrap**: `includes/db.php` ahora ejecuta `CREATE TABLE IF NOT EXISTS` e índices automáticamente al inicializar la conexión SQLite. Elimina la dependencia frágil de scripts manuales en `dev/` que causaban 500 en shared hosting.
+
 ### Added
 - **Sistema de Alertas (Fase C)**:
   - Tablas `alert_subscriptions` y `alerts` con índices SQLite.
