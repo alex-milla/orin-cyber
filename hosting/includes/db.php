@@ -155,6 +155,7 @@ class Database {
         } catch (PDOException $e) {
             // Ignorar si la tabla no existe todavía
         }
+    }
 
     public static function query(string $sql, array $params = []): PDOStatement {
         $db = self::getInstance();
