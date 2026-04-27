@@ -537,6 +537,7 @@ def main(config_path: Optional[str] = None) -> None:
     current_model = _load_current_model(config)
     if not _llama_server_is_ready(host, port):
         logger.warning("llama-server no responde. Intentando iniciar automáticamente...")
+        _free_jetson_memory(logger)
         if ensure_llama_server_running(config, current_model, logger):
             logger.info("llama-server iniciado correctamente al arranque del worker.")
         else:
