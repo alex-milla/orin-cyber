@@ -130,6 +130,31 @@ switch ($action) {
         jsonResponse(['success' => true, 'message' => 'Tarea cancelada']);
         break;
 
+    case 'add_alert_subscription':
+        $type = validateInput($_POST['type'] ?? '', 20);
+        $value = validateInput($_POST['value'] ?? '', 100);
+        $threshold = validateInput($_POST['severity_threshold'] ?? '', 20);
+
+        if (!in_array($type, ['product', 'vendor', 'keyword', 'severity'], true)) {
+            jsonResponse(['error' => 'Tipo de suscripción inválido'], 400);
+        }
+        if (!$value || strlen($value) < 2) {
+            jsonResponse(['error' => 'Valor inválido (mínimo 2 caracteres)'], 400);
+        }
+
+        try {
+            Database::insert('alert_subscriptions', [
+                'type' => $type,
+                'value' => $value,
+                'severity_threshold' => $threshold ?: 'LOW',
+                'active' => 1,
+            ]);
+            jsonResponse(['success' => true]);
+        } catch (PDOException $e) {
+            jsonResponse(['error' => 'No se pudo crear la suscripción'], 500);
+        }
+        break;
+
     default:
         jsonResponse(['error' => 'Acción no válida'], 400);
 }

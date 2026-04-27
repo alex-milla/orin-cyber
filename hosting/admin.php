@@ -40,6 +40,12 @@ try {
 }
 
 try {
+    $alertSubs = Database::fetchAll("SELECT id, type, value, severity_threshold, active, created_at FROM alert_subscriptions ORDER BY created_at DESC");
+} catch (Throwable $e) {
+    $alertSubs = [];
+}
+
+try {
     $workers = Database::fetchAll(
         "SELECT h.*, k.name as worker_name, k.api_key
          FROM worker_heartbeats h
@@ -79,6 +85,7 @@ require __DIR__ . '/templates/header.php';
         <a href="?tab=updates" class="<?php echo $tab==='updates'?'active':''; ?>">Actualizaciones</a>
         <a href="?tab=workers" class="<?php echo $tab==='workers'?'active':''; ?>">Workers</a>
         <a href="?tab=users" class="<?php echo $tab==='users'?'active':''; ?>">Usuarios</a>
+        <a href="?tab=alerts" class="<?php echo $tab==='alerts'?'active':''; ?>">Alertas</a>
         <a href="?tab=config" class="<?php echo $tab==='config'?'active':''; ?>">Configuración</a>
     </div>
 
@@ -264,6 +271,81 @@ require __DIR__ . '/templates/header.php';
         <button type="submit" class="mt-2">Crear usuario</button>
         <p id="user-msg" class="mt-1"></p>
     </form>
+
+    <?php elseif ($tab === 'alerts'): ?>
+    <h3>🔔 Suscripciones de alertas</h3>
+    <p class="small">El worker ejecuta tareas <code>alert_scan</code> que buscan CVEs recientes y generan alertas según estas suscripciones.</p>
+
+    <?php if (empty($alertSubs)): ?>
+        <p class="small">No hay suscripciones configuradas.</p>
+    <?php else: ?>
+    <table>
+        <thead><tr>
+            <th>Tipo</th>
+            <th>Valor</th>
+            <th>Umbral</th>
+            <th>Activa</th>
+            <th>Creada</th>
+        </tr></thead>
+        <tbody>
+        <?php foreach ($alertSubs as $s): ?>
+        <tr>
+            <td><?php echo htmlspecialchars($s['type']); ?></td>
+            <td><code><?php echo htmlspecialchars($s['value']); ?></code></td>
+            <td><?php echo htmlspecialchars($s['severity_threshold'] ?? 'LOW'); ?></td>
+            <td><?php echo $s['active'] ? 'Sí' : 'No'; ?></td>
+            <td class="small"><?php echo htmlspecialchars($s['created_at']); ?></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    <?php endif; ?>
+
+    <h3 class="mt-4">➕ Añadir suscripción</h3>
+    <form method="POST" action="ajax_admin.php?action=add_alert_subscription" onsubmit="return addAlertSub(this);">
+        <?php echo csrfInput(); ?>
+        <label>Tipo</label>
+        <select name="type" required>
+            <option value="product">Producto / Software</option>
+            <option value="vendor">Vendor / Fabricante</option>
+            <option value="keyword">Palabra clave</option>
+            <option value="severity">Severidad mínima</option>
+        </select>
+        <label>Valor</label>
+        <input type="text" name="value" required maxlength="100" placeholder="Ej: apache, log4j, CRITICAL...">
+        <label>Umbral de severidad (para filtro adicional)</label>
+        <select name="severity_threshold">
+            <option value="LOW">LOW</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="HIGH" selected>HIGH</option>
+            <option value="CRITICAL">CRITICAL</option>
+        </select>
+        <button type="submit" class="mt-2">Añadir suscripción</button>
+        <p id="alert-sub-msg" class="small mt-1"></p>
+    </form>
+    <script>
+    async function addAlertSub(form) {
+        const fd = new FormData(form);
+        const msg = document.getElementById('alert-sub-msg');
+        try {
+            const resp = await fetch(form.action, {method: 'POST', body: fd});
+            const data = await resp.json();
+            if (data.success) {
+                msg.className = 'alert alert-success mt-1';
+                msg.textContent = 'Suscripción añadida.';
+                form.reset();
+                setTimeout(() => location.reload(), 800);
+            } else {
+                msg.className = 'alert alert-error mt-1';
+                msg.textContent = data.error || 'Error';
+            }
+        } catch (err) {
+            msg.className = 'alert alert-error mt-1';
+            msg.textContent = 'Error de red: ' + err.message;
+        }
+        return false;
+    }
+    </script>
 
     <?php else: ?>
     <h3>Configuración del sistema</h3>

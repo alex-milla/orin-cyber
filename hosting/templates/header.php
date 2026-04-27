@@ -40,6 +40,15 @@ if (!isset($pageTitle)) $pageTitle = 'OrinSec';
             </div>
         </div>
         <?php if (isAdmin()): ?><a href="admin.php">Admin</a><?php endif; ?>
+        <a href="alerts.php">🔔 Alertas <?php
+            try {
+                $unreadAlerts = Database::fetchOne("SELECT COUNT(*) as total FROM alerts WHERE read_at IS NULL");
+                $unreadCount = (int)($unreadAlerts['total'] ?? 0);
+                if ($unreadCount > 0) {
+                    echo '<span style="background:var(--error);color:#fff;border-radius:50%;padding:.1rem .4rem;font-size:.75rem;margin-left:.25rem;">' . $unreadCount . '</span>';
+                }
+            } catch (Exception $e) {}
+        ?></a>
         <span class="user-greeting">Hola, <?php echo htmlspecialchars($_SESSION['username']); ?></span>
         <a href="logout.php">Salir</a>
         <div class="theme-switcher">

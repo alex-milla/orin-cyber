@@ -116,3 +116,26 @@ class ApiClient:
         except requests.RequestException as exc:
             logger.debug("Commands poll failed: %s", exc)
         return []
+
+    def get_alert_subscriptions(self) -> list:
+        """Obtiene suscripciones de alertas activas."""
+        try:
+            data = self._request("GET", "/api/v1/alerts.php?action=subscriptions")
+            if data and "subscriptions" in data:
+                return data["subscriptions"]
+        except requests.RequestException as exc:
+            logger.warning("Failed to fetch alert subscriptions: %s", exc)
+        return []
+
+    def send_alerts(self, alerts: list[dict]) -> dict | None:
+        """Envía alertas en batch al hosting."""
+        if not alerts:
+            return None
+        try:
+            return self._request(
+                "POST", "/api/v1/alerts.php",
+                json={"alerts": alerts}
+            )
+        except requests.RequestException as exc:
+            logger.warning("Failed to send alerts: %s", exc)
+        return None

@@ -21,6 +21,7 @@ from typing import Optional
 from utils.api_client import ApiClient
 from utils.monitoring import get_metrics
 from tasks.cve_search import CveSearchTask
+from tasks.alert_scan import AlertScanTask
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CONFIG = os.path.join(BASE_DIR, "config.ini")
@@ -34,6 +35,7 @@ _LLAMA_SERVER_READER_THREAD: Optional[threading.Thread] = None
 # Registry de tareas disponibles
 TASK_REGISTRY = {
     "cve_search": CveSearchTask,
+    "alert_scan": AlertScanTask,
 }
 
 

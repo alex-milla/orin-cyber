@@ -120,3 +120,17 @@ def get_cve_by_id(cve_id: str) -> dict | None:
     parsed["references"] = parsed["references"][:10]
     cache_set(key, parsed, ttl_seconds=24 * 3600)  # 24h
     return parsed
+
+
+def get_recent_cves(hours: int = 48, max_results: int = 50) -> list[dict[str, Any]]:
+    """Busca CVEs publicados en las últimas N horas."""
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(hours=hours)
+    params = {
+        "pubStartDate": start.strftime("%Y-%m-%dT%H:%M:%S.000"),
+        "pubEndDate": now.strftime("%Y-%m-%dT%H:%M:%S.000"),
+        "resultsPerPage": min(max_results, 50),
+    }
+    items = _query_nvd(params)
+    return [_parse_cve_item(i) for i in items]
