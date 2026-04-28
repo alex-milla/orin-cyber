@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.10.11] — 2026-04-28
+
+### Fixed
+- **Importación bulk JSON**: ahora incluye un input `<input type="file" accept=".json">` para cargar el archivo directamente desde disco, además del textarea para pegar el JSON manualmente.
+
 ## [v0.10.10] — 2026-04-28
 
 ### Added
