@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.10.4] — 2026-04-28
+
+### Fixed
+- **Admin providers JS**: `loadProvidersAdmin()` ahora espera `DOMContentLoaded` antes de ejecutarse, evitando el error `apiFetch is not defined`.
+- **Admin providers API**: `create_provider` ahora captura `UNIQUE constraint failed` y devuelve HTTP 409 con mensaje claro en lugar de 500.
+
 ## [v0.10.3] — 2026-04-28
 
 ### Fixed

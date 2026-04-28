@@ -51,15 +51,22 @@ switch ($action) {
         if (!$name || !$label || !$baseUrl || $apiKey === '') {
             jsonResponse(['success' => false, 'error' => 'Campos requeridos inválidos'], 400);
         }
-        $id = Database::insert('external_providers', [
-            'name' => $name,
-            'label' => $label,
-            'base_url' => $baseUrl,
-            'api_key_encrypted' => encryptApiKey($apiKey),
-            'api_key_hint' => apiKeyHint($apiKey),
-            'is_active' => !empty($data['is_active']) ? 1 : 0,
-            'timeout_seconds' => max(10, min(300, $timeout)),
-        ]);
+        try {
+            $id = Database::insert('external_providers', [
+                'name' => $name,
+                'label' => $label,
+                'base_url' => $baseUrl,
+                'api_key_encrypted' => encryptApiKey($apiKey),
+                'api_key_hint' => apiKeyHint($apiKey),
+                'is_active' => !empty($data['is_active']) ? 1 : 0,
+                'timeout_seconds' => max(10, min(300, $timeout)),
+            ]);
+        } catch (PDOException $e) {
+            if (strpos($e->getMessage(), 'UNIQUE constraint failed') !== false || $e->getCode() == 23000) {
+                jsonResponse(['success' => false, 'error' => 'Ya existe un proveedor con ese nombre interno. Usa otro o edita el existente.'], 409);
+            }
+            throw $e;
+        }
         jsonResponse(['success' => true, 'id' => $id]);
         break;
 

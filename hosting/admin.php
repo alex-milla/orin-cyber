@@ -664,8 +664,10 @@ require __DIR__ . '/templates/header.php';
         return d.innerHTML;
     }
 
-    loadProvidersAdmin();
-    loadUsageStats();
+    document.addEventListener('DOMContentLoaded', () => {
+        loadProvidersAdmin();
+        loadUsageStats();
+    });
     </script>
 
     <?php else: ?>
