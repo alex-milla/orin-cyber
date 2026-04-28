@@ -1,0 +1,7 @@
+{
+  "tag_name": "v0.8.6",
+  "name": "v0.8.6 — Fix chat: SyntaxError + CSS + worker robustez",
+  "body": "## [v0.8.6] — 2026-04-28\n\n### Fixed\n- **Chat**: `continue` ilegal dentro de `setInterval` sustituido por `return`. El SyntaxError rompía todo el script y el botón no respondía.\n- **Chat**: CSS corregido para evitar descentrado y desbordamiento. Textarea hereda estilos del tema.\n- **Worker**: `_chat_poll_loop` ahora reintenta inicializar `ChatTask` cada 30s si falla, en lugar de morir para siempre.",
+  "draft": false,
+  "prerelease": false
+}

@@ -18,16 +18,54 @@ require_once __DIR__ . '/templates/header.php';
 ?>
 
 <style>
-.chat-wrap { display: flex; flex-direction: column; gap: .75rem; max-width: 900px; margin: 0 auto; height: calc(100vh - 220px); min-height: 400px; }
-.chat-messages { flex: 1 1 auto; overflow-y: auto; border: 1px solid var(--border); border-radius: .5rem; padding: 1rem; background: var(--bg-secondary); }
+.chat-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+    width: 100%;
+    min-height: 60vh;
+    max-height: calc(100vh - 200px);
+}
+.chat-messages {
+    flex: 1 1 auto;
+    min-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: .5rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+}
 .chat-message { margin-bottom: .75rem; }
 .chat-message.user { text-align: right; }
-.chat-message .bubble { display: inline-block; padding: .5rem .9rem; border-radius: 1rem; max-width: 80%; word-break: break-word; line-height: 1.4; }
+.chat-message .bubble {
+    display: inline-block;
+    padding: .5rem .9rem;
+    border-radius: 1rem;
+    max-width: 80%;
+    word-break: break-word;
+    line-height: 1.4;
+}
 .chat-message.user .bubble { background: var(--primary); color: #fff; }
 .chat-message.assistant .bubble { background: var(--bg-tertiary); color: var(--text); }
 .chat-message .meta { font-size: .7rem; color: var(--text-muted); margin-top: .15rem; }
-.chat-input-area { display: flex; gap: .5rem; }
-.chat-input-area textarea { flex: 1; min-height: 56px; resize: none; }
+
+.chat-input-area {
+    display: flex;
+    gap: .5rem;
+    align-items: flex-end;
+}
+.chat-input-area textarea {
+    flex: 1;
+    min-height: 56px;
+    resize: vertical;
+    padding: .6rem .8rem;
+    border: 1px solid var(--border);
+    border-radius: .5rem;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+}
+.chat-input-area .btn { align-self: stretch; }
 .chat-status { font-size: .85rem; color: var(--text-muted); min-height: 1.2rem; }
 </style>
 
@@ -46,139 +84,151 @@ require_once __DIR__ . '/templates/header.php';
 </div>
 
 <script>
-(function() {
+(function () {
     'use strict';
 
     const messagesEl = document.getElementById('chat-messages');
-    const inputEl = document.getElementById('chat-input');
-    const sendBtn = document.getElementById('chat-send');
-    const statusEl = document.getElementById('chat-status');
+    const inputEl    = document.getElementById('chat-input');
+    const sendBtn    = document.getElementById('chat-send');
+    const statusEl   = document.getElementById('chat-status');
 
     if (!messagesEl || !inputEl || !sendBtn || !statusEl) {
         console.error('Chat: no se encontraron elementos del DOM');
         return;
     }
-    console.log('Chat: inicializado correctamente');
 
-function addMessage(role, text) {
-    const div = document.createElement('div');
-    div.className = 'chat-message ' + role;
-    const time = new Date().toLocaleTimeString();
-    div.innerHTML = '<div class="bubble">' + escapeHtml(text) + '</div><div class="meta">' + time + '</div>';
-    messagesEl.appendChild(div);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-}
+    function escapeHtml(text) {
+        const d = document.createElement('div');
+        d.textContent = text;
+        return d.innerHTML;
+    }
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+    function addMessage(role, text) {
+        const div = document.createElement('div');
+        div.className = 'chat-message ' + role;
+        const time = new Date().toLocaleTimeString();
+        div.innerHTML =
+            '<div class="bubble">' + escapeHtml(text) + '</div>' +
+            '<div class="meta">' + time + '</div>';
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
 
-function setStatus(text) {
-    statusEl.textContent = text;
-}
+    function setStatus(text) { statusEl.textContent = text; }
 
-async function pollTask(taskId) {
-    let attempts = 0;
-    const maxAttempts = 120; // ~6 minutos a 3s
+    function pollTask(taskId) {
+        let attempts = 0;
+        const maxAttempts = 120; // ~6 min a 3 s
 
-    return new Promise((resolve, reject) => {
-        const interval = setInterval(async () => {
-            attempts++;
-            if (attempts > maxAttempts) {
-                clearInterval(interval);
-                reject(new Error('Timeout esperando respuesta'));
-                return;
-            }
-
-            try {
-                const pollUrl = 'api/v1/chat.php?task_id=' + taskId;
-                const resp = await fetch(pollUrl, { credentials: 'same-origin' });
-                const pollRaw = await resp.text();
-                if (resp.status !== 200) {
-                    console.log('Poll URL:', pollUrl, 'Status:', resp.status, 'Raw:', pollRaw.substring(0, 300));
-                }
-                let data;
-                try {
-                    data = JSON.parse(pollRaw);
-                } catch (e) {
-                    continue;
-                }
-                if (!data.success) {
+        return new Promise((resolve, reject) => {
+            const interval = setInterval(async () => {
+                attempts++;
+                if (attempts > maxAttempts) {
                     clearInterval(interval);
-                    reject(new Error(data.error || 'Error desconocido'));
+                    reject(new Error('Timeout esperando respuesta'));
                     return;
                 }
 
-                if (data.status === 'completed') {
-                    clearInterval(interval);
-                    resolve(data.response);
-                } else if (data.status === 'error') {
-                    clearInterval(interval);
-                    reject(new Error(data.error || 'Error en el worker'));
-                } else {
-                    setStatus('Esperando respuesta del worker... (' + attempts + '/' + maxAttempts + ')');
+                try {
+                    const pollUrl = 'api/v1/chat.php?task_id=' + taskId;
+                    const resp = await fetch(pollUrl, { credentials: 'same-origin' });
+                    const pollRaw = await resp.text();
+
+                    if (resp.status !== 200) {
+                        console.log('Poll', pollUrl, 'status', resp.status, pollRaw.substring(0, 300));
+                    }
+
+                    let data;
+                    try {
+                        data = JSON.parse(pollRaw);
+                    } catch (e) {
+                        // Respuesta no-JSON: probablemente HTML de error transitorio.
+                        // Salir de este tick y dejar que el setInterval lo reintente.
+                        return;
+                    }
+
+                    if (!data.success) {
+                        clearInterval(interval);
+                        reject(new Error(data.error || 'Error desconocido'));
+                        return;
+                    }
+
+                    if (data.status === 'completed') {
+                        clearInterval(interval);
+                        resolve(data.response);
+                    } else if (data.status === 'error') {
+                        clearInterval(interval);
+                        reject(new Error(data.error || 'Error en el worker'));
+                    } else {
+                        setStatus('Esperando respuesta del worker... (' + attempts + '/' + maxAttempts + ')');
+                    }
+                } catch (e) {
+                    // Error de red puntual: seguir intentando en el siguiente tick.
                 }
-            } catch (e) {
-                // seguir intentando
-            }
-        }, 3000);
-    });
-}
-
-async function sendMessage() {
-    const text = inputEl.value.trim();
-    if (!text) return;
-
-    inputEl.value = '';
-    addMessage('user', text);
-    sendBtn.disabled = true;
-    setStatus('Enviando mensaje...');
-
-    const url = 'api/v1/chat.php';
-    try {
-        const resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({ message: text })
+            }, 3000);
         });
+    }
 
-        const rawText = await resp.text();
-        console.log('URL:', url, 'Status:', resp.status, 'Raw:', rawText.substring(0, 500));
+    async function sendMessage() {
+        const text = inputEl.value.trim();
+        if (!text) return;
 
-        let data;
+        inputEl.value = '';
+        addMessage('user', text);
+        sendBtn.disabled = true;
+        setStatus('Enviando mensaje...');
+
+        const url = 'api/v1/chat.php';
         try {
-            data = JSON.parse(rawText);
-        } catch (e) {
-            throw new Error('HTTP ' + resp.status + ' — respuesta no es JSON. Primeros 200 chars: ' + rawText.substring(0, 200));
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ message: text })
+            });
+
+            const rawText = await resp.text();
+            if (resp.status !== 200) {
+                console.log('POST', url, 'status', resp.status, rawText.substring(0, 500));
+            }
+
+            let data;
+            try {
+                data = JSON.parse(rawText);
+            } catch (e) {
+                throw new Error(
+                    'HTTP ' + resp.status +
+                    ' — respuesta no es JSON. Primeros 200 chars: ' +
+                    rawText.substring(0, 200)
+                );
+            }
+
+            if (!data.success) {
+                throw new Error(data.error || 'Error al crear la tarea');
+            }
+
+            setStatus('Mensaje enviado. Esperando respuesta del worker...');
+            const response = await pollTask(data.task_id);
+            addMessage('assistant', response);
+            setStatus('');
+        } catch (err) {
+            addMessage('assistant', '❌ ' + err.message);
+            setStatus('');
+        } finally {
+            sendBtn.disabled = false;
+            inputEl.focus();
         }
+    }
 
-        if (!data.success) {
-            throw new Error(data.error || 'Error al crear la tarea');
+    sendBtn.addEventListener('click', sendMessage);
+    inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
         }
+    });
 
-        setStatus('Mensaje enviado. Esperando respuesta del worker...');
-        const response = await pollTask(data.task_id);
-        addMessage('assistant', response);
-        setStatus('');
-    } catch (err) {
-        addMessage('assistant', '❌ ' + err.message);
-        setStatus('');
-    } finally {
-        sendBtn.disabled = false;
-        inputEl.focus();
-    }
-}
-
-sendBtn.addEventListener('click', sendMessage);
-inputEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-    }
-});
+    console.log('Chat: inicializado correctamente');
 })();
 </script>
 

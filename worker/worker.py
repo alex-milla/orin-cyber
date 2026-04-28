@@ -553,15 +553,18 @@ def _tail_log_file(path: str, lines: int = 30) -> str:
 
 def _chat_poll_loop(api: ApiClient, config_path: str, logger: logging.Logger) -> None:
     """Thread daemon dedicado a procesar tareas de chat con polling corto (2s)."""
-    try:
-        chat_runner = ChatTask(config_path)
-    except Exception as exc:
-        logger.error("No se pudo inicializar ChatTask en thread dedicado: %s", exc)
-        return
-
+    chat_runner = None
     logger.info("Chat poll loop iniciado (intervalo 2s)")
     while True:
         try:
+            if chat_runner is None:
+                try:
+                    chat_runner = ChatTask(config_path)
+                except Exception as exc:
+                    logger.error("No se pudo inicializar ChatTask, reintentando en 30s: %s", exc)
+                    time.sleep(30)
+                    continue
+
             data = api._request("GET", "/api/v1/tasks.php?action=pending&type=chat")
             tasks = data.get("tasks", []) if data else []
             for task in tasks:

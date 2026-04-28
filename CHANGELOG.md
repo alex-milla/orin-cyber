@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.8.6] — 2026-04-28
+
+### Fixed
+- **Chat**: sustituido `continue` ilegal por `return` dentro del callback de `setInterval`. El `continue` rompía todo el script con `SyntaxError`, impidiendo que se registraran los event listeners del botón.
+- **Chat**: CSS corregido para evitar descentrado (`width: 100%` en lugar de `max-width: 900px` anidado) y desbordamiento (`min-height: 60vh` + `max-height: calc(100vh - 200px)` en lugar de `calc(100vh - 220px)` frágil).
+- **Chat**: textarea ahora hereda estilos del tema (fondo, borde, color).
+- **Worker**: `_chat_poll_loop` ahora inicializa `ChatTask` dentro del loop con reintento cada 30s. Antes, si fallaba al arrancar, el thread moría para siempre y las tareas de chat quedaban atascadas en `pending`.
+
+---
+
 ## [v0.8.5] — 2026-04-28
 
 ### Fixed
