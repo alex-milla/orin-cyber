@@ -35,7 +35,7 @@ switch ($action) {
         );
         $models = Database::fetchAll(
             "SELECT m.id, m.provider_id, m.model_id, m.label, m.context_window,
-                    m.cost_per_1k_input, m.cost_per_1k_output, m.is_active
+                    m.cost_per_1k_input, m.cost_per_1k_output, m.is_active, m.tags
              FROM external_models m ORDER BY m.label"
         );
         jsonResponse(['success' => true, 'providers' => $providers, 'models' => $models]);
@@ -221,6 +221,7 @@ switch ($action) {
                 'cost_per_1k_input' => is_numeric($m['cost_per_1k_input'] ?? null) ? (float)$m['cost_per_1k_input'] : null,
                 'cost_per_1k_output' => is_numeric($m['cost_per_1k_output'] ?? null) ? (float)$m['cost_per_1k_output'] : null,
                 'is_active' => !empty($m['is_active']) ? 1 : 1,
+                'tags' => !empty($m['tags']) && is_array($m['tags']) ? json_encode($m['tags']) : null,
             ]);
             $imported++;
         }

@@ -590,6 +590,20 @@ require __DIR__ . '/templates/header.php';
         }
     }
 
+    function renderModelTags(tagsJson) {
+        if (!tagsJson) return '';
+        let tags;
+        try { tags = JSON.parse(tagsJson); } catch(e) { return ''; }
+        if (!Array.isArray(tags)) return '';
+        const colors = {
+            cybersecurity: 'background:#fff3e0;color:#f57c00;border:1px solid #f57c00;',
+            reasoning: 'background:#e3f2fd;color:#1976d2;border:1px solid #1976d2;',
+            recommended: 'background:#e8f5e9;color:#2e7d32;border:1px solid #2e7d32;',
+            free: 'background:#f5f5f5;color:#888;border:1px solid #ccc;'
+        };
+        return tags.map(t => `<span class="badge" style="${colors[t]||colors.free}font-size:0.7rem;padding:0.1rem 0.35rem;margin:0 0.15rem 0 0;">${t}</span>`).join('');
+    }
+
     function renderProviders(providers, models) {
         const container = document.getElementById('providers-container');
         if (!providers.length) {
@@ -599,7 +613,7 @@ require __DIR__ . '/templates/header.php';
         let html = '<table><thead><tr><th>ID</th><th>Nombre</th><th>Label</th><th>URL</th><th>Key</th><th>Timeout</th><th>Activo</th><th>Modelos</th><th>Acciones</th></tr></thead><tbody>';
         providers.forEach(p => {
             const pmodels = models.filter(m => m.provider_id == p.id);
-            const modelList = pmodels.map(m => `<span class="badge ${m.is_active?'':'badge-inactive'}">${m.label}</span>`).join(' ');
+            const modelList = pmodels.map(m => `<span class="badge ${m.is_active?'':'badge-inactive'}">${m.label}</span>${renderModelTags(m.tags)}`).join(' ');
             const noModelsHint = pmodels.length ? '' : '<br><span class="small" style="color:var(--warning)">⚠️ Añade modelos abajo para usarlos en el chat</span>';
             html += `<tr>
                 <td>${p.id}</td>

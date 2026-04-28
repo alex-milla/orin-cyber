@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.10.13] — 2026-04-28
+
+### Added
+- **Tags en modelos cloud**: nueva columna `tags` en `external_models`. Los catálogos JSON incluyen `tags: ["recommended", "reasoning", "cybersecurity", "free"]`.
+- **Visualización de tags en Admin → Proveedores**: cada modelo muestra badges de colores: 🛡️ cybersecurity (naranja), 🧠 reasoning (azul), ⭐ recommended (verde).
+- **Tags en selector de tareas CVE**: el dropdown de ejecutor muestra emojis ⭐🛡️🧠 junto a cada modelo cloud para identificar rápidamente los adecuados para ciberseguridad.
+
 ## [v0.10.12] — 2026-04-28
 
 ### Added

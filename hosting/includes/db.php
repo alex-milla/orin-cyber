@@ -188,6 +188,7 @@ class Database {
             cost_per_1k_input REAL,
             cost_per_1k_output REAL,
             is_active INTEGER DEFAULT 1,
+            tags TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (provider_id) REFERENCES external_providers(id) ON DELETE CASCADE,
             UNIQUE(provider_id, model_id)
@@ -240,6 +241,7 @@ class Database {
         self::_addColumnIfNotExists('worker_commands', 'status_updated_at', 'TEXT');
         self::_addColumnIfNotExists('worker_heartbeats', 'recent_logs', 'TEXT');
         self::_addColumnIfNotExists('users', 'monthly_external_budget_usd', 'REAL DEFAULT 5.0');
+        self::_addColumnIfNotExists('external_models', 'tags', 'TEXT');
     }
 
     private static function _addColumnIfNotExists(string $table, string $column, string $type): void {

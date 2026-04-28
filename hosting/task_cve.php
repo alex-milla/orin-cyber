@@ -135,7 +135,8 @@ try {
     $virtualWorkers = Database::fetchAll(
         "SELECT 'provider:' || p.id || ':' || m.model_id as value,
                 p.label || ' → ' || m.label as label,
-                m.model_id
+                m.model_id,
+                m.tags
          FROM external_models m
          JOIN external_providers p ON p.id = m.provider_id
          WHERE m.is_active = 1 AND p.is_active = 1
@@ -176,11 +177,24 @@ require __DIR__ . '/templates/header.php';
             <textarea id="cve_id" name="cve_id" rows="3" maxlength="600" placeholder="Ej: CVE-2024-3393, CVE-2021-44228"><?php echo htmlspecialchars($prefillCve); ?></textarea>
             <p class="small">Introduce uno o varios CVE IDs (máximo 20), separados por coma, espacio o salto de línea.</p>
             <label for="executor" style="margin-top:1rem;display:block;">🖥️ Ejecutor</label>
-            <select id="executor" name="executor" style="min-width:280px;margin-bottom:.5rem;">
+            <select id="executor" name="executor" style="min-width:320px;margin-bottom:.5rem;">
                 <option value="worker">🏠 Worker local (Orin)</option>
-                <?php foreach ($virtualWorkers as $vw): ?>
+                <?php foreach ($virtualWorkers as $vw):
+                    $vwTags = [];
+                    if (!empty($vw['tags'])) {
+                        $tagsArr = json_decode($vw['tags'], true);
+                        if (is_array($tagsArr)) {
+                            foreach ($tagsArr as $t) {
+                                if ($t === 'cybersecurity') $vwTags[] = '🛡️';
+                                if ($t === 'reasoning') $vwTags[] = '🧠';
+                                if ($t === 'recommended') $vwTags[] = '⭐';
+                            }
+                        }
+                    }
+                    $tagStr = $vwTags ? ' ' . implode(' ', $vwTags) : '';
+                ?>
                 <option value="<?php echo htmlspecialchars($vw['value']); ?>">
-                    ☁️ <?php echo htmlspecialchars($vw['label']); ?>
+                    ☁️ <?php echo htmlspecialchars($vw['label']) . $tagStr; ?>
                 </option>
                 <?php endforeach; ?>
             </select>
