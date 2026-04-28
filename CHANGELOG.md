@@ -1,5 +1,27 @@
 # Changelog
 
+## [v0.10.0] — 2026-04-28
+
+### Added
+- **APIs externas (proveedores cloud)** — OpenRouter, OpenAI, Nvidia NIM accesibles directamente desde el hosting:
+  - Nuevas tablas SQLite: `external_providers`, `external_models`, `external_usage`, `chat_conversations`, `chat_messages`.
+  - `hosting/includes/crypto.php`: cifrado AES-256-CBC para API keys. La clave maestra `MASTER_ENCRYPTION_KEY` se define en `config.php` (lee de variable de entorno `ORINSEC_MASTER_KEY` si existe).
+  - `hosting/includes/external_client.php`: cliente HTTP síncrono compatible con OpenAI Chat Completions.
+  - `hosting/api/v1/chat_external.php`: endpoint REST para chat con modelos externos. Soporta historial de conversación, rate limit (2s/IP) y control de presupuesto mensual por usuario (`users.monthly_external_budget_usd`, default $5.0).
+  - `hosting/chat.php`: selector de proveedor que permite elegir entre **🏠 Local** (Orin vía Cloudflare Tunnel) y **☁️ Proveedores cloud**. Los modelos locales abren el túnel en nueva pestaña; los modelos externos usan el chat integrado con historial.
+  - `hosting/api/v1/admin_providers.php`: endpoint admin para CRUD de proveedores/modelos, test de conexión (`/v1/models`) y métricas de uso del mes.
+  - `hosting/admin.php`: nueva pestaña "Proveedores" con gestión completa de proveedores cloud, modelos asociados y estadísticas de consumo.
+
+### Security
+- Las API keys de proveedores externos se almacenan cifradas en la base de datos. Nunca se exponen al cliente; solo se muestra un hint (`sk-...abcd`).
+- Validación estricta de `provider_id` + `model_id` contra la base de datos antes de cada llamada externa.
+
+### Notes
+- El worker del Orin **no se modifica**. La ruta local sigue funcionando exactamente igual a través del Cloudflare Tunnel.
+- **Importante**: cambiar `MASTER_ENCRYPTION_KEY` en producción antes de añadir proveedores reales.
+
+---
+
 ## [v0.9.0] — 2026-04-28
 
 ### Changed
