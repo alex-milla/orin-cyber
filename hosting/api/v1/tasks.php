@@ -33,18 +33,27 @@ Database::query(
 
 switch ($action) {
     case 'pending':
-        $task = Database::fetchOne(
-            "SELECT id, task_type, input_data, status, created_at 
-             FROM tasks 
-             WHERE status = 'pending' 
-             ORDER BY created_at ASC 
-             LIMIT 1"
-        );
-        
+        $type = $_GET['type'] ?? null;
+        $excludeType = $_GET['exclude_type'] ?? null;
+        $sql = "SELECT id, task_type, input_data, status, created_at
+                FROM tasks
+                WHERE status = 'pending'";
+        $params = [];
+        if ($type !== null && in_array($type, ['chat', 'cve_search', 'alert_scan'], true)) {
+            $sql .= " AND task_type = ?";
+            $params[] = $type;
+        }
+        if ($excludeType !== null && in_array($excludeType, ['chat', 'cve_search', 'alert_scan'], true)) {
+            $sql .= " AND task_type != ?";
+            $params[] = $excludeType;
+        }
+        $sql .= " ORDER BY created_at ASC LIMIT 1";
+        $task = Database::fetchOne($sql, $params);
+
         if (!$task) {
             jsonResponse(['tasks' => []]);
         }
-        
+
         jsonResponse(['tasks' => [$task]]);
         break;
 

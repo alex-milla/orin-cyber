@@ -551,6 +551,42 @@ def _tail_log_file(path: str, lines: int = 30) -> str:
         return ""
 
 
+def _chat_poll_loop(api: ApiClient, config_path: str, logger: logging.Logger) -> None:
+    """Thread daemon dedicado a procesar tareas de chat con polling corto (2s)."""
+    try:
+        chat_runner = ChatTask(config_path)
+    except Exception as exc:
+        logger.error("No se pudo inicializar ChatTask en thread dedicado: %s", exc)
+        return
+
+    logger.info("Chat poll loop iniciado (intervalo 2s)")
+    while True:
+        try:
+            data = api._request("GET", "/api/v1/tasks.php?action=pending&type=chat")
+            tasks = data.get("tasks", []) if data else []
+            for task in tasks:
+                task_id = task.get("id")
+                if not task_id:
+                    continue
+                if not api.claim_task(task_id):
+                    continue
+                try:
+                    input_data = json.loads(task.get("input_data", "{}"))
+                    result = chat_runner.execute(input_data)
+                    api.send_result(
+                        task_id,
+                        result_html=result.get("result_html", ""),
+                        result_text=result.get("result_text", ""),
+                    )
+                    logger.info("Chat task %s completada", task_id)
+                except Exception as exc:
+                    logger.exception("Error en chat task %s", task_id)
+                    api.send_error(task_id, str(exc))
+        except Exception as exc:
+            logger.warning("Chat poll loop error: %s", exc)
+        time.sleep(2)
+
+
 def main(config_path: Optional[str] = None) -> None:
     config = configparser.ConfigParser()
     config.read(config_path or DEFAULT_CONFIG)
@@ -600,6 +636,16 @@ def main(config_path: Optional[str] = None) -> None:
     except Exception as exc:
         logger.warning("Error escaneando catálogo de modelos al arranque: %s", exc)
 
+    # Thread daemon dedicado para tareas de chat (latencia baja)
+    chat_thread = threading.Thread(
+        target=_chat_poll_loop,
+        args=(api, config_path or DEFAULT_CONFIG, logger),
+        daemon=True,
+        name="chat-poll"
+    )
+    chat_thread.start()
+    logger.info("Chat poll thread arrancado")
+
     while True:
         try:
             # ── 1. Heartbeat ──────────────────────────────────────────────
@@ -643,9 +689,9 @@ def main(config_path: Optional[str] = None) -> None:
             except Exception as exc:
                 logger.warning("Error consultando comandos: %s", exc)
 
-            # ── 3. Tareas pendientes ──────────────────────────────────────
+            # ── 3. Tareas pendientes (excluyendo chat, que va por thread dedicado) ──
             try:
-                tasks = api.get_pending_tasks()
+                tasks = api.get_pending_tasks(exclude_type='chat')
             except Exception as exc:
                 logger.error("Error consultando tareas: %s", exc)
                 time.sleep(poll_interval)

@@ -1,0 +1,7 @@
+{
+  "tag_name": "v0.8.4",
+  "name": "v0.8.4 — Cola dedicada para chat (latencia 2s)",
+  "body": "## [v0.8.4] — 2026-04-28\n\n### Added\n- **Cola dedicada para chat** (latencia reducida de ~15s a ~2s):\n  - Endpoint de tareas filtra por `type` y `exclude_type`.\n  - Thread daemon en el worker procesa solo chats cada 2s.\n  - El loop principal excluye chats, evitando que CVEs pesadas bloqueen el chat.",
+  "draft": false,
+  "prerelease": false
+}

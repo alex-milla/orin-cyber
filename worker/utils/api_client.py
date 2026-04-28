@@ -48,9 +48,14 @@ class ApiClient:
                 time.sleep(1.5)  # backoff entre reintentos
         return None
 
-    def get_pending_tasks(self) -> list:
+    def get_pending_tasks(self, type: str = None, exclude_type: str = None) -> list:
         """Obtiene tareas pendientes del hosting."""
-        data = self._request("GET", "/api/v1/tasks.php?action=pending")
+        url = "/api/v1/tasks.php?action=pending"
+        if type:
+            url += "&type=" + type
+        if exclude_type:
+            url += "&exclude_type=" + exclude_type
+        data = self._request("GET", url)
         if data and "tasks" in data:
             return data["tasks"]
         return []

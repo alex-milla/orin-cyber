@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.8.4] — 2026-04-28
+
+### Added
+- **Cola dedicada para chat** (latencia reducida de ~15s a ~2s):
+  - `hosting/api/v1/tasks.php`: filtrado por `type` y `exclude_type` en la acción `pending`.
+  - `worker/utils/api_client.py`: `get_pending_tasks()` acepta `type` y `exclude_type`.
+  - `worker/worker.py`: thread daemon `_chat_poll_loop` que procesa solo tareas `chat` cada 2s. El loop principal excluye chats (`exclude_type=chat`), evitando que CVEs pesadas bloqueen el chat.
+
+---
+
 ## [v0.8.3] — 2026-04-28
 
 ### Fixed
