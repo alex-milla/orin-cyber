@@ -68,6 +68,19 @@ try {
 }
 
 try {
+    $virtualWorkers = Database::fetchAll(
+        "SELECT m.id, m.model_id, m.label as model_label, m.context_window,
+                p.id as provider_id, p.label as provider_label, p.base_url
+         FROM external_models m
+         JOIN external_providers p ON p.id = m.provider_id
+         WHERE m.is_active = 1 AND p.is_active = 1
+         ORDER BY p.label, m.label"
+    );
+} catch (Throwable $e) {
+    $virtualWorkers = [];
+}
+
+try {
     $regRow = Database::fetchOne("SELECT value FROM config WHERE key = 'allow_registration'");
     $regEnabled = !$regRow || $regRow['value'] === '1';
 } catch (Throwable $e) {
@@ -227,6 +240,35 @@ require __DIR__ . '/templates/header.php';
         </div>
     </div>
     <?php endforeach; ?>
+    <?php endif; ?>
+
+    <?php if (!empty($virtualWorkers)): ?>
+    <h3 class="mt-4">☁️ Virtual Workers (modelos cloud)</h3>
+    <p class="small">Estos modelos se ejecutan vía API externa y pueden ser seleccionados como ejecutores en las herramientas.</p>
+    <table>
+        <thead><tr>
+            <th>Nombre</th>
+            <th>Estado</th>
+            <th>Proveedor</th>
+            <th>Modelo</th>
+            <th>Context</th>
+            <th>Acciones</th>
+        </tr></thead>
+        <tbody>
+        <?php foreach ($virtualWorkers as $vw): ?>
+        <tr>
+            <td><strong>☁️ <?php echo htmlspecialchars($vw['provider_label']); ?> → <?php echo htmlspecialchars($vw['model_label']); ?></strong></td>
+            <td><span class="status-completed">● Online</span></td>
+            <td><?php echo htmlspecialchars($vw['provider_label']); ?></td>
+            <td class="small mono"><?php echo htmlspecialchars($vw['model_id']); ?></td>
+            <td><?php echo number_format($vw['context_window']); ?></td>
+            <td>
+                <button class="secondary small" onclick="testProvider(<?php echo (int)$vw['provider_id']; ?>)">🧪 Test</button>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
     <?php endif; ?>
 
     <h3 class="mt-4">📡 Enviar comando a worker</h3>

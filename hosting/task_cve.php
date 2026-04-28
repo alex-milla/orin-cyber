@@ -55,6 +55,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $execConfig = Database::fetchOne("SELECT value FROM config WHERE key = 'default_task_executor'");
             $assignment = $execConfig['value'] ?? 'worker';
 
+            $assignment = validateInput($_POST['executor'] ?? '', 255) ?: 'worker';
+            if ($assignment !== 'worker' && !str_starts_with($assignment, 'provider:')) {
+                $assignment = 'worker';
+            }
+
             $newTaskId = Database::insert('tasks', [
                 'task_type' => 'cve_search',
                 'input_data' => $input,
@@ -124,6 +129,22 @@ foreach ($recentCveRows as $row) {
 // Pre-fill CVE from URL tag click
 $prefillCve = validateInput($_GET['cve'] ?? '', 50, '/^CVE-\d{4}-\d+$/i') ?: '';
 
+// Virtual Workers disponibles
+$virtualWorkers = [];
+try {
+    $virtualWorkers = Database::fetchAll(
+        "SELECT 'provider:' || p.id || ':' || m.model_id as value,
+                p.label || ' → ' || m.label as label,
+                m.model_id
+         FROM external_models m
+         JOIN external_providers p ON p.id = m.provider_id
+         WHERE m.is_active = 1 AND p.is_active = 1
+         ORDER BY p.label, m.label"
+    );
+} catch (Throwable $e) {
+    $virtualWorkers = [];
+}
+
 $pageTitle = 'Búsqueda CVE — OrinSec';
 require __DIR__ . '/templates/header.php';
 ?>
@@ -154,6 +175,15 @@ require __DIR__ . '/templates/header.php';
             <label for="cve_id">CVE ID(s)</label>
             <textarea id="cve_id" name="cve_id" rows="3" maxlength="600" placeholder="Ej: CVE-2024-3393, CVE-2021-44228"><?php echo htmlspecialchars($prefillCve); ?></textarea>
             <p class="small">Introduce uno o varios CVE IDs (máximo 20), separados por coma, espacio o salto de línea.</p>
+            <label for="executor" style="margin-top:1rem;display:block;">🖥️ Ejecutor</label>
+            <select id="executor" name="executor" style="min-width:280px;margin-bottom:.5rem;">
+                <option value="worker">🏠 Worker local (Orin)</option>
+                <?php foreach ($virtualWorkers as $vw): ?>
+                <option value="<?php echo htmlspecialchars($vw['value']); ?>">
+                    ☁️ <?php echo htmlspecialchars($vw['label']); ?>
+                </option>
+                <?php endforeach; ?>
+            </select>
             <button type="submit" class="mt-2">Buscar vulnerabilidad</button>
             
             <button type="button" class="advanced-toggle" onclick="document.getElementById('adv-fields').classList.toggle('open')">⚙️ Búsqueda avanzada ▾</button>

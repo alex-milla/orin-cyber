@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.10.8] — 2026-04-28
+
+### Added
+- **Virtual Workers**: los modelos cloud configurados aparecen ahora como "Virtual Workers" en Admin → Workers, con estado ☁️ Online.
+- **Selector de ejecutor en CVE**: al crear una tarea CVE puedes elegir entre el Worker local (Orin) o cualquier Virtual Worker (modelo cloud). El selector se genera dinámicamente desde los modelos configurados, funcionando con cualquier proveedor.
+
 ## [v0.10.7] — 2026-04-28
 
 ### Added
