@@ -18,24 +18,24 @@ require_once __DIR__ . '/templates/header.php';
 ?>
 
 <style>
-.chat-container { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; height: calc(100vh - 180px); }
-.chat-messages { flex: 1; overflow-y: auto; border: 1px solid var(--border); border-radius: .5rem; padding: 1rem; background: var(--bg-secondary); margin-bottom: 1rem; }
-.chat-message { margin-bottom: 1rem; }
+.chat-wrap { display: flex; flex-direction: column; gap: .75rem; max-width: 900px; margin: 0 auto; height: calc(100vh - 220px); min-height: 400px; }
+.chat-messages { flex: 1 1 auto; overflow-y: auto; border: 1px solid var(--border); border-radius: .5rem; padding: 1rem; background: var(--bg-secondary); }
+.chat-message { margin-bottom: .75rem; }
 .chat-message.user { text-align: right; }
-.chat-message .bubble { display: inline-block; padding: .6rem 1rem; border-radius: 1rem; max-width: 80%; word-break: break-word; }
+.chat-message .bubble { display: inline-block; padding: .5rem .9rem; border-radius: 1rem; max-width: 80%; word-break: break-word; line-height: 1.4; }
 .chat-message.user .bubble { background: var(--primary); color: #fff; }
 .chat-message.assistant .bubble { background: var(--bg-tertiary); color: var(--text); }
-.chat-message .meta { font-size: .7rem; color: var(--text-muted); margin-top: .2rem; }
+.chat-message .meta { font-size: .7rem; color: var(--text-muted); margin-top: .15rem; }
 .chat-input-area { display: flex; gap: .5rem; }
-.chat-input-area textarea { flex: 1; min-height: 60px; resize: vertical; }
-.chat-status { font-size: .85rem; color: var(--text-muted); margin-top: .5rem; min-height: 1.2rem; }
+.chat-input-area textarea { flex: 1; min-height: 56px; resize: none; }
+.chat-status { font-size: .85rem; color: var(--text-muted); min-height: 1.2rem; }
 </style>
 
 <h2>💬 Chat con el modelo</h2>
 <p class="text-muted">Los mensajes se procesan a través del worker. Puede tardar unos segundos.</p>
 <p class="text-muted">Modelo activo: <code><?php echo htmlspecialchars($currentModel); ?></code></p>
 
-<div class="chat-container">
+<div class="chat-wrap">
     <div class="chat-messages" id="chat-messages"></div>
 
     <div class="chat-input-area">
@@ -84,8 +84,18 @@ async function pollTask(taskId) {
             }
 
             try {
-                const resp = await fetch('api/v1/chat.php?task_id=' + taskId, { credentials: 'same-origin' });
-                const data = await resp.json();
+                const pollUrl = 'api/v1/chat.php?task_id=' + taskId;
+                const resp = await fetch(pollUrl, { credentials: 'same-origin' });
+                const pollRaw = await resp.text();
+                if (resp.status !== 200) {
+                    console.log('Poll URL:', pollUrl, 'Status:', resp.status, 'Raw:', pollRaw.substring(0, 300));
+                }
+                let data;
+                try {
+                    data = JSON.parse(pollRaw);
+                } catch (e) {
+                    continue;
+                }
                 if (!data.success) {
                     clearInterval(interval);
                     reject(new Error(data.error || 'Error desconocido'));
@@ -117,14 +127,24 @@ async function sendMessage() {
     sendBtn.disabled = true;
     setStatus('Enviando mensaje...');
 
+    const url = 'api/v1/chat.php';
     try {
-        const resp = await fetch('api/v1/chat.php', {
+        const resp = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
             body: JSON.stringify({ message: text })
         });
-        const data = await resp.json();
+
+        const rawText = await resp.text();
+        console.log('URL:', url, 'Status:', resp.status, 'Raw:', rawText.substring(0, 500));
+
+        let data;
+        try {
+            data = JSON.parse(rawText);
+        } catch (e) {
+            throw new Error('HTTP ' + resp.status + ' — respuesta no es JSON. Primeros 200 chars: ' + rawText.substring(0, 200));
+        }
 
         if (!data.success) {
             throw new Error(data.error || 'Error al crear la tarea');

@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.8.2] — 2026-04-28
+
+### Fixed
+- **Chat**: CSS corregido para que el contenedor quepa dentro de la pantalla (`height: calc(100vh - 220px)` en lugar de `100vh - 180px`).
+- **Chat**: añadido diagnóstico en consola del navegador (URL, status HTTP y respuesta cruda) para identificar errores de conexión con el endpoint.
+- **Chat**: endpoint `api/v1/chat.php` envuelto en `try/catch` + `set_error_handler` para que cualquier error PHP se devuelva como JSON en vez de página HTML.
+- **Chat**: pollTask ahora parsea el body manualmente con `JSON.parse` para evitar errores de doble-consumo del stream.
+
+---
+
 ## [v0.8.1] — 2026-04-28
 
 ### Fixed
