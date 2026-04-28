@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.8.5] — 2026-04-28
+
+### Fixed
+- **Chat**: eliminado `DOMContentLoaded` del script. Al estar al final del `<body>`, el evento ya se había disparado antes de registrar el listener, por lo que la IIFE nunca se ejecutaba y el botón no respondía.
+
+---
+
 ## [v0.8.4] — 2026-04-28
 
 ### Added

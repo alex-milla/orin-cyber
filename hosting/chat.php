@@ -46,7 +46,7 @@ require_once __DIR__ . '/templates/header.php';
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+(function() {
     'use strict';
 
     const messagesEl = document.getElementById('chat-messages');
@@ -179,7 +179,7 @@ inputEl.addEventListener('keydown', (e) => {
         sendMessage();
     }
 });
-});
+})();
 </script>
 
 <?php require_once __DIR__ . '/templates/footer.php'; ?>
