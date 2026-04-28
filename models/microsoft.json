@@ -1,0 +1,10 @@
+[
+  {
+    "model_id": "microsoft/phi-4:free",
+    "label": "Phi-4 (Free)",
+    "context_window": 16384,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  }
+]

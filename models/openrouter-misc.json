@@ -1,0 +1,26 @@
+[
+  {
+    "model_id": "nousresearch/hermes-3-llama-3.1-405b:free",
+    "label": "Hermes 3 Llama 3.1 405B (Free)",
+    "context_window": 128000,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  },
+  {
+    "model_id": "moonshotai/kimi-vl-a3b:free",
+    "label": "Kimi VL A3B (Free)",
+    "context_window": 131072,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  },
+  {
+    "model_id": "tencent/hunyuan-a13b-instruct:free",
+    "label": "Tencent Hunyuan A13B Instruct (Free)",
+    "context_window": 262144,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  }
+]

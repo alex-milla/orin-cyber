@@ -1,0 +1,42 @@
+[
+  {
+    "model_id": "nvidia/nemotron-3-super-120b-a12b:free",
+    "label": "Nemotron 3 Super 120B (Free)",
+    "context_window": 262144,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  },
+  {
+    "model_id": "nvidia/nemotron-3-nano-30b-a3b:free",
+    "label": "Nemotron 3 Nano 30B (Free)",
+    "context_window": 256000,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  },
+  {
+    "model_id": "nvidia/nemotron-nano-9b-v2:free",
+    "label": "Nemotron Nano 9B v2 (Free)",
+    "context_window": 131072,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  },
+  {
+    "model_id": "nvidia/nemotron-nano-12b-v2-vl:free",
+    "label": "Nemotron Nano 12B v2 VL (Free)",
+    "context_window": 131072,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  },
+  {
+    "model_id": "nvidia/llama-3.1-nemotron-70b-instruct:free",
+    "label": "Llama 3.1 Nemotron 70B Instruct (Free)",
+    "context_window": 131072,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  }
+]

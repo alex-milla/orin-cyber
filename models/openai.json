@@ -1,0 +1,18 @@
+[
+  {
+    "model_id": "openai/gpt-oss-20b:free",
+    "label": "GPT-OSS 20B (Free)",
+    "context_window": 131072,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  },
+  {
+    "model_id": "openai/gpt-oss-120b:free",
+    "label": "GPT-OSS 120B (Free)",
+    "context_window": 131072,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  }
+]

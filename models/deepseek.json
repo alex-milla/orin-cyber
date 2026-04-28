@@ -1,0 +1,42 @@
+[
+  {
+    "model_id": "deepseek/deepseek-chat:free",
+    "label": "DeepSeek Chat (Free)",
+    "context_window": 64000,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  },
+  {
+    "model_id": "deepseek/deepseek-r1:free",
+    "label": "DeepSeek R1 (Free)",
+    "context_window": 64000,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  },
+  {
+    "model_id": "deepseek/deepseek-v3.2:free",
+    "label": "DeepSeek V3.2 (Free)",
+    "context_window": 64000,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  },
+  {
+    "model_id": "deepseek/deepseek-r1-distill-llama-70b:free",
+    "label": "DeepSeek R1 Distill Llama 70B (Free)",
+    "context_window": 32000,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  },
+  {
+    "model_id": "deepseek/deepseek-r1-distill-qwen-32b:free",
+    "label": "DeepSeek R1 Distill Qwen 32B (Free)",
+    "context_window": 32000,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  }
+]

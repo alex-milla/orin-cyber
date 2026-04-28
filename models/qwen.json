@@ -1,0 +1,26 @@
+[
+  {
+    "model_id": "qwen/qwen3-coder:free",
+    "label": "Qwen3 Coder (Free)",
+    "context_window": 131072,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  },
+  {
+    "model_id": "qwen/qwen3-next-80b-a3b-instruct:free",
+    "label": "Qwen3 Next 80B A3B Instruct (Free)",
+    "context_window": 131072,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  },
+  {
+    "model_id": "qwen/qwen2.5-vl-3b-instruct:free",
+    "label": "Qwen2.5 VL 3B Instruct (Free)",
+    "context_window": 32000,
+    "cost_per_1k_input": 0,
+    "cost_per_1k_output": 0,
+    "is_active": 1
+  }
+]
