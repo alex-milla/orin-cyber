@@ -80,6 +80,7 @@ try {
         'completed_at' => date('Y-m-d H:i:s'),
         'result_html'  => $result['result_html'] ?? '',
         'result_text'  => $result['result_text'] ?? '',
+        'executed_by'  => "OpenRouter → {$modelId}",
     ], 'id = ?', [$task['id']]);
 
     echo "Task {$task['id']} OK\n";

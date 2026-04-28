@@ -233,6 +233,7 @@ class Database {
 
         // Migraciones de columnas para tablas existentes
         self::_addColumnIfNotExists('tasks', 'assignment', 'TEXT DEFAULT "worker"');
+        self::_addColumnIfNotExists('tasks', 'executed_by', 'TEXT');
         self::_addColumnIfNotExists('worker_heartbeats', 'available_models', 'TEXT');
         self::_addColumnIfNotExists('worker_commands', 'status', 'TEXT');
         self::_addColumnIfNotExists('worker_commands', 'status_message', 'TEXT');

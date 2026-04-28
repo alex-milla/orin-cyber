@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.10.7] — 2026-04-28
+
+### Added
+- **Ejecutor configurable para tareas**: en Admin → Configuración puedes elegir el ejecutor por defecto para tareas CVE (worker local o cualquier modelo cloud configurado).
+- **Columna `executed_by`** en tabla `tasks`: muestra quién procesó cada tarea — "Worker local" o "OpenRouter → Modelo".
+- **Historial CVE**: nueva columna "Ejecutor" en la tabla de historial.
+
+### Changed
+- `task_cve.php`: lee `default_task_executor` desde config para asignar tareas al ejecutor elegido.
+- `run_virtual_tasks.php`: guarda el modelo cloud usado en `executed_by`.
+- `tasks.php` (endpoint worker): marca `executed_by = 'Worker local'` al completar.
+
 ## [v0.10.6] — 2026-04-28
 
 ### Fixed

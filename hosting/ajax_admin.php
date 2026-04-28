@@ -53,6 +53,15 @@ switch ($action) {
         jsonResponse(['success' => true, 'enabled' => $newValue === '1']);
         break;
 
+    case 'save_default_executor':
+        $executor = $_POST['executor'] ?? '';
+        if ($executor !== 'worker' && !str_starts_with($executor, 'provider:')) {
+            jsonResponse(['error' => 'Ejecutor no válido'], 400);
+        }
+        Database::query("INSERT OR REPLACE INTO config (key, value) VALUES ('default_task_executor', ?)", [$executor]);
+        jsonResponse(['success' => true]);
+        break;
+
     case 'add_api_key':
         $name = validateInput($_POST['name'] ?? '', 100);
         if (!$name || strlen($name) < 2) {

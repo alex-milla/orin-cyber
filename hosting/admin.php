@@ -81,6 +81,27 @@ try {
     $githubPat = '';
 }
 
+try {
+    $execRow = Database::fetchOne("SELECT value FROM config WHERE key = 'default_task_executor'");
+    $defaultExecutor = $execRow['value'] ?? 'worker';
+} catch (Throwable $e) {
+    $defaultExecutor = 'worker';
+}
+
+try {
+    $executorOptions = Database::fetchAll(
+        "SELECT 'worker' as value, 'Worker local (Orin)' as label
+         UNION ALL
+         SELECT 'provider:' || p.id || ':' || m.model_id as value,
+                p.label || ' → ' || m.label as label
+         FROM external_models m
+         JOIN external_providers p ON p.id = m.provider_id
+         WHERE m.is_active = 1 AND p.is_active = 1"
+    );
+} catch (Throwable $e) {
+    $executorOptions = [['value' => 'worker', 'label' => 'Worker local (Orin)']];
+}
+
 $pageTitle = 'Administración — OrinSec';
 require __DIR__ . '/templates/header.php';
 ?>
@@ -733,6 +754,21 @@ require __DIR__ . '/templates/header.php';
     </div>
     <p id="key-msg" class="small mt-1"></p>
     
+    <h3 class="mt-4">🖥️ Ejecutor por defecto para tareas</h3>
+    <p class="small">Las tareas CVE (y futuras tareas) se ejecutarán en el worker o modelo seleccionado por defecto.</p>
+    <form method="POST" action="ajax_admin.php?action=save_default_executor" onsubmit="return saveExecutor(this);">
+        <?php echo csrfInput(); ?>
+        <select name="executor" style="min-width: 280px;">
+            <?php foreach ($executorOptions as $opt): ?>
+            <option value="<?php echo htmlspecialchars($opt['value']); ?>" <?php echo $defaultExecutor === $opt['value'] ? 'selected' : ''; ?>>
+                <?php echo htmlspecialchars($opt['label']); ?>
+            </option>
+            <?php endforeach; ?>
+        </select>
+        <button type="submit" class="mt-2">💾 Guardar</button>
+        <p id="exec-msg" class="small mt-1"></p>
+    </form>
+
     <h3 class="mt-4">Registro de usuarios</h3>
     <p>Estado: <strong><?php echo $regEnabled ? 'Abierto' : 'Cerrado'; ?></strong></p>
     <form method="POST" action="ajax_admin.php?action=toggle_registration" onsubmit="return toggleReg(this);">
@@ -1025,6 +1061,21 @@ async function deleteKey(id) {
     const data = await resp.json();
     if (data.success) location.reload();
     else alert(data.error || 'Error');
+}
+
+async function saveExecutor(form) {
+    event.preventDefault();
+    const fd = new FormData(form);
+    const resp = await fetch(form.action, { method: 'POST', body: fd });
+    const data = await resp.json();
+    const msg = document.getElementById('exec-msg');
+    if (data.success) {
+        msg.style.color = '#2e7d32';
+        msg.textContent = 'Ejecutor por defecto guardado.';
+    } else {
+        msg.style.color = '#c62828';
+        msg.textContent = data.error || 'Error';
+    }
 }
 
 async function toggleReg(form) {

@@ -51,10 +51,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'max_results' => $maxResults
             ], JSON_UNESCAPED_UNICODE);
             
+            // Leer ejecutor por defecto desde config
+            $execConfig = Database::fetchOne("SELECT value FROM config WHERE key = 'default_task_executor'");
+            $assignment = $execConfig['value'] ?? 'worker';
+
             $newTaskId = Database::insert('tasks', [
                 'task_type' => 'cve_search',
                 'input_data' => $input,
-                'status' => 'pending'
+                'status' => 'pending',
+                'assignment' => $assignment
             ]);
             
             // PRG pattern: redirect to avoid duplicate task on refresh
@@ -91,7 +96,7 @@ try {
 $cveHistory = [];
 try {
     $cveHistory = Database::fetchAll(
-        "SELECT id, status, created_at FROM tasks WHERE task_type='cve_search' ORDER BY created_at DESC LIMIT 20"
+        "SELECT id, status, created_at, executed_by FROM tasks WHERE task_type='cve_search' ORDER BY created_at DESC LIMIT 20"
     );
 } catch (Exception $e) {
     $cveHistory = [];
@@ -234,6 +239,7 @@ require __DIR__ . '/templates/header.php';
                 <tr>
                     <th>ID</th>
                     <th>Estado</th>
+                    <th>Ejecutor</th>
                     <th>Creado</th>
                     <th>Acción</th>
                 </tr>
@@ -243,6 +249,7 @@ require __DIR__ . '/templates/header.php';
                 <tr>
                     <td>#<?php echo $t['id']; ?></td>
                     <td class="status-<?php echo $t['status']; ?>"><?php echo ucfirst(htmlspecialchars($t['status'])); ?></td>
+                    <td class="small"><?php echo htmlspecialchars($t['executed_by'] ?? '—'); ?></td>
                     <td class="small"><?php echo htmlspecialchars($t['created_at']); ?></td>
                     <td>
                         <?php if ($t['status'] === 'completed' || $t['status'] === 'error' || $t['status'] === 'cancelled'): ?>

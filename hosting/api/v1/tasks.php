@@ -77,7 +77,8 @@ switch ($action) {
         
         $updateData = [
             'status' => 'completed',
-            'completed_at' => date('Y-m-d H:i:s')
+            'completed_at' => date('Y-m-d H:i:s'),
+            'executed_by' => 'Worker local'
         ];
         
         if (isset($data['result_html']) && is_string($data['result_html'])) {
