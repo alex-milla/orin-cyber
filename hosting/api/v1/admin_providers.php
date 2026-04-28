@@ -142,7 +142,7 @@ switch ($action) {
         $data = getJsonInput();
         $providerId = (int)($data['provider_id'] ?? 0);
         $modelId = validateInput((string)($data['model_id'] ?? ''), 128, '/^[\w\s\-.@:\/]+$/u');
-        $label = validateInput((string)($data['label'] ?? ''), 128);
+        $label = validateInput((string)($data['label'] ?? ''), 128, '/^[\w\s\-.@:()]+$/u');
         if ($providerId <= 0 || !$modelId || !$label) {
             jsonResponse(['success' => false, 'error' => 'Campos requeridos inválidos'], 400);
         }

@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.10.6] — 2026-04-28
+
+### Fixed
+- **Admin providers API**: `create_model` ahora permite paréntesis `()` en el Label. Los labels como `DeepSeek V3 (Free)` eran rechazados por el patrón de validación.
+
 ## [v0.10.5] — 2026-04-28
 
 ### Fixed
