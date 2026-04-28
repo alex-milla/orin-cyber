@@ -6,7 +6,6 @@ require_once __DIR__ . '/includes/auth.php';
 
 requireAuth();
 
-// ── URL DEL TÚNEL CLOUDFLARE ──
 $tunnelUrl = 'https://chat-orin.cyberintelligence.dev';
 
 $pageTitle = 'Chat — OrinSec';
@@ -14,22 +13,16 @@ require_once __DIR__ . '/templates/header.php';
 ?>
 
 <h2>💬 Chat con el modelo</h2>
+<p class="text-muted">Interfaz directa del modelo a través de Cloudflare Tunnel (protegido con MFA).</p>
 
-<?php if (empty($tunnelUrl)): ?>
-    <div class="alert alert-info" style="margin-top:1rem;">
-        <strong>Túnel no configurado.</strong><br>
-        El chat ahora se sirve directamente desde el Orin mediante Cloudflare Tunnel.<br>
-        Completa los pasos de instalación en el Orin y actualiza la variable
-        <code>$tunnelUrl</code> en este archivo con la URL del túnel.
-    </div>
-<?php else: ?>
-    <p class="text-muted">Interfaz directa del modelo a través de Cloudflare Tunnel.</p>
-    <div style="width:100%; height: calc(100vh - 200px); min-height: 500px; margin-top: .5rem;">
-        <iframe src="<?php echo htmlspecialchars($tunnelUrl, ENT_QUOTES, 'UTF-8'); ?>"
-                style="width:100%; height:100%; border:1px solid var(--border); border-radius:.5rem;"
-                allow="clipboard-write">
-        </iframe>
-    </div>
-<?php endif; ?>
+<div style="margin-top: 2rem; padding: 2rem; border: 2px dashed var(--border); border-radius: .75rem; text-align: center; background: var(--bg-secondary);">
+    <p style="font-size: 1.1rem; margin-bottom: 1.5rem;">
+        El chat se abre en una ventana segura protegida por Cloudflare Access.<br>
+        Se te pedirá un código de verificación por email.
+    </p>
+    <a href="<?php echo htmlspecialchars($tunnelUrl, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="font-size: 1.1rem; padding: .75rem 1.5rem;">
+        🚀 Abrir Chat en nueva pestaña
+    </a>
+</div>
 
 <?php require_once __DIR__ . '/templates/footer.php'; ?>
