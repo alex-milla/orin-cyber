@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.10.12] — 2026-04-28
+
+### Added
+- **Catálogos JSON por familia de modelo**: nueva carpeta `models/` con archivos JSON listos para importar en Admin → Proveedores: `deepseek.json`, `nvidia.json`, `google.json`, `meta.json`, `microsoft.json`, `mistral.json`, `qwen.json`, `openai.json`, `z-ai.json`, `openrouter-misc.json`.
+
+### Fixed
+- **CSS badges en Admin → Proveedores**: definida la variable `--primary-bg` que faltaba, por lo que los badges de modelos ahora se renderizan con fondo y bordes redondeados en lugar de texto plano amontonado. Bumped `style.css?v=3` → `v=4`.
+
 ## [v0.10.11] — 2026-04-28
 
 ### Fixed
