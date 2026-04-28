@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.10.5] — 2026-04-28
+
+### Fixed
+- **Admin providers API**: `create_model` ahora permite barras `/` en el Model ID. Los IDs de OpenRouter (ej: `deepseek/deepseek-chat:free`) usan el formato `editor/modelo` y el patrón de validación lo rechazaba.
+
 ## [v0.10.4] — 2026-04-28
 
 ### Fixed
