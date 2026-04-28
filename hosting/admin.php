@@ -94,6 +94,7 @@ require __DIR__ . '/templates/header.php';
         <a href="?tab=workers" class="<?php echo $tab==='workers'?'active':''; ?>">Workers</a>
         <a href="?tab=users" class="<?php echo $tab==='users'?'active':''; ?>">Usuarios</a>
         <a href="?tab=alerts" class="<?php echo $tab==='alerts'?'active':''; ?>">Alertas</a>
+        <a href="?tab=providers" class="<?php echo $tab==='providers'?'active':''; ?>">Proveedores</a>
         <a href="?tab=config" class="<?php echo $tab==='config'?'active':''; ?>">Configuración</a>
     </div>
 
@@ -411,6 +412,269 @@ require __DIR__ . '/templates/header.php';
         }
         return false;
     }
+    </script>
+
+    <?php elseif ($tab === 'providers'): ?>
+    <h3>🌐 Proveedores externos</h3>
+    <p class="small">Gestiona API keys de proveedores cloud (OpenRouter, OpenAI, Nvidia NIM). Las keys se cifran en la base de datos.</p>
+
+    <div id="providers-container">
+        <p class="small">Cargando...</p>
+    </div>
+
+    <h4 class="mt-4">Añadir proveedor</h4>
+    <form id="provider-form" onsubmit="return saveProvider(this);" class="flex gap-1 flex-wrap items-end">
+        <?php echo csrfInput(); ?>
+        <div>
+            <label class="small">Nombre interno</label>
+            <input type="text" name="name" placeholder="openrouter" required maxlength="64" pattern="[\w\-]+">
+        </div>
+        <div>
+            <label class="small">Label</label>
+            <input type="text" name="label" placeholder="OpenRouter" required maxlength="100">
+        </div>
+        <div style="flex:1;min-width:200px;">
+            <label class="small">Base URL</label>
+            <input type="url" name="base_url" placeholder="https://openrouter.ai/api/v1" required>
+        </div>
+        <div>
+            <label class="small">API Key</label>
+            <input type="password" name="api_key" placeholder="sk-..." required>
+        </div>
+        <div>
+            <label class="small">Timeout (s)</label>
+            <input type="number" name="timeout_seconds" value="60" min="10" max="300" style="width:70px;">
+        </div>
+        <div>
+            <label class="small">Activo</label>
+            <input type="checkbox" name="is_active" value="1" checked>
+        </div>
+        <button type="submit">➕ Añadir</button>
+    </form>
+    <p id="provider-msg" class="small mt-1"></p>
+
+    <h4 class="mt-4">Añadir modelo</h4>
+    <form id="model-form" onsubmit="return saveModel(this);" class="flex gap-1 flex-wrap items-end">
+        <?php echo csrfInput(); ?>
+        <div>
+            <label class="small">Proveedor</label>
+            <select name="provider_id" id="model-provider-select" required></select>
+        </div>
+        <div>
+            <label class="small">Model ID</label>
+            <input type="text" name="model_id" placeholder="anthropic/claude-3.5-sonnet" required maxlength="128">
+        </div>
+        <div>
+            <label class="small">Label</label>
+            <input type="text" name="label" placeholder="Claude 3.5 Sonnet" required maxlength="128">
+        </div>
+        <div>
+            <label class="small">Context</label>
+            <input type="number" name="context_window" value="8192" min="512" style="width:90px;">
+        </div>
+        <div>
+            <label class="small">$ / 1k in</label>
+            <input type="number" step="0.0001" name="cost_per_1k_input" placeholder="0.003" style="width:80px;">
+        </div>
+        <div>
+            <label class="small">$ / 1k out</label>
+            <input type="number" step="0.0001" name="cost_per_1k_output" placeholder="0.015" style="width:80px;">
+        </div>
+        <div>
+            <label class="small">Activo</label>
+            <input type="checkbox" name="is_active" value="1" checked>
+        </div>
+        <button type="submit">➕ Añadir</button>
+    </form>
+    <p id="model-msg" class="small mt-1"></p>
+
+    <h4 class="mt-4">📊 Uso del mes</h4>
+    <div id="usage-stats-container">
+        <p class="small">Cargando...</p>
+    </div>
+
+    <script>
+    async function loadProvidersAdmin() {
+        try {
+            const resp = await fetch('api/v1/admin_providers.php?action=list');
+            const data = await resp.json();
+            if (!data.success) return;
+            renderProviders(data.providers, data.models);
+            populateModelProviderSelect(data.providers);
+        } catch (e) { console.error(e); }
+    }
+
+    function renderProviders(providers, models) {
+        const container = document.getElementById('providers-container');
+        if (!providers.length) {
+            container.innerHTML = '<p class="small">No hay proveedores configurados.</p>';
+            return;
+        }
+        let html = '<table><thead><tr><th>ID</th><th>Nombre</th><th>Label</th><th>URL</th><th>Key</th><th>Timeout</th><th>Activo</th><th>Modelos</th><th>Acciones</th></tr></thead><tbody>';
+        providers.forEach(p => {
+            const pmodels = models.filter(m => m.provider_id === p.id);
+            const modelList = pmodels.map(m => `<span class="badge ${m.is_active?'':'badge-inactive'}">${m.label}</span>`).join(' ');
+            html += `<tr>
+                <td>${p.id}</td>
+                <td>${escapeHtml(p.name)}</td>
+                <td>${escapeHtml(p.label)}</td>
+                <td class="small mono">${escapeHtml(p.base_url)}</td>
+                <td class="small mono">${escapeHtml(p.api_key_hint || '—')}</td>
+                <td>${p.timeout_seconds}s</td>
+                <td>${p.is_active ? 'Sí' : 'No'}</td>
+                <td>${modelList || '<span class="small text-muted">Sin modelos</span>'}</td>
+                <td>
+                    <div class="flex gap-1 flex-wrap">
+                        <button class="secondary small" onclick="testProvider(${p.id})">🧪 Test</button>
+                        <button class="secondary small danger" onclick="deleteProvider(${p.id})">🗑️</button>
+                    </div>
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    function populateModelProviderSelect(providers) {
+        const sel = document.getElementById('model-provider-select');
+        sel.innerHTML = '';
+        providers.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.label;
+            sel.appendChild(opt);
+        });
+    }
+
+    async function loadUsageStats() {
+        try {
+            const resp = await fetch('api/v1/admin_providers.php?action=usage_stats');
+            const data = await resp.json();
+            const container = document.getElementById('usage-stats-container');
+            if (!data.success || !data.stats.length) {
+                container.innerHTML = '<p class="small">Sin uso este mes.</p>';
+                return;
+            }
+            let html = '<table><thead><tr><th>Proveedor</th><th>Modelo</th><th>Input tokens</th><th>Output tokens</th><th>Coste ($)</th><th>Llamadas</th></tr></thead><tbody>';
+            data.stats.forEach(s => {
+                html += `<tr>
+                    <td>${escapeHtml(s.provider)}</td>
+                    <td>${escapeHtml(s.model || '—')}</td>
+                    <td>${s.in_tokens || 0}</td>
+                    <td>${s.out_tokens || 0}</td>
+                    <td>$${(s.cost_total || 0).toFixed(4)}</td>
+                    <td>${s.calls}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        } catch (e) { console.error(e); }
+    }
+
+    async function saveProvider(form) {
+        event.preventDefault();
+        const fd = new FormData(form);
+        const payload = {
+            name: fd.get('name'),
+            label: fd.get('label'),
+            base_url: fd.get('base_url'),
+            api_key: fd.get('api_key'),
+            timeout_seconds: parseInt(fd.get('timeout_seconds')),
+            is_active: fd.get('is_active') ? 1 : 0
+        };
+        const msg = document.getElementById('provider-msg');
+        try {
+            const resp = await fetch('api/v1/admin_providers.php?action=create_provider', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json();
+            if (data.success) {
+                msg.style.color = '#2e7d32';
+                msg.textContent = 'Proveedor añadido.';
+                form.reset();
+                loadProvidersAdmin();
+                loadUsageStats();
+            } else {
+                msg.style.color = '#c62828';
+                msg.textContent = data.error || 'Error';
+            }
+        } catch (err) {
+            msg.style.color = '#c62828';
+            msg.textContent = 'Error de red: ' + err.message;
+        }
+        return false;
+    }
+
+    async function saveModel(form) {
+        event.preventDefault();
+        const fd = new FormData(form);
+        const payload = {
+            provider_id: parseInt(fd.get('provider_id')),
+            model_id: fd.get('model_id'),
+            label: fd.get('label'),
+            context_window: parseInt(fd.get('context_window')),
+            cost_per_1k_input: fd.get('cost_per_1k_input') || null,
+            cost_per_1k_output: fd.get('cost_per_1k_output') || null,
+            is_active: fd.get('is_active') ? 1 : 0
+        };
+        const msg = document.getElementById('model-msg');
+        try {
+            const resp = await fetch('api/v1/admin_providers.php?action=create_model', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json();
+            if (data.success) {
+                msg.style.color = '#2e7d32';
+                msg.textContent = 'Modelo añadido.';
+                form.reset();
+                loadProvidersAdmin();
+            } else {
+                msg.style.color = '#c62828';
+                msg.textContent = data.error || 'Error';
+            }
+        } catch (err) {
+            msg.style.color = '#c62828';
+            msg.textContent = 'Error de red: ' + err.message;
+        }
+        return false;
+    }
+
+    async function testProvider(id) {
+        if (!confirm('¿Probar conexión con este proveedor?')) return;
+        try {
+            const resp = await fetch('api/v1/admin_providers.php?action=test_connection', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({id: id})
+            });
+            const data = await resp.json();
+            alert(data.success ? '✅ Conexión OK. Modelos disponibles: ' + (data.models_available || '?') : '❌ ' + (data.error || 'Error'));
+        } catch (err) { alert('❌ Error de red: ' + err.message); }
+    }
+
+    async function deleteProvider(id) {
+        if (!confirm('¿Eliminar proveedor y todos sus modelos? No se puede deshacer.')) return;
+        try {
+            const resp = await fetch('api/v1/admin_providers.php?action=delete_provider', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({id: id})
+            });
+            const data = await resp.json();
+            if (data.success) loadProvidersAdmin();
+            else alert(data.error || 'Error');
+        } catch (err) { alert('❌ Error de red: ' + err.message); }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const d = document.createElement('div');
+        d.textContent = text;
+        return d.innerHTML;
+    }
+
+    loadProvidersAdmin();
+    loadUsageStats();
     </script>
 
     <?php else: ?>

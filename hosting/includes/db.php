@@ -165,12 +165,79 @@ class Database {
             $stmt->execute($row);
         }
 
+        // Proveedores externos (APIs cloud)
+        $db->exec("CREATE TABLE IF NOT EXISTS external_providers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            label TEXT NOT NULL,
+            base_url TEXT NOT NULL,
+            api_key_encrypted TEXT NOT NULL,
+            api_key_hint TEXT,
+            is_active INTEGER DEFAULT 1,
+            timeout_seconds INTEGER DEFAULT 60,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS external_models (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider_id INTEGER NOT NULL,
+            model_id TEXT NOT NULL,
+            label TEXT NOT NULL,
+            context_window INTEGER DEFAULT 8192,
+            cost_per_1k_input REAL,
+            cost_per_1k_output REAL,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (provider_id) REFERENCES external_providers(id) ON DELETE CASCADE,
+            UNIQUE(provider_id, model_id)
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS external_usage (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            provider_id INTEGER NOT NULL,
+            model_id TEXT NOT NULL,
+            tokens_input INTEGER DEFAULT 0,
+            tokens_output INTEGER DEFAULT 0,
+            cost_usd REAL,
+            duration_ms INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        // Conversaciones y mensajes de chat (histórico)
+        $db->exec("CREATE TABLE IF NOT EXISTS chat_conversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT,
+            system_prompt TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id INTEGER NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('user','assistant','system')),
+            content TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE
+        )");
+
+        // Índices externos + chat
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_extusage_user_date ON external_usage(user_id, created_at DESC)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_extusage_provider_date ON external_usage(provider_id, created_at DESC)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_extmodels_active ON external_models(provider_id, is_active)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_chatconv_user ON chat_conversations(user_id, updated_at DESC)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_chatmsg_conv ON chat_messages(conversation_id, created_at)");
+
         // Migraciones de columnas para tablas existentes
         self::_addColumnIfNotExists('worker_heartbeats', 'available_models', 'TEXT');
         self::_addColumnIfNotExists('worker_commands', 'status', 'TEXT');
         self::_addColumnIfNotExists('worker_commands', 'status_message', 'TEXT');
         self::_addColumnIfNotExists('worker_commands', 'status_updated_at', 'TEXT');
         self::_addColumnIfNotExists('worker_heartbeats', 'recent_logs', 'TEXT');
+        self::_addColumnIfNotExists('users', 'monthly_external_budget_usd', 'REAL DEFAULT 5.0');
     }
 
     private static function _addColumnIfNotExists(string $table, string $column, string $type): void {
