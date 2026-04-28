@@ -552,7 +552,7 @@ require __DIR__ . '/templates/header.php';
     <p id="model-msg" class="small mt-1"></p>
 
     <h4 class="mt-4">📥 Importar modelos desde JSON</h4>
-    <p class="small">Pega un array JSON con modelos para importar masivamente al proveedor seleccionado. Los que ya existen se saltan.</p>
+    <p class="small">Selecciona un archivo .json o pega un array JSON para importar masivamente al proveedor seleccionado. Los que ya existen se saltan.</p>
     <form id="import-form" onsubmit="return importModels(this);" class="flex gap-1 flex-wrap items-end">
         <?php echo csrfInput(); ?>
         <div>
@@ -560,8 +560,9 @@ require __DIR__ . '/templates/header.php';
             <select name="provider_id" id="import-provider-select" required></select>
         </div>
         <div style="flex:1;min-width:300px;">
-            <label class="small">JSON</label>
-            <textarea name="json" rows="6" placeholder='[&#10;  {"model_id":"nvidia/nemotron-3-super-120b-a12b:free","label":"Nemotron 3 Super 120B (Free)","context_window":262144},&#10;  {"model_id":"z-ai/glm-4.5-air:free","label":"GLM 4.5 Air (Free)","context_window":131072}&#10;]' required style="font-family:monospace;font-size:12px;"></textarea>
+            <label class="small">Archivo JSON <span class="small" style="color:#888">(opcional — se carga en el campo de abajo)</span></label>
+            <input type="file" id="import-file" accept=".json,application/json" onchange="loadJsonFile(this)" style="font-size:12px;">
+            <textarea name="json" rows="6" placeholder='[&#10;  {"model_id":"nvidia/nemotron-3-super-120b-a12b:free","label":"Nemotron 3 Super 120B (Free)","context_window":262144},&#10;  {"model_id":"z-ai/glm-4.5-air:free","label":"GLM 4.5 Air (Free)","context_window":131072}&#10;]' required style="font-family:monospace;font-size:12px;width:100%;margin-top:4px;"></textarea>
         </div>
         <button type="submit">📥 Importar</button>
     </form>
@@ -735,6 +736,20 @@ require __DIR__ . '/templates/header.php';
             });
             alert('✅ Conexión OK. Modelos disponibles: ' + (data.models_available || '?'));
         } catch (err) { alert('❌ ' + err.message); }
+    }
+
+    function loadJsonFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const textarea = input.parentElement.querySelector('textarea[name=json]');
+            if (textarea) textarea.value = e.target.result;
+        };
+        reader.onerror = function() {
+            alert('No se pudo leer el archivo JSON');
+        };
+        reader.readAsText(file);
     }
 
     async function importModels(form) {
