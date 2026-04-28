@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.10.2] — 2026-04-28
+
+### Fixed
+- **`api/v1/.htaccess`**: añadidos `admin_providers.php` y `chat_external.php` a la lista blanca. El archivo bloqueaba **todo** excepto `tasks.php`, `heartbeat.php` y `commands.php`, devolviendo 403 Forbidden de Apache antes de que PHP se ejecutara.
+
 ## [v0.10.0] — 2026-04-28
 
 ### Added

@@ -11,3 +11,11 @@ Require all denied
 <Files "commands.php">
     Require all granted
 </Files>
+
+<Files "admin_providers.php">
+    Require all granted
+</Files>
+
+<Files "chat_external.php">
+    Require all granted
+</Files>
