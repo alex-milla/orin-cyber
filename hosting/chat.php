@@ -117,6 +117,7 @@ require_once __DIR__ . '/templates/header.php';
         localOpt.textContent = '🏠 Local — Orin';
         providerSelect.appendChild(localOpt);
 
+        let hasExternal = false;
         try {
             const resp = await fetch('api/v1/chat_external.php', { credentials: 'same-origin' });
             const data = await resp.json();
@@ -133,6 +134,7 @@ require_once __DIR__ . '/templates/header.php';
                 });
                 Object.keys(byProvider).forEach(pid => {
                     const provider = providersById[pid];
+                    if (!provider) return;
                     const group = document.createElement('optgroup');
                     group.label = '☁️ ' + provider.label;
                     byProvider[pid].forEach(m => {
@@ -144,12 +146,24 @@ require_once __DIR__ . '/templates/header.php';
                         });
                         opt.textContent = m.label;
                         group.appendChild(opt);
+                        hasExternal = true;
                     });
                     providerSelect.appendChild(group);
                 });
+
+                if (data.providers.length && !hasExternal) {
+                    const hint = document.createElement('option');
+                    hint.disabled = true;
+                    hint.textContent = '⚠️ Hay proveedores pero sin modelos (configúralos en Admin → Proveedores)';
+                    providerSelect.appendChild(hint);
+                }
             }
         } catch (e) {
             console.warn('No se pudieron cargar proveedores externos:', e);
+            const errOpt = document.createElement('option');
+            errOpt.disabled = true;
+            errOpt.textContent = '❌ Error cargando proveedores cloud';
+            providerSelect.appendChild(errOpt);
         }
 
         const saved = localStorage.getItem('orinsec_provider');

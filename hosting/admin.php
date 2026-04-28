@@ -495,11 +495,19 @@ require __DIR__ . '/templates/header.php';
 
     <script>
     async function loadProvidersAdmin() {
+        const container = document.getElementById('providers-container');
         try {
             const data = await apiFetch('api/v1/admin_providers.php?action=list');
-            renderProviders(data.providers, data.models);
-            populateModelProviderSelect(data.providers);
-        } catch (e) { console.error(e); }
+            if (!data.success) {
+                container.innerHTML = '<p class="alert alert-error small">Error al cargar proveedores: ' + escapeHtml(data.error || 'Desconocido') + '</p>';
+                return;
+            }
+            renderProviders(data.providers || [], data.models || []);
+            populateModelProviderSelect(data.providers || []);
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = '<p class="alert alert-error small">Error al cargar proveedores: ' + escapeHtml(e.message) + '</p>';
+        }
     }
 
     function renderProviders(providers, models) {
@@ -510,8 +518,9 @@ require __DIR__ . '/templates/header.php';
         }
         let html = '<table><thead><tr><th>ID</th><th>Nombre</th><th>Label</th><th>URL</th><th>Key</th><th>Timeout</th><th>Activo</th><th>Modelos</th><th>Acciones</th></tr></thead><tbody>';
         providers.forEach(p => {
-            const pmodels = models.filter(m => m.provider_id === p.id);
+            const pmodels = models.filter(m => m.provider_id == p.id);
             const modelList = pmodels.map(m => `<span class="badge ${m.is_active?'':'badge-inactive'}">${m.label}</span>`).join(' ');
+            const noModelsHint = pmodels.length ? '' : '<br><span class="small" style="color:var(--warning)">⚠️ Añade modelos abajo para usarlos en el chat</span>';
             html += `<tr>
                 <td>${p.id}</td>
                 <td>${escapeHtml(p.name)}</td>
@@ -520,7 +529,7 @@ require __DIR__ . '/templates/header.php';
                 <td class="small mono">${escapeHtml(p.api_key_hint || '—')}</td>
                 <td>${p.timeout_seconds}s</td>
                 <td>${p.is_active ? 'Sí' : 'No'}</td>
-                <td>${modelList || '<span class="small text-muted">Sin modelos</span>'}</td>
+                <td>${modelList || '<span class="small text-muted">Sin modelos</span>'}${noModelsHint}</td>
                 <td>
                     <div class="flex gap-1 flex-wrap">
                         <button class="secondary small" onclick="testProvider(${p.id})">🧪 Test</button>
@@ -545,10 +554,14 @@ require __DIR__ . '/templates/header.php';
     }
 
     async function loadUsageStats() {
+        const container = document.getElementById('usage-stats-container');
         try {
             const data = await apiFetch('api/v1/admin_providers.php?action=usage_stats');
-            const container = document.getElementById('usage-stats-container');
-            if (!data.stats.length) {
+            if (!data.success) {
+                container.innerHTML = '<p class="alert alert-error small">Error al cargar estadísticas: ' + escapeHtml(data.error || 'Desconocido') + '</p>';
+                return;
+            }
+            if (!data.stats || !data.stats.length) {
                 container.innerHTML = '<p class="small">Sin uso este mes.</p>';
                 return;
             }

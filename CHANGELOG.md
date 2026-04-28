@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.10.3] — 2026-04-28
+
+### Fixed
+- **Admin providers**: errores al cargar la lista ya no quedan silenciosos. El contenedor muestra el mensaje de error en lugar de quedarse en "Cargando...".
+- **Chat externo**: si hay proveedores configurados pero sin modelos, el selector muestra un hint informativo apuntando a Admin → Proveedores.
+- **Admin providers tabla**: cuando un proveedor no tiene modelos asociados, se muestra un aviso "⚠️ Añade modelos abajo para usarlos en el chat".
+
 ## [v0.10.2] — 2026-04-28
 
 ### Fixed
