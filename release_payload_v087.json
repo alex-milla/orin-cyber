@@ -1,0 +1,7 @@
+{
+  "tag_name": "v0.8.7",
+  "name": "v0.8.7 — Fix: 403 Forbidden en endpoint de chat",
+  "body": "## [v0.8.7] — 2026-04-28\n\n### Fixed\n- **Chat**: movido el endpoint de `api/v1/chat.php` a `chat_api.php` en la raíz. El directorio `api/v1/` devolvía **403 Forbidden** desde Apache/Cloudflare, bloqueando todas las peticiones POST del chat.",
+  "draft": false,
+  "prerelease": false
+}

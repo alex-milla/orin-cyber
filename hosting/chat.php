@@ -130,7 +130,7 @@ require_once __DIR__ . '/templates/header.php';
                 }
 
                 try {
-                    const pollUrl = 'api/v1/chat.php?task_id=' + taskId;
+                    const pollUrl = 'chat_api.php?task_id=' + taskId;
                     const resp = await fetch(pollUrl, { credentials: 'same-origin' });
                     const pollRaw = await resp.text();
 
@@ -178,7 +178,7 @@ require_once __DIR__ . '/templates/header.php';
         sendBtn.disabled = true;
         setStatus('Enviando mensaje...');
 
-        const url = 'api/v1/chat.php';
+        const url = 'chat_api.php';
         try {
             const resp = await fetch(url, {
                 method: 'POST',

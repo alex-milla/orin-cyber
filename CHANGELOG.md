@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.8.7] — 2026-04-28
+
+### Fixed
+- **Chat**: movido el endpoint de `api/v1/chat.php` a `chat_api.php` en la raíz. El directorio `api/v1/` devolvía **403 Forbidden** desde Apache/Cloudflare, bloqueando todas las peticiones POST del chat.
+
+---
+
 ## [v0.8.6] — 2026-04-28
 
 ### Fixed
