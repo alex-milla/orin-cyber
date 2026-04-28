@@ -31,12 +31,12 @@ if (!isset($pageTitle)) $pageTitle = 'OrinSec';
     <?php if (isLoggedIn()): ?>
     <nav>
         <a href="index.php">Inicio</a>
+        <a href="chat.php">💬 Chat</a>
         <div class="dropdown" id="tools-dropdown">
             <span class="dropdown-toggle" onclick="event.stopPropagation();document.getElementById('tools-dropdown').classList.toggle('open');">Herramientas <span class="dropdown-arrow">▾</span></span>
             <div class="dropdown-menu">
                 <div class="dropdown-menu-inner">
                     <a href="task_cve.php">🔍 Búsqueda CVE</a>
-                    <a href="chat.php">💬 Chat</a>
                 </div>
             </div>
         </div>

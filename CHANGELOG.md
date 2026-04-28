@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.8.1] — 2026-04-28
+
+### Fixed
+- **Chat**: añadido `credentials: 'same-origin'` a los fetch para que las peticiones AJAX envíen la cookie de sesión. Esto evita el error `"<!DOCTYPE... is not valid JSON"` causado por redirección a login.php.
+- **Chat**: movido el enlace del menú desplegable "Herramientas" a pestaña principal del header.
+- **Chat**: muestra el modelo activo cargado (`worker_heartbeats.model_loaded`) en la interfaz.
+
+---
+
 ## [v0.8.0] — 2026-04-28
 
 ### Added

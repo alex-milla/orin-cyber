@@ -7,6 +7,12 @@ require_once __DIR__ . '/includes/auth.php';
 
 requireAuth();
 
+// Obtener el modelo más reciente cargado por cualquier worker
+$latestModel = Database::fetchOne(
+    "SELECT model_loaded FROM worker_heartbeats WHERE model_loaded IS NOT NULL AND model_loaded != '' ORDER BY created_at DESC LIMIT 1"
+);
+$currentModel = $latestModel['model_loaded'] ?? 'Ninguno';
+
 $pageTitle = 'Chat — OrinSec';
 require_once __DIR__ . '/templates/header.php';
 ?>
@@ -27,6 +33,7 @@ require_once __DIR__ . '/templates/header.php';
 
 <h2>💬 Chat con el modelo</h2>
 <p class="text-muted">Los mensajes se procesan a través del worker. Puede tardar unos segundos.</p>
+<p class="text-muted">Modelo activo: <code><?php echo htmlspecialchars($currentModel); ?></code></p>
 
 <div class="chat-container">
     <div class="chat-messages" id="chat-messages"></div>
@@ -77,7 +84,7 @@ async function pollTask(taskId) {
             }
 
             try {
-                const resp = await fetch('api/v1/chat.php?task_id=' + taskId);
+                const resp = await fetch('api/v1/chat.php?task_id=' + taskId, { credentials: 'same-origin' });
                 const data = await resp.json();
                 if (!data.success) {
                     clearInterval(interval);
@@ -114,6 +121,7 @@ async function sendMessage() {
         const resp = await fetch('api/v1/chat.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
             body: JSON.stringify({ message: text })
         });
         const data = await resp.json();

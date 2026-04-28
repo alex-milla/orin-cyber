@@ -1,0 +1,7 @@
+{
+  "tag_name": "v0.8.1",
+  "name": "v0.8.1 — Hotfix chat: sesión AJAX + modelo activo",
+  "body": "## [v0.8.1] — 2026-04-28\n\n### Fixed\n- **Chat**: añadido `credentials: 'same-origin'` a los fetch para que las peticiones AJAX envíen la cookie de sesión. Evita el error `<!DOCTYPE... is not valid JSON`.\n- **Chat**: enlace movido a pestaña principal del header (fuera del dropdown Herramientas).\n- **Chat**: muestra el modelo activo cargado en la interfaz.",
+  "draft": false,
+  "prerelease": false
+}
