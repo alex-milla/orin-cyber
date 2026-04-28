@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.10.10] — 2026-04-28
+
+### Added
+- **Importación bulk de modelos desde JSON**: en Admin → Proveedores, nueva sección "📥 Importar modelos desde JSON". Pega un array JSON con múltiples modelos para importarlos masivamente al proveedor seleccionado. Los modelos que ya existen se saltan automáticamente. Muestra conteo de importados, saltados y errores.
+- **Nuevo endpoint `import_models`**: `admin_providers.php` acepta `POST` con `provider_id` + `models[]`. Valida cada entrada, duplica el regex de `create_model`, y devuelve `{imported, skipped, errors}`.
+
 ## [v0.10.9] — 2026-04-28
 
 ### Added

@@ -551,6 +551,22 @@ require __DIR__ . '/templates/header.php';
     </form>
     <p id="model-msg" class="small mt-1"></p>
 
+    <h4 class="mt-4">📥 Importar modelos desde JSON</h4>
+    <p class="small">Pega un array JSON con modelos para importar masivamente al proveedor seleccionado. Los que ya existen se saltan.</p>
+    <form id="import-form" onsubmit="return importModels(this);" class="flex gap-1 flex-wrap items-end">
+        <?php echo csrfInput(); ?>
+        <div>
+            <label class="small">Proveedor</label>
+            <select name="provider_id" id="import-provider-select" required></select>
+        </div>
+        <div style="flex:1;min-width:300px;">
+            <label class="small">JSON</label>
+            <textarea name="json" rows="6" placeholder='[&#10;  {"model_id":"nvidia/nemotron-3-super-120b-a12b:free","label":"Nemotron 3 Super 120B (Free)","context_window":262144},&#10;  {"model_id":"z-ai/glm-4.5-air:free","label":"GLM 4.5 Air (Free)","context_window":131072}&#10;]' required style="font-family:monospace;font-size:12px;"></textarea>
+        </div>
+        <button type="submit">📥 Importar</button>
+    </form>
+    <p id="import-msg" class="small mt-1"></p>
+
     <h4 class="mt-4">📊 Uso del mes</h4>
     <div id="usage-stats-container">
         <p class="small">Cargando...</p>
@@ -614,6 +630,17 @@ require __DIR__ . '/templates/header.php';
             opt.textContent = p.label;
             sel.appendChild(opt);
         });
+        // También poblar el select de importación
+        const importSel = document.getElementById('import-provider-select');
+        if (importSel) {
+            importSel.innerHTML = '';
+            providers.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.label;
+                importSel.appendChild(opt);
+            });
+        }
     }
 
     async function loadUsageStats() {
@@ -708,6 +735,40 @@ require __DIR__ . '/templates/header.php';
             });
             alert('✅ Conexión OK. Modelos disponibles: ' + (data.models_available || '?'));
         } catch (err) { alert('❌ ' + err.message); }
+    }
+
+    async function importModels(form) {
+        event.preventDefault();
+        const msg = document.getElementById('import-msg');
+        const providerId = parseInt(document.getElementById('import-provider-select').value);
+        if (!providerId) {
+            msg.style.color = '#c62828';
+            msg.textContent = 'Selecciona un proveedor.';
+            return false;
+        }
+        let models;
+        try {
+            models = JSON.parse(form.querySelector('textarea[name=json]').value);
+            if (!Array.isArray(models)) throw new Error('El JSON debe ser un array');
+        } catch (e) {
+            msg.style.color = '#c62828';
+            msg.textContent = 'JSON inválido: ' + e.message;
+            return false;
+        }
+        try {
+            const data = await apiFetch('api/v1/admin_providers.php?action=import_models', {
+                method: 'POST', body: JSON.stringify({provider_id: providerId, models: models})
+            });
+            msg.style.color = '#2e7d32';
+            let txt = 'Importados: ' + data.imported + ', Saltados (ya existían): ' + data.skipped;
+            if (data.errors.length) txt += ', Errores: ' + data.errors.join('; ');
+            msg.textContent = txt;
+            loadProvidersAdmin();
+        } catch (err) {
+            msg.style.color = '#c62828';
+            msg.textContent = err.message;
+        }
+        return false;
     }
 
     async function deleteProvider(id) {

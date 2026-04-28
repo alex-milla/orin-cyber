@@ -184,6 +184,49 @@ switch ($action) {
         jsonResponse(['success' => true]);
         break;
 
+    case 'import_models':
+        $data = getJsonInput();
+        $providerId = (int)($data['provider_id'] ?? 0);
+        $models = $data['models'] ?? [];
+        if ($providerId <= 0 || !is_array($models) || empty($models)) {
+            jsonResponse(['success' => false, 'error' => 'provider_id y array models requeridos'], 400);
+        }
+        $provider = Database::fetchOne("SELECT id FROM external_providers WHERE id = ?", [$providerId]);
+        if (!$provider) {
+            jsonResponse(['success' => false, 'error' => 'Proveedor no encontrado'], 404);
+        }
+        $imported = 0;
+        $skipped = 0;
+        $errors = [];
+        foreach ($models as $idx => $m) {
+            $modelId = validateInput((string)($m['model_id'] ?? ''), 128, '/^[\w\s\-.@:\/]+$/u');
+            $label = validateInput((string)($m['label'] ?? ''), 128, '/^[\w\s\-.@:()]+$/u');
+            if (!$modelId || !$label) {
+                $errors[] = 'Fila ' . ($idx + 1) . ': model_id o label inválido';
+                continue;
+            }
+            $exists = Database::fetchOne(
+                "SELECT id FROM external_models WHERE provider_id = ? AND model_id = ?",
+                [$providerId, $modelId]
+            );
+            if ($exists) {
+                $skipped++;
+                continue;
+            }
+            Database::insert('external_models', [
+                'provider_id' => $providerId,
+                'model_id' => $modelId,
+                'label' => $label,
+                'context_window' => (int)($m['context_window'] ?? 8192),
+                'cost_per_1k_input' => is_numeric($m['cost_per_1k_input'] ?? null) ? (float)$m['cost_per_1k_input'] : null,
+                'cost_per_1k_output' => is_numeric($m['cost_per_1k_output'] ?? null) ? (float)$m['cost_per_1k_output'] : null,
+                'is_active' => !empty($m['is_active']) ? 1 : 1,
+            ]);
+            $imported++;
+        }
+        jsonResponse(['success' => true, 'imported' => $imported, 'skipped' => $skipped, 'errors' => $errors]);
+        break;
+
     case 'usage_stats':
         $stats = Database::fetchAll(
             "SELECT p.label AS provider, m.label AS model,
