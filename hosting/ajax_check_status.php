@@ -17,7 +17,7 @@ if ($taskId <= 0) {
 }
 
 $task = Database::fetchOne(
-    'SELECT id, status, result_html, result_text, error_message, created_at, started_at, completed_at 
+    'SELECT id, status, result_html, result_text, error_message, created_at, started_at, completed_at, executed_by
      FROM tasks WHERE id = ?',
     [$taskId]
 );
@@ -34,5 +34,6 @@ jsonResponse([
     'error_message' => $task['error_message'],
     'created_at' => $task['created_at'],
     'started_at' => $task['started_at'],
-    'completed_at' => $task['completed_at']
+    'completed_at' => $task['completed_at'],
+    'executed_by' => $task['executed_by']
 ]);

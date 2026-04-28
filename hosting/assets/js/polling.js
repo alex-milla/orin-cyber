@@ -59,12 +59,14 @@
 
             if (data.status === 'completed') {
                 showResult(data.result_html, data.result_text);
+                updateHistoryRow(data.status, data.executed_by);
                 stopPolling();
                 return;
             }
 
             if (data.status === 'error') {
                 showResult('<p style="color:#c62828;"><strong>Error:</strong> ' + escapeHtml(data.error_message || 'Error desconocido') + '</p>', data.error_message || '');
+                updateHistoryRow(data.status, data.executed_by);
                 stopPolling();
                 return;
             }
@@ -96,6 +98,32 @@
         // Ocultar spinner
         const spinner = area.querySelector('.spinner');
         if (spinner) spinner.style.display = 'none';
+    }
+
+    function updateHistoryRow(status, executedBy) {
+        const row = document.querySelector('table tbody tr td:first-child');
+        if (!row) return;
+        // Buscar la fila que coincide con el taskId
+        const rows = document.querySelectorAll('table tbody tr');
+        for (const r of rows) {
+            const idCell = r.querySelector('td:first-child');
+            if (idCell && idCell.textContent.trim() === '#' + taskId) {
+                const statusCell = r.querySelector('td:nth-child(2)');
+                const execCell = r.querySelector('td:nth-child(3)');
+                const actionCell = r.querySelector('td:last-child');
+                if (statusCell) {
+                    statusCell.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+                    statusCell.className = 'status-' + status;
+                }
+                if (execCell && executedBy) {
+                    execCell.textContent = executedBy;
+                }
+                if (actionCell) {
+                    actionCell.innerHTML = '<a href="task_result.php?id=' + taskId + '"><button class="secondary small">Ver resultado</button></a>';
+                }
+                break;
+            }
+        }
     }
 
     function stopPolling() {

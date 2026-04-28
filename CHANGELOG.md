@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.10.14] — 2026-04-28
+
+### Fixed
+- **Historial CVE se actualiza en tiempo real**: cuando el polling detecta que la tarea está `completed` o `error`, actualiza dinámicamente la fila correspondiente en la tabla de historial (estado, ejecutor y botón de acción cambian de "Cancelar" a "Ver resultado").
+- `ajax_check_status.php`: ahora devuelve también `executed_by` para poder reflejar el ejecutor en el historial.
+
 ## [v0.10.13] — 2026-04-28
 
 ### Added
