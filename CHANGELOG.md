@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.10.9] — 2026-04-28
+
+### Added
+- **Polling desde navegador para Virtual Workers**: cuando el usuario tiene abierta la página de CVE esperando resultado, el navegador llama automáticamente a `ajax_virtual_worker.php` cada 10 segundos. Esto procesa las tareas cloud pendientes sin necesidad de cron en el hosting.
+- **Nuevo endpoint `ajax_virtual_worker.php`**: versión web de `run_virtual_tasks.php` que ejecuta una tarea cloud por llamada, protegida con CSRF.
+
 ## [v0.10.8] — 2026-04-28
 
 ### Added

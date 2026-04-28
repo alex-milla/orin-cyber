@@ -11,10 +11,34 @@
     const resultContent = document.getElementById('result-content');
 
     const POLL_INTERVAL = 5000;   // 5 segundos
+    const VIRTUAL_POLL_INTERVAL = 10000; // 10 segundos para virtual worker
     const MAX_WAIT = 180000;      // 3 minutos timeout
     const startTime = Date.now();
 
     let timer = null;
+    let virtualTimer = null;
+
+    async function pollVirtualWorker() {
+        try {
+            const csrfInput = document.querySelector('input[name="csrf_token"]');
+            const csrf = csrfInput ? csrfInput.value : '';
+            const res = await fetch('ajax_virtual_worker.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRF-Token': csrf,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: 'csrf_token=' + encodeURIComponent(csrf)
+            });
+            const data = await res.json();
+            if (data.processed) {
+                console.log('Virtual Worker procesó tarea #' + data.task_id);
+            }
+        } catch (e) {
+            // Silencioso: no interrumpe el polling principal
+        }
+    }
 
     async function checkStatus() {
         try {
@@ -91,4 +115,8 @@
     // Primera consulta inmediata, luego cada 5s
     checkStatus();
     timer = setInterval(checkStatus, POLL_INTERVAL);
+
+    // Polling de Virtual Worker en segundo plano (cada 10s)
+    pollVirtualWorker();
+    virtualTimer = setInterval(pollVirtualWorker, VIRTUAL_POLL_INTERVAL);
 })();
