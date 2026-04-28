@@ -5,7 +5,8 @@
     "context_window": 131072,
     "cost_per_1k_input": 0,
     "cost_per_1k_output": 0,
-    "is_active": 1
+    "is_active": 1,
+    "tags": ["free"]
   },
   {
     "model_id": "google/gemma-3-12b-it:free",
@@ -13,7 +14,8 @@
     "context_window": 131072,
     "cost_per_1k_input": 0,
     "cost_per_1k_output": 0,
-    "is_active": 1
+    "is_active": 1,
+    "tags": ["free"]
   },
   {
     "model_id": "google/gemma-3-27b-it:free",
@@ -21,7 +23,8 @@
     "context_window": 131072,
     "cost_per_1k_input": 0,
     "cost_per_1k_output": 0,
-    "is_active": 1
+    "is_active": 1,
+    "tags": ["recommended"]
   },
   {
     "model_id": "google/gemma-3n-e2b-it:free",
@@ -29,7 +32,8 @@
     "context_window": 131072,
     "cost_per_1k_input": 0,
     "cost_per_1k_output": 0,
-    "is_active": 1
+    "is_active": 1,
+    "tags": ["free"]
   },
   {
     "model_id": "google/gemma-4-26b-a4b-it:free",
@@ -37,6 +41,7 @@
     "context_window": 131072,
     "cost_per_1k_input": 0,
     "cost_per_1k_output": 0,
-    "is_active": 1
+    "is_active": 1,
+    "tags": ["recommended"]
   }
 ]

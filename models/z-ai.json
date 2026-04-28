@@ -5,6 +5,7 @@
     "context_window": 131072,
     "cost_per_1k_input": 0,
     "cost_per_1k_output": 0,
-    "is_active": 1
+    "is_active": 1,
+    "tags": ["recommended"]
   }
 ]

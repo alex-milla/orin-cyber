@@ -5,7 +5,8 @@
     "context_window": 262144,
     "cost_per_1k_input": 0,
     "cost_per_1k_output": 0,
-    "is_active": 1
+    "is_active": 1,
+    "tags": ["recommended", "cybersecurity"]
   },
   {
     "model_id": "nvidia/nemotron-3-nano-30b-a3b:free",
@@ -13,7 +14,8 @@
     "context_window": 256000,
     "cost_per_1k_input": 0,
     "cost_per_1k_output": 0,
-    "is_active": 1
+    "is_active": 1,
+    "tags": ["recommended"]
   },
   {
     "model_id": "nvidia/nemotron-nano-9b-v2:free",
@@ -21,7 +23,8 @@
     "context_window": 131072,
     "cost_per_1k_input": 0,
     "cost_per_1k_output": 0,
-    "is_active": 1
+    "is_active": 1,
+    "tags": ["free"]
   },
   {
     "model_id": "nvidia/nemotron-nano-12b-v2-vl:free",
@@ -29,7 +32,8 @@
     "context_window": 131072,
     "cost_per_1k_input": 0,
     "cost_per_1k_output": 0,
-    "is_active": 1
+    "is_active": 1,
+    "tags": ["free"]
   },
   {
     "model_id": "nvidia/llama-3.1-nemotron-70b-instruct:free",
@@ -37,6 +41,7 @@
     "context_window": 131072,
     "cost_per_1k_input": 0,
     "cost_per_1k_output": 0,
-    "is_active": 1
+    "is_active": 1,
+    "tags": ["recommended"]
   }
 ]

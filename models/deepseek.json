@@ -5,7 +5,8 @@
     "context_window": 64000,
     "cost_per_1k_input": 0,
     "cost_per_1k_output": 0,
-    "is_active": 1
+    "is_active": 1,
+    "tags": ["free"]
   },
   {
     "model_id": "deepseek/deepseek-r1:free",
@@ -13,7 +14,8 @@
     "context_window": 64000,
     "cost_per_1k_input": 0,
     "cost_per_1k_output": 0,
-    "is_active": 1
+    "is_active": 1,
+    "tags": ["recommended", "reasoning", "cybersecurity"]
   },
   {
     "model_id": "deepseek/deepseek-v3.2:free",
@@ -21,7 +23,8 @@
     "context_window": 64000,
     "cost_per_1k_input": 0,
     "cost_per_1k_output": 0,
-    "is_active": 1
+    "is_active": 1,
+    "tags": ["free"]
   },
   {
     "model_id": "deepseek/deepseek-r1-distill-llama-70b:free",
@@ -29,7 +32,8 @@
     "context_window": 32000,
     "cost_per_1k_input": 0,
     "cost_per_1k_output": 0,
-    "is_active": 1
+    "is_active": 1,
+    "tags": ["recommended", "reasoning", "cybersecurity"]
   },
   {
     "model_id": "deepseek/deepseek-r1-distill-qwen-32b:free",
@@ -37,6 +41,7 @@
     "context_window": 32000,
     "cost_per_1k_input": 0,
     "cost_per_1k_output": 0,
-    "is_active": 1
+    "is_active": 1,
+    "tags": ["recommended", "reasoning"]
   }
 ]
