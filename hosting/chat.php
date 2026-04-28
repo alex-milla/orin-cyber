@@ -2,234 +2,34 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/includes/config.php';
-require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/auth.php';
 
 requireAuth();
 
-// Obtener el modelo más reciente cargado por cualquier worker
-$latestModel = Database::fetchOne(
-    "SELECT model_loaded FROM worker_heartbeats WHERE model_loaded IS NOT NULL AND model_loaded != '' ORDER BY created_at DESC LIMIT 1"
-);
-$currentModel = $latestModel['model_loaded'] ?? 'Ninguno';
+// ── URL DEL TÚNEL CLOUDFLARE ──
+$tunnelUrl = 'https://chat-orin.cyberintelligence.dev';
 
 $pageTitle = 'Chat — OrinSec';
 require_once __DIR__ . '/templates/header.php';
 ?>
 
-<style>
-.chat-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: .75rem;
-    width: 100%;
-    min-height: 60vh;
-    max-height: calc(100vh - 200px);
-}
-.chat-messages {
-    flex: 1 1 auto;
-    min-height: 300px;
-    overflow-y: auto;
-    border: 1px solid var(--border);
-    border-radius: .5rem;
-    padding: 1rem;
-    background: var(--bg-secondary);
-}
-.chat-message { margin-bottom: .75rem; }
-.chat-message.user { text-align: right; }
-.chat-message .bubble {
-    display: inline-block;
-    padding: .5rem .9rem;
-    border-radius: 1rem;
-    max-width: 80%;
-    word-break: break-word;
-    line-height: 1.4;
-}
-.chat-message.user .bubble { background: var(--primary); color: #fff; }
-.chat-message.assistant .bubble { background: var(--bg-tertiary); color: var(--text); }
-.chat-message .meta { font-size: .7rem; color: var(--text-muted); margin-top: .15rem; }
-
-.chat-input-area {
-    display: flex;
-    gap: .5rem;
-    align-items: flex-end;
-}
-.chat-input-area textarea {
-    flex: 1;
-    min-height: 56px;
-    resize: vertical;
-    padding: .6rem .8rem;
-    border: 1px solid var(--border);
-    border-radius: .5rem;
-    background: var(--surface);
-    color: var(--text);
-    font: inherit;
-}
-.chat-input-area .btn { align-self: stretch; }
-.chat-status { font-size: .85rem; color: var(--text-muted); min-height: 1.2rem; }
-</style>
-
 <h2>💬 Chat con el modelo</h2>
-<p class="text-muted">Los mensajes se procesan a través del worker. Puede tardar unos segundos.</p>
-<p class="text-muted">Modelo activo: <code><?php echo htmlspecialchars($currentModel); ?></code></p>
 
-<div class="chat-wrap">
-    <div class="chat-messages" id="chat-messages"></div>
-
-    <div class="chat-input-area">
-        <textarea id="chat-input" placeholder="Escribe tu mensaje..." rows="3"></textarea>
-        <button id="chat-send" class="btn btn-primary">Enviar</button>
+<?php if (empty($tunnelUrl)): ?>
+    <div class="alert alert-info" style="margin-top:1rem;">
+        <strong>Túnel no configurado.</strong><br>
+        El chat ahora se sirve directamente desde el Orin mediante Cloudflare Tunnel.<br>
+        Completa los pasos de instalación en el Orin y actualiza la variable
+        <code>$tunnelUrl</code> en este archivo con la URL del túnel.
     </div>
-    <div class="chat-status" id="chat-status"></div>
-</div>
-
-<script>
-(function () {
-    'use strict';
-
-    const messagesEl = document.getElementById('chat-messages');
-    const inputEl    = document.getElementById('chat-input');
-    const sendBtn    = document.getElementById('chat-send');
-    const statusEl   = document.getElementById('chat-status');
-
-    if (!messagesEl || !inputEl || !sendBtn || !statusEl) {
-        console.error('Chat: no se encontraron elementos del DOM');
-        return;
-    }
-
-    function escapeHtml(text) {
-        const d = document.createElement('div');
-        d.textContent = text;
-        return d.innerHTML;
-    }
-
-    function addMessage(role, text) {
-        const div = document.createElement('div');
-        div.className = 'chat-message ' + role;
-        const time = new Date().toLocaleTimeString();
-        div.innerHTML =
-            '<div class="bubble">' + escapeHtml(text) + '</div>' +
-            '<div class="meta">' + time + '</div>';
-        messagesEl.appendChild(div);
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-
-    function setStatus(text) { statusEl.textContent = text; }
-
-    function pollTask(taskId) {
-        let attempts = 0;
-        const maxAttempts = 120; // ~6 min a 3 s
-
-        return new Promise((resolve, reject) => {
-            const interval = setInterval(async () => {
-                attempts++;
-                if (attempts > maxAttempts) {
-                    clearInterval(interval);
-                    reject(new Error('Timeout esperando respuesta'));
-                    return;
-                }
-
-                try {
-                    const pollUrl = 'chat_api.php?task_id=' + taskId;
-                    const resp = await fetch(pollUrl, { credentials: 'same-origin' });
-                    const pollRaw = await resp.text();
-
-                    if (resp.status !== 200) {
-                        console.log('Poll', pollUrl, 'status', resp.status, pollRaw.substring(0, 300));
-                    }
-
-                    let data;
-                    try {
-                        data = JSON.parse(pollRaw);
-                    } catch (e) {
-                        // Respuesta no-JSON: probablemente HTML de error transitorio.
-                        // Salir de este tick y dejar que el setInterval lo reintente.
-                        return;
-                    }
-
-                    if (!data.success) {
-                        clearInterval(interval);
-                        reject(new Error(data.error || 'Error desconocido'));
-                        return;
-                    }
-
-                    if (data.status === 'completed') {
-                        clearInterval(interval);
-                        resolve(data.response);
-                    } else if (data.status === 'error') {
-                        clearInterval(interval);
-                        reject(new Error(data.error || 'Error en el worker'));
-                    } else {
-                        setStatus('Esperando respuesta del worker... (' + attempts + '/' + maxAttempts + ')');
-                    }
-                } catch (e) {
-                    // Error de red puntual: seguir intentando en el siguiente tick.
-                }
-            }, 3000);
-        });
-    }
-
-    async function sendMessage() {
-        const text = inputEl.value.trim();
-        if (!text) return;
-
-        inputEl.value = '';
-        addMessage('user', text);
-        sendBtn.disabled = true;
-        setStatus('Enviando mensaje...');
-
-        const url = 'chat_api.php';
-        try {
-            const resp = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'same-origin',
-                body: JSON.stringify({ message: text })
-            });
-
-            const rawText = await resp.text();
-            if (resp.status !== 200) {
-                console.log('POST', url, 'status', resp.status, rawText.substring(0, 500));
-            }
-
-            let data;
-            try {
-                data = JSON.parse(rawText);
-            } catch (e) {
-                throw new Error(
-                    'HTTP ' + resp.status +
-                    ' — respuesta no es JSON. Primeros 200 chars: ' +
-                    rawText.substring(0, 200)
-                );
-            }
-
-            if (!data.success) {
-                throw new Error(data.error || 'Error al crear la tarea');
-            }
-
-            setStatus('Mensaje enviado. Esperando respuesta del worker...');
-            const response = await pollTask(data.task_id);
-            addMessage('assistant', response);
-            setStatus('');
-        } catch (err) {
-            addMessage('assistant', '❌ ' + err.message);
-            setStatus('');
-        } finally {
-            sendBtn.disabled = false;
-            inputEl.focus();
-        }
-    }
-
-    sendBtn.addEventListener('click', sendMessage);
-    inputEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    });
-
-    console.log('Chat: inicializado correctamente');
-})();
-</script>
+<?php else: ?>
+    <p class="text-muted">Interfaz directa del modelo a través de Cloudflare Tunnel.</p>
+    <div style="width:100%; height: calc(100vh - 200px); min-height: 500px; margin-top: .5rem;">
+        <iframe src="<?php echo htmlspecialchars($tunnelUrl, ENT_QUOTES, 'UTF-8'); ?>"
+                style="width:100%; height:100%; border:1px solid var(--border); border-radius:.5rem;"
+                allow="clipboard-write">
+        </iframe>
+    </div>
+<?php endif; ?>
 
 <?php require_once __DIR__ . '/templates/footer.php'; ?>

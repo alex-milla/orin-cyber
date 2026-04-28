@@ -1,5 +1,26 @@
 # Changelog
 
+## [v0.9.0] — 2026-04-28
+
+### Changed
+- **Arquitectura del chat rediseñada** (de worker+ polling → Cloudflare Tunnel directo):
+  - Eliminado todo el código legacy del chat por worker: `worker/tasks/chat_task.py`, `hosting/chat_api.php`, thread `_chat_poll_loop` en `worker.py`, y filtrado `type`/`exclude_type` en `worker/utils/api_client.py` y `hosting/api/v1/tasks.php`.
+  - La pestaña **Chat** ahora carga la UI nativa de llama-server mediante un **iframe** apuntando al túnel de Cloudflare. Esto elimina la latencia mínima de 2s por polling y permite interacción directa con el modelo.
+  - `hosting/chat.php`: reemplazada la interfaz de chat custom (JS, polling, textarea) por un iframe simple a `https://chat-orin.cyberintelligence.dev`.
+
+### Added
+- **Cloudflare Tunnel** (`cloudflared`) en el Orin Nano:
+  - Túnel persistente `orin-chat` que expone `localhost:8080` (llama-server) a Internet vía `chat-orin.cyberintelligence.dev`.
+  - Servicio systemd `cloudflared` para auto-arranque.
+- **Cloudflare Access (Zero Trust)** con MFA:
+  - Aplicación "Orin Chat" protegida en `chat-orin.cyberintelligence.dev`.
+  - Autenticación por email + PIN de un solo uso. Solo el email autorizado puede acceder.
+
+### Security
+- El chat ya no está expuesto públicamente sin protección. Cloudflare Access bloquea cualquier acceso no autorizado antes de que llegue al Orin.
+
+---
+
 ## [v0.8.8] — 2026-04-28
 
 ### Fixed
