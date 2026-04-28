@@ -38,6 +38,8 @@ class ChatTask(BaseTask):
 
         try:
             response = self.llm.chat(system, message)
+            # Quitar razonamiento interno de modelos tipo DeepSeek/MiMo
+            response = self._strip_think_tags(response)
             return {
                 "result_html": f"<div class='chat-response'>{self._escape_html(response)}</div>",
                 "result_text": response,
@@ -48,6 +50,12 @@ class ChatTask(BaseTask):
                 "result_html": f"<p class='text-error'>Error: {self._escape_html(str(exc))}</p>",
                 "result_text": f"Error: {exc}",
             }
+
+    @staticmethod
+    def _strip_think_tags(text: str) -> str:
+        """Elimina bloques <think>...</think> que algunos modelos incluyen en la respuesta."""
+        import re
+        return re.sub(r"<think>[\s\S]*?</think>\s*", "", text).strip()
 
     @staticmethod
     def _escape_html(text: str) -> str:

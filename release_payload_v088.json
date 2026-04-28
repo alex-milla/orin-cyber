@@ -1,0 +1,7 @@
+{
+  "tag_name": "v0.8.8",
+  "name": "v0.8.8 — Filtrar razonamiento <think> en respuestas de chat",
+  "body": "## [v0.8.8] — 2026-04-28\n\n### Fixed\n- **Chat**: filtrado de bloques `<think>...</think>` en las respuestas del modelo. Los modelos de razonamiento (MiMo, DeepSeek-R1, etc.) incluyen su cadena de pensamiento interna entre estas etiquetas. Ahora el worker la elimina antes de enviar la respuesta al usuario.",
+  "draft": false,
+  "prerelease": false
+}

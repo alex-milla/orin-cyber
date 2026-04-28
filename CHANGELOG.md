@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.8.8] — 2026-04-28
+
+### Fixed
+- **Chat**: filtrado de bloques `<think>...</think>` en las respuestas del modelo. Los modelos de razonamiento (MiMo, DeepSeek-R1, etc.) incluyen su cadena de pensamiento interna entre estas etiquetas. Ahora el worker la elimina antes de enviar la respuesta al usuario.
+
+---
+
 ## [v0.8.7] — 2026-04-28
 
 ### Fixed
