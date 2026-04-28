@@ -232,6 +232,7 @@ class Database {
         $db->exec("CREATE INDEX IF NOT EXISTS idx_chatmsg_conv ON chat_messages(conversation_id, created_at)");
 
         // Migraciones de columnas para tablas existentes
+        self::_addColumnIfNotExists('tasks', 'assignment', 'TEXT DEFAULT "worker"');
         self::_addColumnIfNotExists('worker_heartbeats', 'available_models', 'TEXT');
         self::_addColumnIfNotExists('worker_commands', 'status', 'TEXT');
         self::_addColumnIfNotExists('worker_commands', 'status_message', 'TEXT');

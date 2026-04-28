@@ -22,6 +22,22 @@
 
 ---
 
+## [v0.10.1] — 2026-04-28
+
+### Fixed
+- **Auth**: `requireAuth()` y `requireAdmin()` ahora usan `isApiRequest()` para detectar si la petición viene de un endpoint `/api/` y devuelven JSON en lugar de HTML. Esto evita el error `Unexpected token '<', "<!DOCTYPE..."` cuando el frontend olvida enviar `X-Requested-With`.
+- **Admin providers**: `admin_providers.php` ahora valida el token CSRF en todas las peticiones POST (`X-CSRF-Token`).
+- **Admin JS**: Todas las llamadas `fetch` de la pestaña Proveedores usan el helper `apiFetch()` que envía automáticamente `X-Requested-With: XMLHttpRequest`, `X-CSRF-Token` y detecta respuestas no-JSON.
+
+### Added
+- **VirtualWorker** (`hosting/includes/virtual_worker.php`): adaptador PHP que expone la misma interfaz que `LlmClient` del worker Python (`chat()`, `chatJson()`) pero ejecutando contra proveedores externos. Permite reutilizar la lógica de tareas con modelos cloud.
+- **Tareas virtuales** (`hosting/run_virtual_tasks.php`): script CLI con file-lock para ejecutar tareas asignadas a proveedores externos. Procesa una tarea por invocación, reclama atómicamente, gestiona timeouts y guarda resultados en la BD.
+- **CVE Search en PHP** (`hosting/includes/tasks/cve_search_task.php`): versión PHP de la tarea CVE que enriquece datos vía NVD API + EPSS API y genera el informe con VirtualWorker.
+- **Columna `assignment`** en tabla `tasks`: permite elegir `worker` (por defecto) o `provider:{id}:{model_id}` para tareas cloud.
+- **Filtrado en `tasks.php`**: el worker físico solo recibe tareas con `assignment = 'worker'`, evitando que coja tareas destinadas a proveedores externos.
+
+---
+
 ## [v0.9.0] — 2026-04-28
 
 ### Changed

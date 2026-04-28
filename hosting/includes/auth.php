@@ -26,9 +26,16 @@ function isAdmin(): bool {
     return isLoggedIn() && !empty($_SESSION['is_admin']);
 }
 
+function isApiRequest(): bool {
+    if (strpos($_SERVER['REQUEST_URI'] ?? '', '/api/') !== false) return true;
+    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') return true;
+    if (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false) return true;
+    return false;
+}
+
 function requireAuth(): void {
     if (!isLoggedIn()) {
-        if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+        if (isApiRequest()) {
             jsonResponse(['error' => 'No autenticado'], 401);
         }
         header('Location: login.php');
@@ -39,7 +46,7 @@ function requireAuth(): void {
 function requireAdmin(): void {
     requireAuth();
     if (!isAdmin()) {
-        if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+        if (isApiRequest()) {
             jsonResponse(['error' => 'Acceso denegado'], 403);
         }
         header('Location: index.php');

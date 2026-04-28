@@ -34,9 +34,9 @@ Database::query(
 switch ($action) {
     case 'pending':
         $task = Database::fetchOne(
-            "SELECT id, task_type, input_data, status, created_at
+            "SELECT id, task_type, input_data, status, created_at, assignment
              FROM tasks
-             WHERE status = 'pending'
+             WHERE status = 'pending' AND (assignment = 'worker' OR assignment IS NULL)
              ORDER BY created_at ASC LIMIT 1"
         );
 

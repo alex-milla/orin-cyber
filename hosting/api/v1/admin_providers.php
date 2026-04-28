@@ -18,6 +18,12 @@ set_exception_handler(function ($e) {
 
 requireAdmin();
 
+// Validar CSRF para todos los métodos que modifican estado
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $csrf = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    verifyCsrf($csrf);
+}
+
 $action = $_GET['action'] ?? '';
 
 switch ($action) {

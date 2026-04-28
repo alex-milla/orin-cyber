@@ -496,9 +496,7 @@ require __DIR__ . '/templates/header.php';
     <script>
     async function loadProvidersAdmin() {
         try {
-            const resp = await fetch('api/v1/admin_providers.php?action=list');
-            const data = await resp.json();
-            if (!data.success) return;
+            const data = await apiFetch('api/v1/admin_providers.php?action=list');
             renderProviders(data.providers, data.models);
             populateModelProviderSelect(data.providers);
         } catch (e) { console.error(e); }
@@ -548,10 +546,9 @@ require __DIR__ . '/templates/header.php';
 
     async function loadUsageStats() {
         try {
-            const resp = await fetch('api/v1/admin_providers.php?action=usage_stats');
-            const data = await resp.json();
+            const data = await apiFetch('api/v1/admin_providers.php?action=usage_stats');
             const container = document.getElementById('usage-stats-container');
-            if (!data.success || !data.stats.length) {
+            if (!data.stats.length) {
                 container.innerHTML = '<p class="small">Sin uso este mes.</p>';
                 return;
             }
@@ -584,24 +581,17 @@ require __DIR__ . '/templates/header.php';
         };
         const msg = document.getElementById('provider-msg');
         try {
-            const resp = await fetch('api/v1/admin_providers.php?action=create_provider', {
-                method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify(payload)
+            await apiFetch('api/v1/admin_providers.php?action=create_provider', {
+                method: 'POST', body: JSON.stringify(payload)
             });
-            const data = await resp.json();
-            if (data.success) {
-                msg.style.color = '#2e7d32';
-                msg.textContent = 'Proveedor añadido.';
-                form.reset();
-                loadProvidersAdmin();
-                loadUsageStats();
-            } else {
-                msg.style.color = '#c62828';
-                msg.textContent = data.error || 'Error';
-            }
+            msg.style.color = '#2e7d32';
+            msg.textContent = 'Proveedor añadido.';
+            form.reset();
+            loadProvidersAdmin();
+            loadUsageStats();
         } catch (err) {
             msg.style.color = '#c62828';
-            msg.textContent = 'Error de red: ' + err.message;
+            msg.textContent = err.message;
         }
         return false;
     }
@@ -620,23 +610,16 @@ require __DIR__ . '/templates/header.php';
         };
         const msg = document.getElementById('model-msg');
         try {
-            const resp = await fetch('api/v1/admin_providers.php?action=create_model', {
-                method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify(payload)
+            await apiFetch('api/v1/admin_providers.php?action=create_model', {
+                method: 'POST', body: JSON.stringify(payload)
             });
-            const data = await resp.json();
-            if (data.success) {
-                msg.style.color = '#2e7d32';
-                msg.textContent = 'Modelo añadido.';
-                form.reset();
-                loadProvidersAdmin();
-            } else {
-                msg.style.color = '#c62828';
-                msg.textContent = data.error || 'Error';
-            }
+            msg.style.color = '#2e7d32';
+            msg.textContent = 'Modelo añadido.';
+            form.reset();
+            loadProvidersAdmin();
         } catch (err) {
             msg.style.color = '#c62828';
-            msg.textContent = 'Error de red: ' + err.message;
+            msg.textContent = err.message;
         }
         return false;
     }
@@ -644,26 +627,21 @@ require __DIR__ . '/templates/header.php';
     async function testProvider(id) {
         if (!confirm('¿Probar conexión con este proveedor?')) return;
         try {
-            const resp = await fetch('api/v1/admin_providers.php?action=test_connection', {
-                method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({id: id})
+            const data = await apiFetch('api/v1/admin_providers.php?action=test_connection', {
+                method: 'POST', body: JSON.stringify({id: id})
             });
-            const data = await resp.json();
-            alert(data.success ? '✅ Conexión OK. Modelos disponibles: ' + (data.models_available || '?') : '❌ ' + (data.error || 'Error'));
-        } catch (err) { alert('❌ Error de red: ' + err.message); }
+            alert('✅ Conexión OK. Modelos disponibles: ' + (data.models_available || '?'));
+        } catch (err) { alert('❌ ' + err.message); }
     }
 
     async function deleteProvider(id) {
         if (!confirm('¿Eliminar proveedor y todos sus modelos? No se puede deshacer.')) return;
         try {
-            const resp = await fetch('api/v1/admin_providers.php?action=delete_provider', {
-                method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({id: id})
+            await apiFetch('api/v1/admin_providers.php?action=delete_provider', {
+                method: 'POST', body: JSON.stringify({id: id})
             });
-            const data = await resp.json();
-            if (data.success) loadProvidersAdmin();
-            else alert(data.error || 'Error');
-        } catch (err) { alert('❌ Error de red: ' + err.message); }
+            loadProvidersAdmin();
+        } catch (err) { alert('❌ ' + err.message); }
     }
 
     function escapeHtml(text) {
@@ -754,6 +732,30 @@ require __DIR__ . '/templates/header.php';
 <script>
 let remoteInfo = null;
 const csrfToken = <?php echo json_encode(csrfToken()); ?>;
+
+async function apiFetch(url, options = {}) {
+    const csrf = document.querySelector('input[name="csrf_token"]')?.value || csrfToken;
+    const resp = await fetch(url, {
+        credentials: 'same-origin',
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': csrf,
+            ...(options.headers || {})
+        }
+    });
+    const ct = resp.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+        const text = await resp.text();
+        throw new Error(`Respuesta no-JSON (${resp.status}): ${text.slice(0, 200)}`);
+    }
+    const data = await resp.json();
+    if (!resp.ok) {
+        throw new Error(data.error || `HTTP ${resp.status}`);
+    }
+    return data;
+}
 
 function compareSemver(a, b) {
     const parse = s => s.replace(/^v/, '').split('.').map(Number);
