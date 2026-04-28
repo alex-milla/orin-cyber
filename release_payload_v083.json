@@ -1,0 +1,7 @@
+{
+  "tag_name": "v0.8.3",
+  "name": "v0.8.3 — Chat: DOMContentLoaded + diagnóstico inicialización",
+  "body": "## [v0.8.3] — 2026-04-28\n\n### Fixed\n- **Chat**: script envuelto en `document.addEventListener('DOMContentLoaded', ...)` para asegurar que el DOM esté listo antes de registrar event listeners.\n- **Chat**: añadida verificación de elementos DOM y log de consola para diagnóstico de inicialización.",
+  "draft": false,
+  "prerelease": false
+}

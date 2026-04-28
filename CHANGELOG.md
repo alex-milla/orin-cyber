@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.8.3] — 2026-04-28
+
+### Fixed
+- **Chat**: script envuelto en `document.addEventListener('DOMContentLoaded', ...)` para asegurar que el DOM esté listo antes de registrar event listeners.
+- **Chat**: añadida verificación de elementos DOM y log de consola para diagnóstico de inicialización.
+
+---
+
 ## [v0.8.2] — 2026-04-28
 
 ### Fixed

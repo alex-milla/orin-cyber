@@ -46,10 +46,19 @@ require_once __DIR__ . '/templates/header.php';
 </div>
 
 <script>
-const messagesEl = document.getElementById('chat-messages');
-const inputEl = document.getElementById('chat-input');
-const sendBtn = document.getElementById('chat-send');
-const statusEl = document.getElementById('chat-status');
+document.addEventListener('DOMContentLoaded', function() {
+    'use strict';
+
+    const messagesEl = document.getElementById('chat-messages');
+    const inputEl = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('chat-send');
+    const statusEl = document.getElementById('chat-status');
+
+    if (!messagesEl || !inputEl || !sendBtn || !statusEl) {
+        console.error('Chat: no se encontraron elementos del DOM');
+        return;
+    }
+    console.log('Chat: inicializado correctamente');
 
 function addMessage(role, text) {
     const div = document.createElement('div');
@@ -169,6 +178,7 @@ inputEl.addEventListener('keydown', (e) => {
         e.preventDefault();
         sendMessage();
     }
+});
 });
 </script>
 
