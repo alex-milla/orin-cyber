@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.8.0] — 2026-04-28
+
+### Added
+- **Chat integrado en la app web** ( Opción B — vía worker ):
+  - `worker/tasks/chat_task.py`: nueva tarea `chat` que envía mensajes a llama-server vía `LlmClient.chat()` y devuelve la respuesta al hosting.
+  - `worker/worker.py`: registrada `ChatTask` en `TASK_REGISTRY`.
+  - `hosting/api/v1/chat.php`: endpoint REST para crear tareas `chat` (POST) y consultar respuestas (GET). Protegido por sesión de usuario.
+  - `hosting/chat.php`: interfaz de chat con historial visual, envío por AJAX y polling cada 3 s hasta recibir la respuesta del worker.
+  - `hosting/templates/header.php`: enlace "💬 Chat" en el dropdown de Herramientas.
+
+---
+
 ## [v0.7.9] — 2026-04-28
 
 ### Changed

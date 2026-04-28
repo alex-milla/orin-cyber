@@ -36,6 +36,7 @@ if (!isset($pageTitle)) $pageTitle = 'OrinSec';
             <div class="dropdown-menu">
                 <div class="dropdown-menu-inner">
                     <a href="task_cve.php">🔍 Búsqueda CVE</a>
+                    <a href="chat.php">💬 Chat</a>
                 </div>
             </div>
         </div>
