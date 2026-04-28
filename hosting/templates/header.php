@@ -8,7 +8,7 @@ if (!isset($pageTitle)) $pageTitle = 'OrinSec';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($pageTitle); ?></title>
-    <link rel="stylesheet" href="assets/css/style.css?v=3">
+    <link rel="stylesheet" href="assets/css/style.css?v=4">
     <script>
     (function() {
         const saved = localStorage.getItem('orinsec-theme') || 'system';
