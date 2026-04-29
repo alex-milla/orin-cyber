@@ -74,19 +74,21 @@ switch ($action) {
         if ($taskId <= 0) {
             jsonResponse(['error' => 'task_id requerido'], 400);
         }
+
+        $executedBy = 'Worker local';
+        $html = $data['result_html'] ?? '';
+        if ($html) {
+            $html .= '<div class="cve-footer small" style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border);color:var(--text-muted);">🤖 Generado por: ' . $executedBy . '</div>';
+        }
         
         $updateData = [
             'status' => 'completed',
             'completed_at' => date('Y-m-d H:i:s'),
-            'executed_by' => 'Worker local'
+            'executed_by' => $executedBy,
+            'result_html' => $html,
+            'result_text' => $data['result_text'] ?? null,
         ];
         
-        if (isset($data['result_html']) && is_string($data['result_html'])) {
-            $updateData['result_html'] = $data['result_html'];
-        }
-        if (isset($data['result_text']) && is_string($data['result_text'])) {
-            $updateData['result_text'] = $data['result_text'];
-        }
         if (isset($data['error_message']) && is_string($data['error_message'])) {
             $updateData['status'] = 'error';
             $updateData['error_message'] = $data['error_message'];

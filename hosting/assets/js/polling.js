@@ -111,8 +111,8 @@
         for (const r of rows) {
             const idCell = r.querySelector('td:first-child');
             if (idCell && idCell.textContent.trim() === '#' + taskId) {
-                const statusCell = r.querySelector('td:nth-child(2)');
-                const execCell = r.querySelector('td:nth-child(3)');
+                const statusCell = r.querySelector('td:nth-child(3)');
+                const execCell = r.querySelector('td:nth-child(4)');
                 const actionCell = r.querySelector('td:last-child');
                 if (statusCell) {
                     statusCell.textContent = status.charAt(0).toUpperCase() + status.slice(1);

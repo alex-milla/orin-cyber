@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.10.16] — 2026-04-28
+
+### Added
+- **Columna "Consulta" en historial CVE**: muestra el CVE ID o producto buscado, extraído del `input_data` JSON.
+- **Pie de página en informes CVE**: cada resultado incluye al final `🤖 Generado por: {Ejecutor}` (Worker local o Proveedor → Modelo) para identificar claramente quién generó el análisis.
+
+### Fixed
+- **`executed_by` para tareas cloud**: antes estaba hardcodeado a `"OpenRouter → {model_id}"`. Ahora obtiene el nombre real del proveedor desde la BD (`external_providers.label`) y lo guarda correctamente tanto en éxito como en error.
+- **`VirtualWorker`**: nuevo método `getProviderLabel()` que devuelve el label real del proveedor desde la BD.
+
 ## [v0.10.15] — 2026-04-28
 
 ### Fixed

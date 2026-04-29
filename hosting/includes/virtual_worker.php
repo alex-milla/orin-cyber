@@ -23,7 +23,7 @@ class VirtualWorker {
 
         $row = Database::fetchOne(
             "SELECT m.context_window, m.cost_per_1k_input, m.cost_per_1k_output,
-                    m.label, p.is_active AS provider_active, m.is_active AS model_active
+                    m.label, p.label AS provider_label, p.is_active AS provider_active, m.is_active AS model_active
              FROM external_models m
              JOIN external_providers p ON p.id = m.provider_id
              WHERE m.provider_id = ? AND m.model_id = ?",
@@ -104,5 +104,7 @@ class VirtualWorker {
     }
 
     public function getModelLabel(): string { return $this->modelMeta['label']; }
+    public function getModelId(): string { return $this->modelId; }
+    public function getProviderLabel(): string { return $this->modelMeta['provider_label'] ?? 'Desconocido'; }
     public function getContextWindow(): int { return (int)$this->modelMeta['context_window']; }
 }

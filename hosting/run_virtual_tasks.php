@@ -63,6 +63,11 @@ if (count($parts) !== 3 || $parts[0] !== 'provider') {
 $providerId = (int)$parts[1];
 $modelId = $parts[2];
 
+// Obtener nombre real del proveedor para executed_by
+$provider = Database::fetchOne("SELECT label FROM external_providers WHERE id = ?", [$providerId]);
+$providerLabel = $provider['label'] ?? 'Cloud';
+$executedBy = "{$providerLabel} → {$modelId}";
+
 try {
     $worker = new VirtualWorker($providerId, $modelId, null);
 
@@ -75,12 +80,14 @@ try {
     $input = json_decode($task['input_data'], true) ?: [];
     $result = $instance->run($input);
 
+    $html = ($result['result_html'] ?? '') . '<div class="cve-footer small" style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border);color:var(--text-muted);">🤖 Generado por: ' . htmlspecialchars($executedBy) . '</div>';
+
     Database::update('tasks', [
         'status'       => 'completed',
         'completed_at' => date('Y-m-d H:i:s'),
-        'result_html'  => $result['result_html'] ?? '',
+        'result_html'  => $html,
         'result_text'  => $result['result_text'] ?? '',
-        'executed_by'  => "OpenRouter → {$modelId}",
+        'executed_by'  => $executedBy,
     ], 'id = ?', [$task['id']]);
 
     echo "Task {$task['id']} OK\n";
@@ -90,6 +97,7 @@ try {
         'status'        => 'error',
         'completed_at'  => date('Y-m-d H:i:s'),
         'error_message' => $e->getMessage(),
+        'executed_by'   => $executedBy,
     ], 'id = ?', [$task['id']]);
     echo "Task {$task['id']} ERROR: {$e->getMessage()}\n";
 }
