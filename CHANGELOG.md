@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.10.19] — 2026-04-29
+
+### Added
+- **Fallback automático para modelos cloud**: si un modelo devuelve `No endpoints found` o `Model not found`, el Virtual Worker intenta automáticamente con otro modelo activo del mismo proveedor (elegido al azar). La tarea se marca como completada con el modelo fallback y `executed_by` refleja el cambio.
+
 ## [v0.10.18] — 2026-04-28
 
 ### Fixed

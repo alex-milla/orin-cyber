@@ -68,17 +68,19 @@ $provider = Database::fetchOne("SELECT label FROM external_providers WHERE id = 
 $providerLabel = $provider['label'] ?? 'Cloud';
 $executedBy = "{$providerLabel} → {$modelId}";
 
-try {
+function runVirtualTask(int $taskId, int $providerId, string $modelId, array $taskData): array {
     $worker = new VirtualWorker($providerId, $modelId, null);
-
-    $taskClass = match ($task['task_type']) {
+    $taskClass = match ($taskData['task_type']) {
         'cve_search' => CveSearchTaskPhp::class,
-        default => throw new RuntimeException("task_type desconocido: {$task['task_type']}"),
+        default => throw new RuntimeException("task_type desconocido: {$taskData['task_type']}"),
     };
-
     $instance = new $taskClass($worker);
-    $input = json_decode($task['input_data'], true) ?: [];
-    $result = $instance->run($input);
+    $input = json_decode($taskData['input_data'], true) ?: [];
+    return $instance->run($input);
+}
+
+try {
+    $result = runVirtualTask($task['id'], $providerId, $modelId, $task);
 
     $html = ($result['result_html'] ?? '') . '<div class="cve-footer small" style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border);color:var(--text-muted);">🤖 Generado por: ' . htmlspecialchars($executedBy) . '</div>';
 
@@ -93,13 +95,48 @@ try {
     echo "Task {$task['id']} OK\n";
 
 } catch (Throwable $e) {
+    $errMsg = $e->getMessage();
+
+    // Fallback: si es "No endpoints found", intentar con otro modelo del mismo proveedor
+    if (str_contains($errMsg, 'No endpoints found') || str_contains($errMsg, 'Model not found')) {
+        $fallback = Database::fetchOne(
+            "SELECT model_id, label FROM external_models
+             WHERE provider_id = ? AND model_id != ? AND is_active = 1
+             ORDER BY RANDOM() LIMIT 1",
+            [$providerId, $modelId]
+        );
+        if ($fallback) {
+            $fallbackModelId = $fallback['model_id'];
+            $fallbackExecutedBy = "{$providerLabel} → {$fallbackModelId} (fallback desde {$modelId})";
+            try {
+                $result = runVirtualTask($task['id'], $providerId, $fallbackModelId, $task);
+
+                $html = ($result['result_html'] ?? '') . '<div class="cve-footer small" style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border);color:var(--text-muted);">🤖 Generado por: ' . htmlspecialchars($fallbackExecutedBy) . '</div>';
+
+                Database::update('tasks', [
+                    'status'       => 'completed',
+                    'completed_at' => date('Y-m-d H:i:s'),
+                    'result_html'  => $html,
+                    'result_text'  => $result['result_text'] ?? '',
+                    'executed_by'  => $fallbackExecutedBy,
+                ], 'id = ?', [$task['id']]);
+
+                echo "Task {$task['id']} OK (fallback to {$fallbackModelId})\n";
+                flock($fp, LOCK_UN);
+                exit(0);
+            } catch (Throwable $e2) {
+                $errMsg = $e2->getMessage();
+            }
+        }
+    }
+
     Database::update('tasks', [
         'status'        => 'error',
         'completed_at'  => date('Y-m-d H:i:s'),
-        'error_message' => $e->getMessage(),
+        'error_message' => $errMsg,
         'executed_by'   => $executedBy,
     ], 'id = ?', [$task['id']]);
-    echo "Task {$task['id']} ERROR: {$e->getMessage()}\n";
+    echo "Task {$task['id']} ERROR: {$errMsg}\n";
 }
 
 flock($fp, LOCK_UN);
