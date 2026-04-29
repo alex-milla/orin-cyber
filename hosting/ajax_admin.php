@@ -10,8 +10,8 @@ requireAdmin();
 
 $action = $_GET['action'] ?? '';
 
-// Verificar CSRF para todas las acciones
-$token = $_POST['csrf_token'] ?? ($_GET['csrf_token'] ?? '');
+// Verificar CSRF para todas las acciones (soporta form-data, query-string y header X-CSRF-Token)
+$token = $_POST['csrf_token'] ?? ($_GET['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
 if (!hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
     jsonResponse(['error' => 'Token CSRF inválido'], 403);
 }

@@ -968,10 +968,13 @@ require __DIR__ . '/templates/header.php';
         const fd = new FormData(form);
         fd.append('content', document.getElementById('tpl-content').value);
         try {
-            const data = await apiFetch('ajax_admin.php?action=save_report_template', {
+            const resp = await fetch('ajax_admin.php?action=save_report_template', {
                 method: 'POST',
-                body: JSON.stringify(Object.fromEntries(fd))
+                body: fd,
+                headers: {'X-Requested-With': 'XMLHttpRequest'}
             });
+            const data = await resp.json();
+            if (!resp.ok || data.error) throw new Error(data.error || 'Error desconocido');
             msg.style.color = '#2e7d32';
             msg.textContent = 'Plantilla guardada.';
             setTimeout(() => location.reload(), 600);
@@ -983,11 +986,17 @@ require __DIR__ . '/templates/header.php';
     }
     async function deleteTemplate(id) {
         if (!confirm('¿Eliminar esta plantilla? No se puede deshacer.')) return;
+        const fd = new FormData();
+        fd.append('id', id);
+        fd.append('csrf_token', document.querySelector('input[name="csrf_token"]')?.value || csrfToken);
         try {
-            await apiFetch('ajax_admin.php?action=delete_report_template', {
+            const resp = await fetch('ajax_admin.php?action=delete_report_template', {
                 method: 'POST',
-                body: JSON.stringify({id: id})
+                body: fd,
+                headers: {'X-Requested-With': 'XMLHttpRequest'}
             });
+            const data = await resp.json();
+            if (!resp.ok || data.error) throw new Error(data.error || 'Error desconocido');
             location.reload();
         } catch (err) {
             alert('❌ ' + err.message);
