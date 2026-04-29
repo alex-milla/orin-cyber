@@ -21,8 +21,24 @@ class CveSearchTaskPhp {
 
         // 2. Generar informe con LLM
         $customTemplate = trim((string)($input['template'] ?? ''));
-        $systemPrompt = $customTemplate ? $this->buildSystemPromptFromTemplate($customTemplate) : $this->buildSystemPrompt();
-        $userPrompt = json_encode($enriched, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        if ($customTemplate) {
+            // Para modelos cloud: la plantilla va en el user prompt (mayor peso instruccional)
+            $systemPrompt = 'Eres un analista de ciberseguridad experto. Genera el informe SIGUIENDO EXACTAMENTE la plantilla proporcionada. NO omitas secciones. NO inventes datos.';
+            $userPrompt = "PLANTILLA DEL INFORME (síguela al pie de la letra):\n\n" .
+                          $customTemplate .
+                          "\n\n---\nREGLAS DEL SISTEMA (no omitir):\n" .
+                          "1. No inventes versiones de parche, fechas ni detalles de vendor.\n" .
+                          "2. No repitas datos que ya aparecen en los metadatos (CVSS, EPSS, CISA KEV).\n" .
+                          "3. Usa [INFERIDO] solo para consecuencias lógicas obvias.\n" .
+                          "4. Sé conciso: máximo 300 palabras en total.\n" .
+                          "5. Responde en español.\n" .
+                          "6. Los datos estructurados se proporcionan a continuación.\n\n" .
+                          "---\nDATOS ESTRUCTURADOS DE LA VULNERABILIDAD:\n" .
+                          json_encode($enriched, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        } else {
+            $systemPrompt = $this->buildSystemPrompt();
+            $userPrompt = json_encode($enriched, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        }
 
         $report = $this->worker->chat($systemPrompt, $userPrompt, [
             'temperature' => 0.2,
