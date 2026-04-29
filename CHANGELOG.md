@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.10.40] — 2026-04-30
+
+### Added
+- **Blue Team Intelligence Toolkit — Fase 2**: integración OSINT + IOC Tracker.
+  - Nuevo `worker/utils/osint_client.py`: consulta VirusTotal, AbuseIPDB, URLhaus y AlienVault OTX con caché SQLite local, rate limiting automático y TTL por fuente.
+  - El task `incident_analysis` ahora enriquece automáticamente cada entidad con OSINT antes de enviar al LLM. El informe HTML incluye tabla de scores VT/AbuseIPDB/URLhaus/OTX.
+  - Prompt LLM actualizado: ahora también clasifica el incidente como **GENÉRICO** o **DIRIGIDO** con confianza.
+  - Nueva sección **IOC Tracker** en `blue_team.php`: estadísticas por estado, tabla de IOCs con VT/AbuseIPDB scores, formulario para añadir IOC manual, cambio de estado inline (sospechosa/confirmada/falsa_alarma/whitelist).
+  - Nuevo endpoint REST `api/v1/ioc_tracker.php` (list, get, add, update_status, delete, stats).
+  - Nueva sección `[osint]` en `config.ini.example` para API keys de VT, AbuseIPDB y OTX.
+
+### Changed
+- `tasks.php` post-procesamiento: ahora también captura `blue_team_classification` (GENÉRICO/DIRIGIDO).
+
 ## [v0.10.39] — 2026-04-30
 
 ### Added
