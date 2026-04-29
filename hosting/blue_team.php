@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['incident_csv'])) {
 
 // ── Extraer entidades del CSV y guardarlas ──────────────────────────
 function _extractAndStoreEntities(string $incidentId, string $csvData): void {
-    $lines = str_getcsv($csvData, "\n");
+    $lines = explode("\n", $csvData);
     if (count($lines) < 2) return;
 
     $headers = str_getcsv($lines[0]);
