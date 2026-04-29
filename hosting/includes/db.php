@@ -236,6 +236,122 @@ class Database {
         $db->exec("CREATE INDEX IF NOT EXISTS idx_chatconv_user ON chat_conversations(user_id, updated_at DESC)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_chatmsg_conv ON chat_messages(conversation_id, created_at)");
 
+        // ─── BLUE TEAM INTELLIGENCE ─────────────────────────────────────────
+        // Entidades monitoreadas
+        $db->exec("CREATE TABLE IF NOT EXISTS entities (
+            entity_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity_type TEXT CHECK(entity_type IN ('user','device','ip','application','domain','url','hash')),
+            entity_value TEXT UNIQUE NOT NULL,
+            first_seen TEXT DEFAULT CURRENT_TIMESTAMP,
+            last_seen TEXT DEFAULT CURRENT_TIMESTAMP,
+            total_incidents INTEGER DEFAULT 0,
+            current_risk_score REAL DEFAULT 0.0,
+            baseline_profile TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        // Incidentes procesados
+        $db->exec("CREATE TABLE IF NOT EXISTS incidents (
+            incident_id TEXT PRIMARY KEY,
+            sentinel_number TEXT,
+            title TEXT,
+            description TEXT,
+            severity TEXT,
+            status TEXT DEFAULT 'open',
+            source TEXT DEFAULT 'manual',
+            created_time TEXT,
+            llm_verdict TEXT CHECK(llm_verdict IN ('True Positive','False Positive','Needs Review')),
+            mitre_tactic TEXT,
+            mitre_technique TEXT,
+            raw_data TEXT,
+            result_html TEXT,
+            result_text TEXT,
+            blue_team_task_id INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        // Relación incidente-entidad
+        $db->exec("CREATE TABLE IF NOT EXISTS incident_entities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            incident_id TEXT REFERENCES incidents(incident_id) ON DELETE CASCADE,
+            entity_value TEXT NOT NULL,
+            role TEXT CHECK(role IN ('victim','attacker','source','target','related')),
+            risk_contribution REAL DEFAULT 0.0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (entity_value) REFERENCES entities(entity_value) ON DELETE CASCADE
+        )");
+
+        // Timeline histórico por entidad
+        $db->exec("CREATE TABLE IF NOT EXISTS entity_timeline (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity_value TEXT NOT NULL,
+            event_type TEXT CHECK(event_type IN ('logon','network','process','alert','ioc_seen','incident_linked','verdict_changed')),
+            event_time TEXT DEFAULT CURRENT_TIMESTAMP,
+            incident_id TEXT,
+            event_data TEXT,
+            anomaly_score REAL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (entity_value) REFERENCES entities(entity_value) ON DELETE CASCADE
+        )");
+
+        // IOCs
+        $db->exec("CREATE TABLE IF NOT EXISTS iocs (
+            ioc_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ioc_value TEXT UNIQUE NOT NULL,
+            ioc_type TEXT CHECK(ioc_type IN ('ip','domain','hash','url')),
+            first_seen TEXT DEFAULT CURRENT_TIMESTAMP,
+            last_seen TEXT DEFAULT CURRENT_TIMESTAMP,
+            status TEXT DEFAULT 'sospechosa' CHECK(status IN ('sospechosa','confirmada_maliciosa','falsa_alarma','whitelist')),
+            declared_by TEXT,
+            declared_at TEXT,
+            notes TEXT,
+            osint_vt_score INTEGER,
+            osint_abuse_score INTEGER,
+            is_targeted INTEGER DEFAULT 0,
+            targeted_evidence TEXT,
+            campaign_tag TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        // Relación IOC-incidente
+        $db->exec("CREATE TABLE IF NOT EXISTS ioc_incidents (
+            ioc_value TEXT NOT NULL,
+            incident_id TEXT NOT NULL,
+            appearance_time TEXT DEFAULT CURRENT_TIMESTAMP,
+            context TEXT,
+            PRIMARY KEY (ioc_value, incident_id),
+            FOREIGN KEY (ioc_value) REFERENCES iocs(ioc_value) ON DELETE CASCADE,
+            FOREIGN KEY (incident_id) REFERENCES incidents(incident_id) ON DELETE CASCADE
+        )");
+
+        // Queries de hunting generadas
+        $db->exec("CREATE TABLE IF NOT EXISTS hunting_queries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            incident_id TEXT REFERENCES incidents(incident_id) ON DELETE CASCADE,
+            query_type TEXT DEFAULT 'kql',
+            query_text TEXT NOT NULL,
+            description TEXT,
+            created_by TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        // Índices Blue Team
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_entities_value ON entities(entity_value)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(entity_type)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_entities_risk ON entities(current_risk_score DESC)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_incidents_created ON incidents(created_time DESC)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_incidents_sentinel ON incidents(sentinel_number)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_incident_entities_incident ON incident_entities(incident_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_incident_entities_value ON incident_entities(entity_value)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_timeline_entity ON entity_timeline(entity_value, event_time DESC)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_iocs_value ON iocs(ioc_value)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_iocs_status ON iocs(status)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_iocs_campaign ON iocs(campaign_tag)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_hunting_incident ON hunting_queries(incident_id)");
+
+        // Migración lazy: añadir blue_team_task_id a incidents si no existe
+        self::_addColumnIfNotExists('incidents', 'blue_team_task_id', 'INTEGER');
+
         // Migraciones de columnas para tablas existentes
         self::_addColumnIfNotExists('tasks', 'assignment', 'TEXT DEFAULT "worker"');
         self::_addColumnIfNotExists('tasks', 'executed_by', 'TEXT');

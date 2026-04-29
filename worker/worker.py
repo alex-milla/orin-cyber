@@ -24,6 +24,7 @@ from utils.monitoring import get_metrics, get_available_models
 from utils.model_catalog import scan_and_update_catalog, get_model_info
 from tasks.cve_search import CveSearchTask
 from tasks.alert_scan import AlertScanTask
+from tasks.incident_analysis import IncidentAnalysisTask
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CONFIG = os.path.join(BASE_DIR, "config.ini")
@@ -41,6 +42,7 @@ _LLAMA_SERVER_READER_THREAD: Optional[threading.Thread] = None
 TASK_REGISTRY = {
     "cve_search": CveSearchTask,
     "alert_scan": AlertScanTask,
+    "incident_analysis": IncidentAnalysisTask,
 }
 
 

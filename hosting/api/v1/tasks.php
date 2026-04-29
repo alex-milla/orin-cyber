@@ -105,7 +105,30 @@ switch ($action) {
         }
         
         Database::update('tasks', $updateData, 'id = ?', [$taskId]);
-        
+
+        // ── Post-procesamiento para tareas Blue Team ─────────────────────
+        $task = Database::fetchOne("SELECT task_type, input_data FROM tasks WHERE id = ?", [$taskId]);
+        if ($task && $task['task_type'] === 'incident_analysis') {
+            $input = json_decode($task['input_data'] ?? '{}', true);
+            $incidentId = $input['incident_id'] ?? '';
+            if ($incidentId) {
+                $btUpdate = [
+                    'result_html' => $html,
+                    'result_text' => $data['result_text'] ?? null,
+                ];
+                if (isset($data['blue_team_verdict']) && is_string($data['blue_team_verdict'])) {
+                    $v = $data['blue_team_verdict'];
+                    if (in_array($v, ['True Positive', 'False Positive', 'Needs Review'], true)) {
+                        $btUpdate['llm_verdict'] = $v;
+                    }
+                }
+                if (isset($data['blue_team_mitre_tactic']) && is_string($data['blue_team_mitre_tactic'])) {
+                    $btUpdate['mitre_tactic'] = $data['blue_team_mitre_tactic'];
+                }
+                Database::update('incidents', $btUpdate, 'incident_id = ?', [$incidentId]);
+            }
+        }
+
         jsonResponse(['success' => true, 'message' => 'Resultado recibido']);
         break;
 
