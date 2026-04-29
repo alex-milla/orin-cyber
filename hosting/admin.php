@@ -875,8 +875,15 @@ require __DIR__ . '/templates/header.php';
                 <td class="small"><?php echo htmlspecialchars($tpl['updated_at'] ?? $tpl['created_at']); ?></td>
                 <td>
                     <div class="flex gap-1 flex-wrap">
-                        <button class="secondary small" onclick="editTemplate(<?php echo (int)$tpl['id']; ?>, <?php echo json_encode($tpl['name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>, <?php echo json_encode($tpl['content'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>, <?php echo (int)$tpl['is_default']; ?>, <?php echo json_encode($tpl['task_type'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>)">✏️ Editar</button>
-                        <button class="secondary small" onclick="previewTemplate(<?php echo json_encode($tpl['content'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>, <?php echo json_encode($tpl['name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>)">👁️ Ver prompt</button>
+                        <button class="secondary small tpl-btn-edit"
+                            data-id="<?php echo (int)$tpl['id']; ?>"
+                            data-name="<?php echo htmlspecialchars($tpl['name'], ENT_QUOTES, 'UTF-8'); ?>"
+                            data-content="<?php echo htmlspecialchars($tpl['content'], ENT_QUOTES, 'UTF-8'); ?>"
+                            data-is-default="<?php echo (int)$tpl['is_default']; ?>"
+                            data-task-type="<?php echo htmlspecialchars($tpl['task_type'], ENT_QUOTES, 'UTF-8'); ?>">✏️ Editar</button>
+                        <button class="secondary small tpl-btn-preview"
+                            data-name="<?php echo htmlspecialchars($tpl['name'], ENT_QUOTES, 'UTF-8'); ?>"
+                            data-content="<?php echo htmlspecialchars($tpl['content'], ENT_QUOTES, 'UTF-8'); ?>">👁️ Ver prompt</button>
                         <button class="secondary small danger" onclick="deleteTemplate(<?php echo (int)$tpl['id']; ?>)">🗑️</button>
                     </div>
                 </td>
@@ -932,6 +939,26 @@ require __DIR__ . '/templates/header.php';
         "4. Sé conciso: máximo 300 palabras en total.\n" +
         "5. Responde en español.\n" +
         "6. Los datos estructurados de la vulnerabilidad se proporcionan en el mensaje del usuario.";
+
+    // Delegación de eventos para botones de plantillas (evita problemas de escaping en onclick inline)
+    document.getElementById('templates-container').addEventListener('click', function(e) {
+        const btnEdit = e.target.closest('.tpl-btn-edit');
+        if (btnEdit) {
+            editTemplate(
+                parseInt(btnEdit.dataset.id, 10),
+                btnEdit.dataset.name,
+                btnEdit.dataset.content,
+                parseInt(btnEdit.dataset.isDefault, 10),
+                btnEdit.dataset.taskType
+            );
+            return;
+        }
+        const btnPreview = e.target.closest('.tpl-btn-preview');
+        if (btnPreview) {
+            previewTemplate(btnPreview.dataset.content, btnPreview.dataset.name);
+            return;
+        }
+    });
 
     function previewTemplate(content, name) {
         document.getElementById('tpl-preview-title').textContent = 'Prompt completo — ' + name;
