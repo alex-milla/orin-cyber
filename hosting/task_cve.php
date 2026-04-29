@@ -353,5 +353,75 @@ function cancelTask(taskId, csrfToken) {
     })
     .catch(err => alert('Error de red: ' + err));
 }
+
+/**
+ * Polling de filas pendientes del historial CVE.
+ * Refresca estado, ejecutor y botón de acción cuando una tarea termina.
+ */
+(function() {
+    const table = document.getElementById('cve-history-table');
+    if (!table) return;
+
+    const POLL_MS = 5000;
+
+    function pendingTaskIds() {
+        const ids = [];
+        table.querySelectorAll('tbody tr').forEach(tr => {
+            const statusCell = tr.querySelector('td:nth-child(3)');
+            if (!statusCell) return;
+            const cls = statusCell.className || '';
+            if (cls.includes('status-pending') || cls.includes('status-processing')) {
+                const idCell = tr.querySelector('td:first-child');
+                if (idCell) {
+                    const m = idCell.textContent.trim().match(/#(\d+)/);
+                    if (m) ids.push(parseInt(m[1], 10));
+                }
+            }
+        });
+        return ids;
+    }
+
+    async function refreshOne(taskId) {
+        try {
+            const res = await fetch('ajax_check_status.php?task_id=' + taskId, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await res.json();
+            if (data.error) return;
+            if (data.status === 'pending' || data.status === 'processing') return;
+            updateRow(taskId, data.status, data.executed_by);
+        } catch (e) { /* silencioso */ }
+    }
+
+    function updateRow(taskId, status, executedBy) {
+        const rows = table.querySelectorAll('tbody tr');
+        for (const r of rows) {
+            const idCell = r.querySelector('td:first-child');
+            if (idCell && idCell.textContent.trim() === '#' + taskId) {
+                const statusCell = r.querySelector('td:nth-child(3)');
+                const execCell = r.querySelector('td:nth-child(4)');
+                const actionCell = r.querySelector('td:last-child');
+                if (statusCell) {
+                    statusCell.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+                    statusCell.className = 'status-' + status;
+                }
+                if (execCell && executedBy) execCell.textContent = executedBy;
+                if (actionCell) {
+                    actionCell.innerHTML = '<a href="task_result.php?id=' + taskId + '"><button class="secondary small">Ver resultado</button></a>';
+                }
+                break;
+            }
+        }
+    }
+
+    async function tick() {
+        const ids = pendingTaskIds();
+        if (ids.length === 0) return;
+        await Promise.all(ids.map(refreshOne));
+    }
+
+    setInterval(tick, POLL_MS);
+    setTimeout(tick, 1500);
+})();
 </script>
 <?php require __DIR__ . '/templates/footer.php'; ?>

@@ -36,7 +36,9 @@ switch ($action) {
         $task = Database::fetchOne(
             "SELECT id, task_type, input_data, status, created_at, assignment
              FROM tasks
-             WHERE status = 'pending' AND (assignment = 'worker' OR assignment IS NULL)
+             WHERE status = 'pending'
+               AND (assignment = 'worker' OR assignment IS NULL)
+               AND assignment NOT LIKE 'provider:%'
              ORDER BY created_at ASC LIMIT 1"
         );
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.10.18] — 2026-04-28
+
+### Fixed
+- **Tareas cloud quedaban atascadas en `pending`**: el procesamiento dependía de `polling.js`, que solo se carga en la página de espera tras enviar el formulario. Añadido `virtual_worker_pulse.js` que dispara `ajax_virtual_worker.php` cada 15s desde cualquier página autenticada. También se endureció `tasks.php` para que el worker local nunca coja tareas con `assignment LIKE 'provider:%'`.
+- **Historial CVE no refrescaba tras completarse**: añadido polling ligero (5s) sobre filas en estado `pending`/`processing` en `task_cve.php`, que actualiza estado, ejecutor y botón de acción sin recargar la página.
+
 ## [v0.10.17] — 2026-04-28
 
 ### Fixed
