@@ -11,6 +11,7 @@ from typing import Any
 from tasks.base import BaseTask
 from utils.llm_client import LlmClient
 from utils.formatter import markdown_to_html
+from utils.osint_client import get_osint_summary, enrich_ioc
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +79,16 @@ def _parse_csv(csv_data: str) -> list[dict[str, str]]:
         return []
 
 
-def _build_llm_context(incident_id: str, title: str, severity: str, rows: list[dict], entities: dict) -> str:
-    """Construye el prompt de contexto para el LLM."""
+def _build_llm_context(
+    incident_id: str,
+    title: str,
+    severity: str,
+    rows: list[dict],
+    entities: dict,
+    osint_data: dict,
+    config_path: str | None = None,
+) -> str:
+    """Construye el prompt de contexto para el LLM, enriquecido con OSINT."""
     lines = [
         f"Incidente: {incident_id}",
         f"Título: {title}",
@@ -98,6 +107,21 @@ def _build_llm_context(incident_id: str, title: str, severity: str, rows: list[d
     for etype, vals in entities.items():
         if vals:
             lines.append(f"{etype}: {', '.join(sorted(vals)[:20])}")
+
+    # OSINT para entidades clave
+    osint_lines = []
+    for etype, vals in entities.items():
+        if not vals or etype not in ("ip", "domain", "hash_sha256", "hash_md5", "url"):
+            continue
+        for val in sorted(vals)[:5]:
+            ioc_type = {"ip": "ip", "domain": "domain", "hash_sha256": "hash", "hash_md5": "hash", "url": "url"}.get(etype)
+            if ioc_type:
+                osint_lines.append(get_osint_summary(val, ioc_type, config_path))
+
+    if osint_lines:
+        lines.append("")
+        lines.append("=== INTELIGENCIA OSINT ===")
+        lines.extend(osint_lines)
 
     return "\n".join(lines)
 
@@ -121,11 +145,14 @@ def _render_incident_html(
     llm_analysis: dict | None,
     entities: dict[str, set[str]],
     rows: list[dict],
+    osint_data: dict[str, dict],
 ) -> str:
     """Genera HTML del informe de incidente."""
 
     verdict = llm_analysis.get("veredicto", "N/A") if llm_analysis else "N/A"
     confidence = llm_analysis.get("confianza", 0.0) if llm_analysis else 0.0
+    classification = llm_analysis.get("clasificacion", "N/A") if llm_analysis else "N/A"
+    class_conf = llm_analysis.get("confianza_clasificacion", 0.0) if llm_analysis else 0.0
     mitre_tac = llm_analysis.get("mitre_tactic", "N/A") if llm_analysis else "N/A"
     mitre_tec = llm_analysis.get("mitre_technique", "N/A") if llm_analysis else "N/A"
     justif = llm_analysis.get("justificacion", "") if llm_analysis else ""
@@ -138,6 +165,11 @@ def _render_incident_html(
         "False Positive": "#2e7d32",
         "Needs Review": "#f57c00",
     }.get(verdict, "#78909c")
+
+    class_color = {
+        "DIRIGIDO": "#c62828",
+        "GENERICO": "#1976d2",
+    }.get(classification, "#78909c")
 
     severity_color = {
         "CRITICAL": "#c62828",
@@ -154,7 +186,7 @@ def _render_incident_html(
     <p style="margin-top:.5rem;font-size:1.1rem;font-weight:600;">{title}</p>
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
     <div style="background:var(--surface);border-radius:var(--radius-sm);padding:1rem;text-align:center;">
       <div style="font-size:.85rem;color:var(--text-muted);">Severidad</div>
       <div style="display:inline-block;background:{severity_color};color:#fff;padding:.25rem .8rem;border-radius:4px;font-weight:700;margin-top:.25rem;">{severity}</div>
@@ -163,6 +195,11 @@ def _render_incident_html(
       <div style="font-size:.85rem;color:var(--text-muted);">Veredicto LLM</div>
       <div style="display:inline-block;background:{verdict_color};color:#fff;padding:.25rem .8rem;border-radius:4px;font-weight:700;margin-top:.25rem;">{verdict}</div>
       <div style="font-size:.8rem;color:var(--text-muted);margin-top:.25rem;">Confianza: {confidence:.0%}</div>
+    </div>
+    <div style="background:var(--surface);border-radius:var(--radius-sm);padding:1rem;text-align:center;">
+      <div style="font-size:.85rem;color:var(--text-muted);">Clasificación</div>
+      <div style="display:inline-block;background:{class_color};color:#fff;padding:.25rem .8rem;border-radius:4px;font-weight:700;margin-top:.25rem;">{classification}</div>
+      <div style="font-size:.8rem;color:var(--text-muted);margin-top:.25rem;">Confianza: {class_conf:.0%}</div>
     </div>
   </div>
 '''
@@ -221,6 +258,30 @@ def _render_incident_html(
         html += '</div>\n'
 
     # Stats
+    # OSINT section
+    if osint_data:
+        html += '<div style="margin:1rem 0;border-left:4px solid #1976d2;padding:.75rem 1rem;background:var(--surface);border-radius:0 var(--radius-sm) var(--radius-sm) 0;">\n'
+        html += '<div style="font-weight:700;color:#1976d2;margin-bottom:.5rem;">🌐 Inteligencia OSINT</div>\n'
+        html += '<table style="width:100%;font-size:.85rem;border-collapse:collapse;">\n'
+        html += '<thead><tr style="border-bottom:1px solid var(--border);"><th style="text-align:left;padding:.3rem;">IOC</th><th style="text-align:left;padding:.3rem;">Tipo</th><th style="text-align:center;padding:.3rem;">VT</th><th style="text-align:center;padding:.3rem;">AbuseIPDB</th><th style="text-align:center;padding:.3rem;">URLhaus</th><th style="text-align:center;padding:.3rem;">OTX</th></tr></thead>\n'
+        html += '<tbody>\n'
+        for key, data in osint_data.items():
+            parts = key.split(":", 1)
+            ioc_type = parts[0] if len(parts) > 0 else "?"
+            ioc_val = parts[1] if len(parts) > 1 else key
+            vt = data.get("vt")
+            abuse = data.get("abuseipdb")
+            uh = data.get("urlhaus")
+            otx = data.get("otx")
+
+            vt_str = f"{vt['malicious']}/{vt['total']}" if vt and vt.get("found") else "—"
+            abuse_str = f"{abuse['score']}/100" if abuse and abuse.get("found") else "—"
+            uh_str = "⚠️" if uh and uh.get("found") else "—"
+            otx_str = f"{otx['pulse_count']}" if otx and otx.get("found") else "—"
+
+            html += f'<tr style="border-bottom:1px solid var(--border);"><td style="padding:.3rem;"><code>{ioc_val}</code></td><td style="padding:.3rem;">{ioc_type}</td><td style="text-align:center;padding:.3rem;">{vt_str}</td><td style="text-align:center;padding:.3rem;">{abuse_str}</td><td style="text-align:center;padding:.3rem;">{uh_str}</td><td style="text-align:center;padding:.3rem;">{otx_str}</td></tr>\n'
+        html += '</tbody></table>\n</div>\n'
+
     html += f'''<div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);color:var(--text-muted);font-size:.85rem;">
     Registros analizados: {len(rows)} · Entidades únicas: {sum(len(v) for v in entities.values())}
   </div>
@@ -265,8 +326,18 @@ class IncidentAnalysisTask(BaseTask):
                 all_values.append(str(val))
         entities = _extract_entities(all_values)
 
+        # Consultar OSINT para entidades clave
+        osint_data: dict[str, dict] = {}
+        for etype, vals in entities.items():
+            if not vals or etype not in ("ip", "domain", "hash_sha256", "hash_md5", "url"):
+                continue
+            for val in sorted(vals)[:5]:
+                ioc_type = {"ip": "ip", "domain": "domain", "hash_sha256": "hash", "hash_md5": "hash", "url": "url"}.get(etype)
+                if ioc_type:
+                    osint_data[f"{ioc_type}:{val}"] = enrich_ioc(val, ioc_type, self.config_path)
+
         # Contexto para LLM
-        context = _build_llm_context(incident_id, title, severity, rows, entities)
+        context = _build_llm_context(incident_id, title, severity, rows, entities, osint_data, self.config_path)
 
         # Llamar al LLM
         llm_analysis = None
@@ -281,7 +352,7 @@ class IncidentAnalysisTask(BaseTask):
             logger.warning("LLM call failed for %s: %s", incident_id, exc)
 
         # Generar informe HTML
-        html = _render_incident_html(incident_id, title, severity, llm_analysis, entities, rows)
+        html = _render_incident_html(incident_id, title, severity, llm_analysis, entities, rows, osint_data)
 
         # Generar texto plano (Markdown)
         lines = [
@@ -331,10 +402,12 @@ class IncidentAnalysisTask(BaseTask):
 
         verdict = llm_analysis.get("veredicto") if llm_analysis else None
         mitre_tac = llm_analysis.get("mitre_tactic") if llm_analysis else None
+        classification = llm_analysis.get("clasificacion") if llm_analysis else None
 
         return {
             "result_html": html,
             "result_text": text,
             "blue_team_verdict": verdict,
             "blue_team_mitre_tactic": mitre_tac,
+            "blue_team_classification": classification,
         }

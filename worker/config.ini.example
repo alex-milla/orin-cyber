@@ -40,6 +40,11 @@ extra_args = -ngl 0 --cache-type-k q8_0 --cache-type-v q8_0 --batch-size 128 --u
 context_size = 2048
 extra_args = -ngl 8 -fa on --cache-type-k q8_0 --cache-type-v q8_0 --batch-size 256 --ubatch-size 256 --no-mmap --mlock
 
+[osint]
+virustotal_api_key =
+abuseipdb_api_key =
+otx_api_key =
+
 [worker]
 poll_interval = 15
 max_retries = 3

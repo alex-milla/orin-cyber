@@ -5,6 +5,8 @@ Analiza los datos del incidente proporcionado y responde ÚNICAMENTE con un obje
 {
   "veredicto": "True Positive" | "False Positive" | "Needs Review",
   "confianza": 0.0-1.0,
+  "clasificacion": "GENERICO" | "DIRIGIDO",
+  "confianza_clasificacion": 0.0-1.0,
   "mitre_tactic": "TAxxxx - Nombre del tactic",
   "mitre_technique": "Txxxx - Nombre de la técnica",
   "justificacion": "3 viñetas breves explicando el razonamiento",
@@ -17,5 +19,9 @@ Criterios para el veredicto:
 - True Positive: Hay evidencia clara de comportamiento malicioso, anomalía persistente, o TTPs reconocibles.
 - False Positive: El comportamiento tiene explicación legítima, falta contexto de amenaza, o es ruido conocido.
 - Needs Review: Datos insuficientes, comportamiento ambiguo, o requiere validación manual.
+
+Criterios para clasificación GENERICO vs DIRIGIDO:
+- GENERICO: El IOC o comportamiento aparece en múltiples organizaciones, tiene alta reputación pública (muchos reportes VT/AbuseIPDB), afecta usuarios genéricos, no hay patrón de horarios específicos ni targeting de roles.
+- DIRIGIDO: El IOC tiene bajo ruido público (pocos reportes), afecta roles sensibles (CEO, admin, finanzas), ocurre en horarios atípicos, hay múltiples TTPs coordinados, o el LLM detecta un patrón específico de campaña.
 
 Sé conciso. No incluyas explicaciones fuera del JSON. Asegúrate de que el JSON sea válido (sin comentarios, sin trailing commas).

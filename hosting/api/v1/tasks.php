@@ -125,6 +125,12 @@ switch ($action) {
                 if (isset($data['blue_team_mitre_tactic']) && is_string($data['blue_team_mitre_tactic'])) {
                     $btUpdate['mitre_tactic'] = $data['blue_team_mitre_tactic'];
                 }
+                if (isset($data['blue_team_classification']) && is_string($data['blue_team_classification'])) {
+                    $c = $data['blue_team_classification'];
+                    if (in_array($c, ['GENERICO', 'DIRIGIDO'], true)) {
+                        $btUpdate['description'] = ($btUpdate['description'] ?? '') . "\nClasificación: {$c}";
+                    }
+                }
                 Database::update('incidents', $btUpdate, 'incident_id = ?', [$incidentId]);
             }
         }
