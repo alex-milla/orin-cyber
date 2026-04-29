@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.10.30] — 2026-04-29
+
+### Fixed
+- **Bug de replicación de plantillas por defecto**: la migración de `report_templates` usaba `INSERT OR IGNORE` sin clave única, provocando que cada request creara una nueva plantilla por defecto. Ahora se verifica primero si existe alguna plantilla antes de insertar, y se limpian automáticamente los duplicados existentes.
+
 ## [v0.10.29] — 2026-04-29
 
 ### Added

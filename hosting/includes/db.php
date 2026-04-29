@@ -261,16 +261,24 @@ class Database {
         )");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_templates_task_default ON report_templates(task_type, is_default)");
 
-        // Plantilla por defecto CVE (idempotente)
-        $defaultTemplate = "Eres un analista de ciberseguridad experto. Genera un informe en español sobre la vulnerabilidad proporcionada.\n\n" .
-            "Estructura obligatoria (usa exactamente estos títulos en markdown):\n" .
-            "## CONTEXTO\n" .
-            "## IMPACTO\n" .
-            "## RECOMENDACIONES\n" .
-            "## NOTAS\n\n" .
-            "Sé conciso (máximo 300 palabras). Usa markdown básico.";
-        $stmt = $db->prepare("INSERT OR IGNORE INTO report_templates (task_type, name, content, is_default) VALUES (?, ?, ?, ?)");
-        $stmt->execute(['cve_search', 'Plantilla por defecto', $defaultTemplate, 1]);
+        // Limpiar duplicados de plantilla por defecto (bug v0.10.29)
+        $db->exec("DELETE FROM report_templates WHERE id NOT IN (
+            SELECT MIN(id) FROM report_templates WHERE name = 'Plantilla por defecto' AND task_type = 'cve_search'
+        ) AND name = 'Plantilla por defecto' AND task_type = 'cve_search'");
+
+        // Plantilla por defecto CVE — solo si no existe ninguna para este task_type
+        $existing = $db->query("SELECT 1 FROM report_templates WHERE task_type = 'cve_search' LIMIT 1")->fetch();
+        if (!$existing) {
+            $defaultTemplate = "Eres un analista de ciberseguridad experto. Genera un informe en español sobre la vulnerabilidad proporcionada.\n\n" .
+                "Estructura obligatoria (usa exactamente estos títulos en markdown):\n" .
+                "## CONTEXTO\n" .
+                "## IMPACTO\n" .
+                "## RECOMENDACIONES\n" .
+                "## NOTAS\n\n" .
+                "Sé conciso (máximo 300 palabras). Usa markdown básico.";
+            $stmt = $db->prepare("INSERT INTO report_templates (task_type, name, content, is_default) VALUES (?, ?, ?, ?)");
+            $stmt->execute(['cve_search', 'Plantilla por defecto', $defaultTemplate, 1]);
+        }
     }
 
     private static function _addColumnIfNotExists(string $table, string $column, string $type): void {
