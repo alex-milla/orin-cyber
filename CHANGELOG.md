@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.10.21] — 2026-04-29
+
+### Fixed
+- **Fallback ampliado a rate limits**: ahora también captura `Rate limit exceeded`, `Too many requests` y `Provider returned error` como errores recuperables. Antes de reintentar con otro modelo, espera 2 segundos para no bombardear la API.
+
 ## [v0.10.20] — 2026-04-29
 
 ### Fixed

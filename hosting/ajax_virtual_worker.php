@@ -96,8 +96,14 @@ try {
 } catch (Throwable $e) {
     $errMsg = $e->getMessage();
 
-    // Fallback: si es "No endpoints found", intentar con otro modelo del mismo proveedor
-    if (str_contains($errMsg, 'No endpoints found') || str_contains($errMsg, 'Model not found')) {
+    // Fallback: si es error recuperable (no endpoints, rate limit, etc.), intentar con otro modelo
+    $recoverable = str_contains($errMsg, 'No endpoints found')
+                || str_contains($errMsg, 'Model not found')
+                || str_contains($errMsg, 'Rate limit')
+                || str_contains($errMsg, 'Too many requests')
+                || str_contains($errMsg, 'Provider returned error');
+
+    if ($recoverable) {
         $fallback = Database::fetchOne(
             "SELECT model_id, label FROM external_models
              WHERE provider_id = ? AND model_id != ? AND is_active = 1
@@ -108,6 +114,8 @@ try {
             $fallbackModelId = $fallback['model_id'];
             $fallbackExecutedBy = "{$providerLabel} → {$fallbackModelId} (fallback desde {$modelId})";
             try {
+                // Pequeña espera para no bombardear la API si fue rate limit
+                sleep(2);
                 $result = runVirtualTask($task['id'], $providerId, $fallbackModelId, $task);
 
                 $html = ($result['result_html'] ?? '') . '<div class="cve-footer small" style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border);color:var(--text-muted);">🤖 Generado por: ' . htmlspecialchars($fallbackExecutedBy) . '</div>';
