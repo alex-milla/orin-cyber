@@ -248,6 +248,29 @@ class Database {
         self::_addColumnIfNotExists('external_models', 'tags', 'TEXT');
         self::_addColumnIfNotExists('tasks', 'cvss_base_score', 'REAL');
         self::_addColumnIfNotExists('tasks', 'cvss_severity', 'TEXT');
+
+        // Plantillas de informe personalizables
+        $db->exec("CREATE TABLE IF NOT EXISTS report_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_type TEXT NOT NULL DEFAULT 'cve_search',
+            name TEXT NOT NULL,
+            content TEXT NOT NULL,
+            is_default INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_templates_task_default ON report_templates(task_type, is_default)");
+
+        // Plantilla por defecto CVE (idempotente)
+        $defaultTemplate = "Eres un analista de ciberseguridad experto. Genera un informe en español sobre la vulnerabilidad proporcionada.\n\n" .
+            "Estructura obligatoria (usa exactamente estos títulos en markdown):\n" .
+            "## CONTEXTO\n" .
+            "## IMPACTO\n" .
+            "## RECOMENDACIONES\n" .
+            "## NOTAS\n\n" .
+            "Sé conciso (máximo 300 palabras). Usa markdown básico.";
+        $stmt = $db->prepare("INSERT OR IGNORE INTO report_templates (task_type, name, content, is_default) VALUES (?, ?, ?, ?)");
+        $stmt->execute(['cve_search', 'Plantilla por defecto', $defaultTemplate, 1]);
     }
 
     private static function _addColumnIfNotExists(string $table, string $column, string $type): void {

@@ -199,6 +199,64 @@ switch ($action) {
         }
         break;
 
+    case 'save_report_template':
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        $name = trim($_POST['name'] ?? '');
+        $content = $_POST['content'] ?? '';
+        $taskType = validateInput($_POST['task_type'] ?? 'cve_search', 50);
+        $isDefault = !empty($_POST['is_default']) ? 1 : 0;
+
+        if (strlen($name) < 2 || strlen($name) > 100) {
+            jsonResponse(['error' => 'Nombre inválido (2-100 caracteres)'], 400);
+        }
+        if (strlen($content) < 10) {
+            jsonResponse(['error' => 'Contenido demasiado corto (mínimo 10 caracteres)'], 400);
+        }
+
+        if ($isDefault) {
+            Database::query("UPDATE report_templates SET is_default = 0 WHERE task_type = ?", [$taskType]);
+        }
+
+        if ($id) {
+            Database::update('report_templates', [
+                'name' => $name,
+                'content' => $content,
+                'task_type' => $taskType,
+                'is_default' => $isDefault,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ], 'id = ?', [$id]);
+            jsonResponse(['success' => true, 'id' => $id]);
+        } else {
+            $newId = Database::insert('report_templates', [
+                'name' => $name,
+                'content' => $content,
+                'task_type' => $taskType,
+                'is_default' => $isDefault,
+            ]);
+            jsonResponse(['success' => true, 'id' => $newId]);
+        }
+        break;
+
+    case 'delete_report_template':
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        if (!$id) jsonResponse(['error' => 'ID inválido'], 400);
+        $count = Database::fetchOne("SELECT COUNT(*) as c FROM report_templates WHERE task_type = 'cve_search'")['c'] ?? 0;
+        if ($count <= 1) {
+            jsonResponse(['error' => 'No se puede eliminar la última plantilla de CVE'], 409);
+        }
+        Database::query("DELETE FROM report_templates WHERE id = ?", [$id]);
+        jsonResponse(['success' => true]);
+        break;
+
+    case 'get_report_templates':
+        $taskType = validateInput($_GET['task_type'] ?? 'cve_search', 50) ?: 'cve_search';
+        $templates = Database::fetchAll(
+            "SELECT id, name, content, is_default, created_at, updated_at FROM report_templates WHERE task_type = ? ORDER BY is_default DESC, name ASC",
+            [$taskType]
+        );
+        jsonResponse(['success' => true, 'templates' => $templates]);
+        break;
+
     default:
         jsonResponse(['error' => 'Acción no válida'], 400);
 }

@@ -50,6 +50,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $assignment = 'worker';
             }
 
+            // Leer plantilla seleccionada
+            $templateContent = '';
+            $templateId = filter_input(INPUT_POST, 'template_id', FILTER_VALIDATE_INT);
+            if ($templateId) {
+                foreach ($reportTemplates as $tpl) {
+                    if ((int)$tpl['id'] === $templateId) {
+                        $templateContent = $tpl['content'];
+                        break;
+                    }
+                }
+            }
+            if (!$templateContent && !empty($reportTemplates)) {
+                // Usar la plantilla por defecto
+                foreach ($reportTemplates as $tpl) {
+                    if ($tpl['is_default']) {
+                        $templateContent = $tpl['content'];
+                        break;
+                    }
+                }
+            }
+
             // Si hay múltiples CVEs, crear una tarea por cada uno (cola individual)
             $createdIds = [];
             if (count($cveList) > 1) {
@@ -61,7 +82,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'version' => $version,
                         'year' => $year,
                         'severity' => $severity,
-                        'max_results' => 1
+                        'max_results' => 1,
+                        'template' => $templateContent,
                     ], JSON_UNESCAPED_UNICODE);
                     $tid = Database::insert('tasks', [
                         'task_type' => 'cve_search',
@@ -82,7 +104,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'version' => $version,
                     'year' => $year,
                     'severity' => $severity,
-                    'max_results' => $maxResults
+                    'max_results' => $maxResults,
+                    'template' => $templateContent,
                 ], JSON_UNESCAPED_UNICODE);
                 $tid = Database::insert('tasks', [
                     'task_type' => 'cve_search',
@@ -206,6 +229,16 @@ try {
     $virtualWorkers = [];
 }
 
+// Plantillas de informe CVE disponibles
+$reportTemplates = [];
+try {
+    $reportTemplates = Database::fetchAll(
+        "SELECT id, name, content, is_default FROM report_templates WHERE task_type = 'cve_search' ORDER BY is_default DESC, name ASC"
+    );
+} catch (Throwable $e) {
+    $reportTemplates = [];
+}
+
 $pageTitle = 'Búsqueda CVE — OrinSec';
 require __DIR__ . '/templates/header.php';
 ?>
@@ -268,6 +301,18 @@ require __DIR__ . '/templates/header.php';
                 </option>
                 <?php endforeach; ?>
             </select>
+
+            <?php if (!empty($reportTemplates)): ?>
+            <label for="template_id" style="margin-top:1rem;display:block;">📄 Plantilla de informe</label>
+            <select id="template_id" name="template_id" style="min-width:320px;margin-bottom:.5rem;">
+                <?php foreach ($reportTemplates as $tpl): ?>
+                <option value="<?php echo (int)$tpl['id']; ?>" <?php echo $tpl['is_default'] ? 'selected' : ''; ?>>
+                    <?php echo htmlspecialchars($tpl['name']) . ($tpl['is_default'] ? ' (por defecto)' : ''); ?>
+                </option>
+                <?php endforeach; ?>
+            </select>
+            <?php endif; ?>
+
             <button type="submit" class="mt-2">Buscar vulnerabilidad</button>
             
             <button type="button" class="advanced-toggle" onclick="document.getElementById('adv-fields').classList.toggle('open')">⚙️ Búsqueda avanzada ▾</button>

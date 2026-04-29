@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.10.29] — 2026-04-29
+
+### Added
+- **Plantillas de informe CVE personalizables**: nueva tabla `report_templates` con CRUD completo en el panel de admin (tab "Plantillas"). El usuario puede crear, editar, previsualizar y eliminar plantillas `.md` que actúan como base del system prompt. El sistema añade automáticamente reglas de seguridad.
+- **Selector de plantilla en task_cve.php**: dropdown para elegir la plantilla de informe al crear una tarea. La plantilla se inyecta en `input_data` y viaja con la tarea, funcionando tanto para Worker Local (Python) como Virtual Worker (PHP).
+- **Modo Markdown libre en Worker Python**: cuando se proporciona plantilla personalizada, el worker usa `llm.chat()` en lugar de `llm.chat_json()`, generando Markdown libre que se convierte a HTML.
+- **Modo plantilla en Virtual Worker PHP**: `CveSearchTaskPhp::buildSystemPromptFromTemplate()` combina la plantilla del usuario con las reglas del sistema.
+
 ## [v0.10.28] — 2026-04-29
 
 ### Fixed

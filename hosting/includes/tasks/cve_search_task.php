@@ -20,7 +20,8 @@ class CveSearchTaskPhp {
         $enriched = $this->enrichCve($cveId);
 
         // 2. Generar informe con LLM
-        $systemPrompt = $this->buildSystemPrompt();
+        $customTemplate = trim((string)($input['template'] ?? ''));
+        $systemPrompt = $customTemplate ? $this->buildSystemPromptFromTemplate($customTemplate) : $this->buildSystemPrompt();
         $userPrompt = json_encode($enriched, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
         $report = $this->worker->chat($systemPrompt, $userPrompt, [
@@ -123,13 +124,27 @@ class CveSearchTaskPhp {
     }
 
     private function buildSystemPrompt(): string {
-        return "Eres un analista de ciberseguridad experto. Genera un informe en español sobre la vulnerabilidad proporcionada.\n\n" .
+        return $this->buildSystemPromptFromTemplate(null);
+    }
+
+    private function buildSystemPromptFromTemplate(?string $template): string {
+        $base = $template ?: "Eres un analista de ciberseguridad experto. Genera un informe en español sobre la vulnerabilidad proporcionada.\n\n" .
                "Estructura obligatoria (usa exactamente estos títulos en markdown):\n" .
                "## CONTEXTO\n" .
                "## IMPACTO\n" .
                "## RECOMENDACIONES\n" .
                "## NOTAS\n\n" .
                "Sé conciso (máximo 300 palabras). Usa markdown básico.";
+
+        $rules = "\n\n---\nREGLAS DEL SISTEMA (no omitir):\n" .
+                 "1. No inventes versiones de parche, fechas ni detalles de vendor.\n" .
+                 "2. No repitas datos que ya aparecen en los metadatos (CVSS, EPSS, CISA KEV).\n" .
+                 "3. Usa [INFERIDO] solo para consecuencias lógicas obvias.\n" .
+                 "4. Sé conciso: máximo 300 palabras en total.\n" .
+                 "5. Responde en español.\n" .
+                 "6. Los datos estructurados de la vulnerabilidad se proporcionan en el mensaje del usuario.";
+
+        return $base . $rules;
     }
 
     private function mdToHtml(string $md): string {

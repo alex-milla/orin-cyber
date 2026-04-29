@@ -126,6 +126,16 @@ try {
     $executorOptions = [['value' => 'worker', 'label' => 'Worker local (Orin)']];
 }
 
+// Plantillas de informe
+$reportTemplates = [];
+try {
+    $reportTemplates = Database::fetchAll(
+        "SELECT id, task_type, name, content, is_default, created_at, updated_at FROM report_templates ORDER BY task_type, is_default DESC, name ASC"
+    );
+} catch (Throwable $e) {
+    $reportTemplates = [];
+}
+
 $pageTitle = 'Administración — OrinSec';
 require __DIR__ . '/templates/header.php';
 ?>
@@ -141,6 +151,7 @@ require __DIR__ . '/templates/header.php';
         <a href="?tab=alerts" class="<?php echo $tab==='alerts'?'active':''; ?>">Alertas</a>
         <a href="?tab=providers" class="<?php echo $tab==='providers'?'active':''; ?>">Proveedores</a>
         <a href="?tab=config" class="<?php echo $tab==='config'?'active':''; ?>">Configuración</a>
+        <a href="?tab=templates" class="<?php echo $tab==='templates'?'active':''; ?>">Plantillas</a>
     </div>
 
     <?php if ($tab === 'updates'): ?>
@@ -835,6 +846,153 @@ require __DIR__ . '/templates/header.php';
         loadProvidersAdmin();
         loadUsageStats();
     });
+    </script>
+
+    <?php elseif ($tab === 'templates'): ?>
+    <h3>📝 Plantillas de informe</h3>
+    <p class="small">Las plantillas definen la estructura y formato del informe CVE generado por el LLM. Se usan como <strong>base</strong> del system prompt; el sistema añade automáticamente reglas de seguridad.</p>
+
+    <div id="templates-container">
+        <?php if (empty($reportTemplates)): ?>
+            <p class="small">No hay plantillas configuradas.</p>
+        <?php else: ?>
+        <table>
+            <thead><tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Tipo</th>
+                <th>Por defecto</th>
+                <th>Actualizada</th>
+                <th>Acciones</th>
+            </tr></thead>
+            <tbody>
+            <?php foreach ($reportTemplates as $tpl): ?>
+            <tr>
+                <td><?php echo $tpl['id']; ?></td>
+                <td><?php echo htmlspecialchars($tpl['name']); ?></td>
+                <td><?php echo htmlspecialchars($tpl['task_type']); ?></td>
+                <td><?php echo $tpl['is_default'] ? '⭐ Sí' : '—'; ?></td>
+                <td class="small"><?php echo htmlspecialchars($tpl['updated_at'] ?? $tpl['created_at']); ?></td>
+                <td>
+                    <div class="flex gap-1 flex-wrap">
+                        <button class="secondary small" onclick="editTemplate(<?php echo (int)$tpl['id']; ?>, <?php echo json_encode($tpl['name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>, <?php echo json_encode($tpl['content'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>, <?php echo (int)$tpl['is_default']; ?>, <?php echo json_encode($tpl['task_type'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>)">✏️ Editar</button>
+                        <button class="secondary small" onclick="previewTemplate(<?php echo json_encode($tpl['content'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>, <?php echo json_encode($tpl['name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>)">👁️ Ver prompt</button>
+                        <button class="secondary small danger" onclick="deleteTemplate(<?php echo (int)$tpl['id']; ?>)">🗑️</button>
+                    </div>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php endif; ?>
+    </div>
+
+    <h4 class="mt-4"><?php echo isset($_GET['edit_template']) ? '✏️ Editar plantilla' : '➕ Crear plantilla'; ?></h4>
+    <form id="template-form" onsubmit="return saveTemplate(this);" class="flex gap-1 flex-wrap items-end">
+        <?php echo csrfInput(); ?>
+        <input type="hidden" name="id" id="tpl-id" value="">
+        <div style="flex:1;min-width:250px;">
+            <label class="small">Nombre</label>
+            <input type="text" name="name" id="tpl-name" placeholder="Ej: Informe ejecutivo" required maxlength="100" style="width:100%;">
+        </div>
+        <div>
+            <label class="small">Tipo de tarea</label>
+            <select name="task_type" id="tpl-task-type">
+                <option value="cve_search">CVE Search</option>
+            </select>
+        </div>
+        <div>
+            <label class="small">Por defecto</label>
+            <input type="checkbox" name="is_default" id="tpl-is-default" value="1">
+        </div>
+        <button type="submit">💾 Guardar</button>
+        <button type="button" class="secondary" onclick="resetTemplateForm()">↩️ Nuevo</button>
+    </form>
+    <label class="small mt-2" style="display:block;">Contenido (Markdown / texto plano)</label>
+    <textarea name="content" id="tpl-content" rows="12" placeholder="Escribe aquí la plantilla. Usa markdown para estructurar el informe." required style="width:100%;font-family:var(--font-mono);font-size:.9rem;margin-top:.25rem;"></textarea>
+    <p class="small mt-1" style="color:var(--text-muted);">💡 Al guardar, el sistema añadirá automáticamente las reglas de seguridad (no inventar datos, concisión, etc.). Usa el botón 👁️ para ver el prompt completo.</p>
+    <p id="tpl-msg" class="small mt-1"></p>
+
+    <!-- Modal preview -->
+    <div id="tpl-preview-modal" class="hidden" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:1000;display:flex;align-items:center;justify-content:center;">
+        <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;width:90%;max-width:800px;max-height:80vh;overflow:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                <h3 id="tpl-preview-title" style="margin:0;">Prompt completo</h3>
+                <button type="button" class="secondary small" onclick="closeTplPreview()">✕ Cerrar</button>
+            </div>
+            <pre id="tpl-preview-body" style="background:var(--surface);padding:1rem;border-radius:6px;font-size:.85rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;"></pre>
+        </div>
+    </div>
+
+    <script>
+    const TPL_SYSTEM_RULES = "\n\n---\nREGLAS DEL SISTEMA (no omitir):\n" +
+        "1. No inventes versiones de parche, fechas ni detalles de vendor.\n" +
+        "2. No repitas datos que ya aparecen en los metadatos (CVSS, EPSS, CISA KEV).\n" +
+        "3. Usa [INFERIDO] solo para consecuencias lógicas obvias.\n" +
+        "4. Sé conciso: máximo 300 palabras en total.\n" +
+        "5. Responde en español.\n" +
+        "6. Los datos estructurados de la vulnerabilidad se proporcionan en el mensaje del usuario.";
+
+    function previewTemplate(content, name) {
+        document.getElementById('tpl-preview-title').textContent = 'Prompt completo — ' + name;
+        document.getElementById('tpl-preview-body').textContent = content + TPL_SYSTEM_RULES;
+        document.getElementById('tpl-preview-modal').style.display = 'flex';
+    }
+    function closeTplPreview() {
+        document.getElementById('tpl-preview-modal').style.display = 'none';
+    }
+    document.getElementById('tpl-preview-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeTplPreview();
+    });
+
+    function editTemplate(id, name, content, isDefault, taskType) {
+        document.getElementById('tpl-id').value = id;
+        document.getElementById('tpl-name').value = name;
+        document.getElementById('tpl-content').value = content;
+        document.getElementById('tpl-is-default').checked = isDefault ? true : false;
+        document.getElementById('tpl-task-type').value = taskType;
+        document.getElementById('tpl-msg').textContent = '';
+        document.getElementById('tpl-content').focus();
+    }
+    function resetTemplateForm() {
+        document.getElementById('tpl-id').value = '';
+        document.getElementById('tpl-name').value = '';
+        document.getElementById('tpl-content').value = '';
+        document.getElementById('tpl-is-default').checked = false;
+        document.getElementById('tpl-task-type').value = 'cve_search';
+        document.getElementById('tpl-msg').textContent = '';
+    }
+    async function saveTemplate(form) {
+        event.preventDefault();
+        const msg = document.getElementById('tpl-msg');
+        const fd = new FormData(form);
+        fd.append('content', document.getElementById('tpl-content').value);
+        try {
+            const data = await apiFetch('ajax_admin.php?action=save_report_template', {
+                method: 'POST',
+                body: JSON.stringify(Object.fromEntries(fd))
+            });
+            msg.style.color = '#2e7d32';
+            msg.textContent = 'Plantilla guardada.';
+            setTimeout(() => location.reload(), 600);
+        } catch (err) {
+            msg.style.color = '#c62828';
+            msg.textContent = err.message;
+        }
+        return false;
+    }
+    async function deleteTemplate(id) {
+        if (!confirm('¿Eliminar esta plantilla? No se puede deshacer.')) return;
+        try {
+            await apiFetch('ajax_admin.php?action=delete_report_template', {
+                method: 'POST',
+                body: JSON.stringify({id: id})
+            });
+            location.reload();
+        } catch (err) {
+            alert('❌ ' + err.message);
+        }
+    }
     </script>
 
     <?php else: ?>
