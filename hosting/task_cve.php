@@ -278,7 +278,7 @@ require __DIR__ . '/templates/header.php';
     <?php if (empty($cveHistory)): ?>
         <p class="small">No hay búsquedas todavía.</p>
     <?php else: ?>
-        <table>
+        <table id="cve-history-table">
             <thead>
                 <tr>
                     <th>ID</th>

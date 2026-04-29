@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.10.15] — 2026-04-28
+
+### Fixed
+- **Historial CVE se actualiza en tiempo real (fix timing)**: `polling.js` ahora usa `requestAnimationFrame` para esperar a que el DOM del historial esté listo antes de intentar actualizar la fila. La tabla del historial tiene ahora `id="cve-history-table"` para selección precisa sin depender de `document.querySelector('table')`.
+
 ## [v0.10.14] — 2026-04-28
 
 ### Fixed

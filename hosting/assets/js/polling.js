@@ -101,10 +101,13 @@
     }
 
     function updateHistoryRow(status, executedBy) {
-        const row = document.querySelector('table tbody tr td:first-child');
-        if (!row) return;
-        // Buscar la fila que coincide con el taskId
-        const rows = document.querySelectorAll('table tbody tr');
+        const table = document.getElementById('cve-history-table');
+        if (!table) {
+            // El DOM del historial puede no estar listo todavía; reintentar en el siguiente frame
+            requestAnimationFrame(function() { updateHistoryRow(status, executedBy); });
+            return;
+        }
+        const rows = table.querySelectorAll('tbody tr');
         for (const r of rows) {
             const idCell = r.querySelector('td:first-child');
             if (idCell && idCell.textContent.trim() === '#' + taskId) {
