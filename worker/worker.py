@@ -696,6 +696,8 @@ def main(config_path: Optional[str] = None) -> None:
                         task_id,
                         result_html=result.get("result_html", ""),
                         result_text=result.get("result_text", ""),
+                        cvss_score=result.get("cvss_score"),
+                        severity=result.get("severity"),
                     )
                     logger.info("Tarea %s completada en %.1fs", task_id, elapsed)
 

@@ -90,6 +90,13 @@ switch ($action) {
             'result_html' => $html,
             'result_text' => $data['result_text'] ?? null,
         ];
+
+        if (isset($data['cvss_score']) && is_numeric($data['cvss_score'])) {
+            $updateData['cvss_base_score'] = (float)$data['cvss_score'];
+        }
+        if (isset($data['severity']) && is_string($data['severity'])) {
+            $updateData['cvss_severity'] = strtoupper($data['severity']);
+        }
         
         if (isset($data['error_message']) && is_string($data['error_message'])) {
             $updateData['status'] = 'error';

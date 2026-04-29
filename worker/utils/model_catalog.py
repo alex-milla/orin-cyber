@@ -140,6 +140,8 @@ def scan_and_update_catalog(
     for fname in sorted(os.listdir(models_dir)):
         if not fname.lower().endswith(".gguf"):
             continue
+        if "mmproj" in fname.lower():
+            continue
         path = os.path.join(models_dir, fname)
         mtime = os.path.getmtime(path)
         current_files.add(fname)

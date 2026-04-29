@@ -752,6 +752,23 @@ pre {
     .tools-grid { grid-template-columns: 1fr; }
 }
 
+/* ---------- CVSS Badge ---------- */
+.cvss-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: #fff;
+    background: #6c757d;
+    white-space: nowrap;
+}
+.cvss-badge.sev-low      { background: #4caf50; }
+.cvss-badge.sev-medium   { background: #ff9800; }
+.cvss-badge.sev-high     { background: #f44336; }
+.cvss-badge.sev-critical { background: #b71c1c; }
+.cvss-badge.sev-none     { background: #6c757d; color: #eee; }
+
 /* ---------- CVE Report ---------- */
 .cve-report {
     line-height: 1.7;

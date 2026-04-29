@@ -1,5 +1,69 @@
 # Changelog
 
+## [v0.10.28] — 2026-04-29
+
+### Fixed
+- **Tareas cloud quedaban atascadas en `pending`**: el procesamiento dependía de
+  `polling.js`, que sólo se carga en la página de espera. Añadido
+  `virtual_worker_pulse.js` que dispara `ajax_virtual_worker.php` cada 15s desde
+  cualquier página autenticada.
+- **Historial CVE no refrescaba tras completarse**: añadido polling ligero (5s)
+  sobre filas en estado `pending`/`processing` en `task_cve.php`.
+
+### Added
+- **Exportación a Markdown y Word**: nuevo endpoint `export_cve.php?format=md|docx`
+  con botones en `task_result.php`. El `.docx` se genera con `ZipArchive` sin
+  dependencias externas.
+- **Filtro de búsqueda en historial CVE**: input encima de la tabla con filtrado
+  client-side instantáneo por cualquier campo visible.
+- **Columna "Score" en historial CVE**: muestra CVSS Base Score con badge de
+  color según severidad (Low/Medium/High/Critical). Persistido en nuevas
+  columnas `tasks.cvss_base_score` y `tasks.cvss_severity`.
+
+## [v0.10.27] — 2026-04-29
+
+### Changed
+- **Múltiples CVEs crean tareas individuales**: `task_cve.php` ahora genera una tarea independiente en la cola por cada CVE introducido, en lugar de una sola tarea con `cve_list`. El worker las procesa de 1 en 1. El historial muestra cada CVE como una entrada separada.
+
+## [v0.10.26] — 2026-04-29
+
+### Changed
+- **Procesamiento de CVEs múltiples en cola**: `cve_search.py` ahora procesa cada CVE **individualmente** (uno tras otro) en lugar de en modo batch. Cada CVE recibe análisis del LLM propio. Los resultados se combinan en un único informe HTML con separadores.
+
+## [v0.10.25] — 2026-04-29
+
+### Fixed
+- **Release packaging corregido**: asegura que todos los archivos modificados (`admin.php`, `monitoring.py`, `model_catalog.py`, `db.php`, `config.ini`) se incluyen correctamente en los zips.
+
+## [v0.10.24] — 2026-04-29
+
+### Fixed
+- **Dropdown de modelos en admin**: ahora muestra correctamente el nombre del archivo sin `.gguf` (ej. `Qwen3.5-4B-Q4_K_M`) en lugar del label amigable. El label se mantiene como tooltip.
+- **Rebuild completo de model_catalog**: migración que limpia todos los patrones viejos conflictivos (`*qwen*4*`, `*gemma*2*`, etc.) y deja solo los específicos.
+
+## [v0.10.23] — 2026-04-29
+
+### Added
+- **Dropdown de modelos muestra nombres de archivo**: el selector de cambio de modelo en `admin.php` ahora muestra el nombre completo del archivo sin `.gguf` (ej. `Qwen3.5-4B-Q4_K_M`) en lugar del label amigable, permitiendo diferenciar modelos con labels idénticos.
+- **Filtrado por tamaño en worker**: `monitoring.py` ignora archivos `.gguf` menores a 500 MB, descartando mmproj corruptos o shards parciales.
+
+### Fixed
+- **Patrones de model_catalog más específicos**: eliminados globs laxos (`*qwen*4*`, `*gemma*2*`, etc.) que causaban falsos positivos. Ahora se usan patrones con versión y quant (`*qwen3.5*4b*`, `*gemma*4b*`, etc.).
+- **Filtrado de mmproj en catálogo**: `model_catalog.py` también excluye archivos que contienen `mmproj`.
+
+## [v0.10.22] — 2026-04-27
+
+### Added
+- **Catálogo de modelos actualizado**: nuevos patrones para Gemma 4B, Granite 8B, MiMo-VL 7B y Nemotron 4B en `model_catalog`.
+- **Nombres legibles en toda la UI**: `admin.php` y `task_cve.php` ahora muestran etiquetas amigables (ej. "DeepSeek 7B (medium)") en lugar del nombre crudo del archivo `.gguf`.
+
+### Fixed
+- **`mmproj` excluido de listados**: `monitoring.py` y `model_catalog.py` filtran archivos con `mmproj` en el nombre, evitando que aparezcan como modelos disponibles en el admin.
+- **Configuración conservadora para 9 modelos**: `config.ini` regenerado con parámetros ajustados por tamaño de modelo (contexto, `-ngl`, flash attention) para evitar OOM en Jetson Orin Nano 8GB.
+
+### Changed
+- **Modelo por defecto**: ahora es `NVIDIA-Nemotron3-Nano-4B-Q4_K_M.gguf` (más ligero y estable para arranque).
+
 ## [v0.10.21] — 2026-04-29
 
 ### Fixed

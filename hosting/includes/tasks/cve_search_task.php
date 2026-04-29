@@ -32,8 +32,10 @@ class CveSearchTaskPhp {
         $html = $this->renderHtml($enriched, $report);
 
         return [
-            'result_html' => $html,
-            'result_text' => $report,
+            'result_html'     => $html,
+            'result_text'     => $report,
+            'cvss_base_score' => $enriched['cvss_score'],
+            'cvss_severity'   => $enriched['severity'],
         ];
     }
 

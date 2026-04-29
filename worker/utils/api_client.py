@@ -66,16 +66,21 @@ class ApiClient:
         except requests.RequestException:
             return False
 
-    def send_result(self, task_id: int, result_html: str, result_text: str) -> bool:
+    def send_result(self, task_id: int, result_html: str, result_text: str, cvss_score: float | None = None, severity: str | None = None) -> bool:
         """Envía el resultado de una tarea completada."""
         try:
+            payload = {
+                "task_id": task_id,
+                "result_html": result_html,
+                "result_text": result_text,
+            }
+            if cvss_score is not None:
+                payload["cvss_score"] = cvss_score
+            if severity:
+                payload["severity"] = severity
             data = self._request(
                 "POST", "/api/v1/tasks.php?action=result",
-                json={
-                    "task_id": task_id,
-                    "result_html": result_html,
-                    "result_text": result_text,
-                }
+                json=payload
             )
             return data is not None and data.get("success", False)
         except requests.RequestException:

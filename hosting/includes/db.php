@@ -152,13 +152,17 @@ class Database {
         $db->exec("CREATE INDEX IF NOT EXISTS idx_modelcatalog_pattern ON model_catalog(pattern)");
 
         // Inserts iniciales (idempotentes: IGNORE en UNIQUE conflict)
+        // Los patrones usan el nombre de archivo GGUF para evitar falsos positivos.
         $defaults = [
-            ['*qwen*4*', 'Qwen 4B', 'small'],
-            ['*qwen*9*', 'Qwen 9B', 'large'],
+            ['*qwen3.5*4b*', 'Qwen 4B', 'small'],
+            ['*qwen3.5*9b*', 'Qwen 9B', 'large'],
             ['*phi*4*', 'Phi-4', 'small'],
-            ['*gemma*2*', 'Gemma 2B', 'small'],
+            ['*gemma*4b*', 'Gemma 4B', 'small'],
             ['*glm*', 'GLM-4.6V', 'large'],
-            ['*deepseek*7*', 'DeepSeek 7B', 'medium'],
+            ['*deepseek*7b*', 'DeepSeek 7B', 'medium'],
+            ['*granite*8b*', 'Granite 8B', 'medium'],
+            ['*mimo*7b*', 'MiMo-VL 7B', 'large'],
+            ['*nemotron*4b*', 'Nemotron 4B', 'small'],
         ];
         $stmt = $db->prepare("INSERT OR IGNORE INTO model_catalog (pattern, label, tier) VALUES (?, ?, ?)");
         foreach ($defaults as $row) {
@@ -242,6 +246,8 @@ class Database {
         self::_addColumnIfNotExists('worker_heartbeats', 'recent_logs', 'TEXT');
         self::_addColumnIfNotExists('users', 'monthly_external_budget_usd', 'REAL DEFAULT 5.0');
         self::_addColumnIfNotExists('external_models', 'tags', 'TEXT');
+        self::_addColumnIfNotExists('tasks', 'cvss_base_score', 'REAL');
+        self::_addColumnIfNotExists('tasks', 'cvss_severity', 'TEXT');
     }
 
     private static function _addColumnIfNotExists(string $table, string $column, string $type): void {

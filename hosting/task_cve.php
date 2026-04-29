@@ -41,16 +41,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (empty($cveList) && !$product) {
             $error = 'Introduce al menos un CVE ID o un producto/software.';
         } else {
-            $input = json_encode([
-                'cve_id' => $cveId,
-                'cve_list' => $cveList,
-                'product' => $product,
-                'version' => $version,
-                'year' => $year,
-                'severity' => $severity,
-                'max_results' => $maxResults
-            ], JSON_UNESCAPED_UNICODE);
-            
             // Leer ejecutor por defecto desde config
             $execConfig = Database::fetchOne("SELECT value FROM config WHERE key = 'default_task_executor'");
             $assignment = $execConfig['value'] ?? 'worker';
@@ -60,16 +50,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $assignment = 'worker';
             }
 
-            $newTaskId = Database::insert('tasks', [
-                'task_type' => 'cve_search',
-                'input_data' => $input,
-                'status' => 'pending',
-                'assignment' => $assignment
-            ]);
-            
+            // Si hay múltiples CVEs, crear una tarea por cada uno (cola individual)
+            $createdIds = [];
+            if (count($cveList) > 1) {
+                foreach ($cveList as $cid) {
+                    $input = json_encode([
+                        'cve_id' => $cid,
+                        'cve_list' => [],
+                        'product' => '',
+                        'version' => $version,
+                        'year' => $year,
+                        'severity' => $severity,
+                        'max_results' => 1
+                    ], JSON_UNESCAPED_UNICODE);
+                    $tid = Database::insert('tasks', [
+                        'task_type' => 'cve_search',
+                        'input_data' => $input,
+                        'status' => 'pending',
+                        'assignment' => $assignment
+                    ]);
+                    if ($tid) {
+                        $createdIds[] = $tid;
+                    }
+                }
+            } else {
+                // Modo single o búsqueda por producto
+                $input = json_encode([
+                    'cve_id' => $cveId,
+                    'cve_list' => $cveList,
+                    'product' => $product,
+                    'version' => $version,
+                    'year' => $year,
+                    'severity' => $severity,
+                    'max_results' => $maxResults
+                ], JSON_UNESCAPED_UNICODE);
+                $tid = Database::insert('tasks', [
+                    'task_type' => 'cve_search',
+                    'input_data' => $input,
+                    'status' => 'pending',
+                    'assignment' => $assignment
+                ]);
+                if ($tid) {
+                    $createdIds[] = $tid;
+                }
+            }
+
             // PRG pattern: redirect to avoid duplicate task on refresh
-            if ($newTaskId) {
-                $_SESSION['last_task_id'] = $newTaskId;
+            if (!empty($createdIds)) {
+                $_SESSION['last_task_ids'] = $createdIds;
+                if (count($createdIds) === 1) {
+                    $_SESSION['last_task_id'] = $createdIds[0];
+                }
                 header('Location: task_cve.php');
                 exit;
             }
@@ -77,7 +108,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Restore task ID from PRG redirect
+// Restore task ID(s) from PRG redirect
+$taskId = null;
+$taskIds = [];
+if (isset($_SESSION['last_task_ids'])) {
+    $taskIds = $_SESSION['last_task_ids'];
+    unset($_SESSION['last_task_ids']);
+    if (count($taskIds) === 1) {
+        $taskId = $taskIds[0];
+    }
+}
 if (isset($_SESSION['last_task_id'])) {
     $taskId = $_SESSION['last_task_id'];
     unset($_SESSION['last_task_id']);
@@ -97,11 +137,31 @@ try {
     $workerOnline = false;
 }
 
+// Catálogo de modelos para etiquetas legibles
+$modelCatalog = [];
+try {
+    $modelCatalog = Database::fetchAll("SELECT pattern, label, tier FROM model_catalog ORDER BY id");
+} catch (Throwable $e) {
+    $modelCatalog = [];
+}
+
+function resolveModelLabel(string $filename, array $catalog): string {
+    foreach ($catalog as $entry) {
+        $pattern = str_replace(['*', '?'], ['.*', '.'], $entry['pattern']);
+        $pattern = '/^' . str_replace('/', '\/', $pattern) . '$/i';
+        if (preg_match($pattern, $filename)) {
+            return $entry['label'] . ($entry['tier'] ? ' (' . $entry['tier'] . ')' : '');
+        }
+    }
+    return $filename;
+}
+$modelDisplayName = $worker ? resolveModelLabel($worker['model_loaded'] ?? '', $modelCatalog) : '—';
+
 // --- CVE search history ---
 $cveHistory = [];
 try {
     $cveHistory = Database::fetchAll(
-        "SELECT id, status, created_at, executed_by, input_data FROM tasks WHERE task_type='cve_search' ORDER BY created_at DESC LIMIT 20"
+        "SELECT id, status, created_at, executed_by, input_data, cvss_base_score, cvss_severity FROM tasks WHERE task_type='cve_search' ORDER BY created_at DESC LIMIT 20"
     );
 } catch (Exception $e) {
     $cveHistory = [];
@@ -166,6 +226,16 @@ require __DIR__ . '/templates/header.php';
             </div>
         </div>
         <script src="assets/js/polling.js"></script>
+    <?php elseif (!empty($taskIds)): ?>
+        <div class="alert alert-success">
+            <p><strong><?php echo count($taskIds); ?></strong> tareas individuales creadas (una por CVE):</p>
+            <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.5rem;">
+                <?php foreach ($taskIds as $tid): ?>
+                    <a href="task_result.php?id=<?php echo (int)$tid; ?>"><button class="secondary small">#<?php echo (int)$tid; ?></button></a>
+                <?php endforeach; ?>
+            </div>
+            <p class="small mt-1">Se procesarán de 1 en 1 en la cola del worker. Refresca el historial para ver el progreso.</p>
+        </div>
     <?php else: ?>
         <?php if ($error): ?>
             <p class="alert alert-error"><?php echo htmlspecialchars($error); ?></p>
@@ -250,7 +320,7 @@ require __DIR__ . '/templates/header.php';
                 </div>
                 <div class="metric">
                     <div class="metric-label">Modelo</div>
-                    <div><?php echo htmlspecialchars($worker['model_loaded'] ?? '—'); ?></div>
+                    <div><?php echo htmlspecialchars($modelDisplayName); ?></div>
                 </div>
                 <div class="metric">
                     <div class="metric-label">CPU</div>
@@ -278,12 +348,16 @@ require __DIR__ . '/templates/header.php';
     <?php if (empty($cveHistory)): ?>
         <p class="small">No hay búsquedas todavía.</p>
     <?php else: ?>
+        <input type="search" id="cve-history-filter"
+               placeholder="🔎 Filtrar por CVE ID, producto, ejecutor..."
+               style="width:100%;max-width:480px;margin-bottom:.75rem;">
         <table id="cve-history-table">
             <thead>
                 <tr>
                     <th>ID</th>
                     <th>Consulta</th>
                     <th>Estado</th>
+                    <th>Score</th>
                     <th>Ejecutor</th>
                     <th>Creado</th>
                     <th>Acción</th>
@@ -302,16 +376,33 @@ require __DIR__ . '/templates/header.php';
                 } else {
                     $queryLabel = '—';
                 }
+
+                $score = $t['cvss_base_score'];
+                $sev   = $t['cvss_severity'] ?? '';
+                if ($score !== null) {
+                    $sevClass = 'sev-' . strtolower($sev ?: 'none');
+                    $scoreCell = '<span class="cvss-badge ' . $sevClass . '">'
+                               . number_format((float)$score, 1)
+                               . ($sev ? ' ' . htmlspecialchars(ucfirst(strtolower($sev))) : '')
+                               . '</span>';
+                } else {
+                    $scoreCell = '<span class="small">—</span>';
+                }
             ?>
                 <tr>
                     <td>#<?php echo $t['id']; ?></td>
                     <td class="small"><?php echo htmlspecialchars($queryLabel); ?></td>
                     <td class="status-<?php echo $t['status']; ?>"><?php echo ucfirst(htmlspecialchars($t['status'])); ?></td>
+                    <td><?php echo $scoreCell; ?></td>
                     <td class="small"><?php echo htmlspecialchars($t['executed_by'] ?? '—'); ?></td>
                     <td class="small"><?php echo htmlspecialchars($t['created_at']); ?></td>
                     <td>
                         <?php if ($t['status'] === 'completed' || $t['status'] === 'error' || $t['status'] === 'cancelled'): ?>
                             <a href="task_result.php?id=<?php echo $t['id']; ?>">Ver</a>
+                            <?php if ($t['status'] === 'completed'): ?>
+                                · <a href="export_cve.php?id=<?php echo $t['id']; ?>&format=md" title="Descargar Markdown">MD</a>
+                                · <a href="export_cve.php?id=<?php echo $t['id']; ?>&format=docx" title="Descargar Word">DOC</a>
+                            <?php endif; ?>
                         <?php else: ?>
                             <button type="button" class="btn small danger" onclick="cancelTask(<?php echo $t['id']; ?>, '<?php echo $_SESSION['csrf_token']; ?>')">Cancelar</button>
                         <?php endif; ?>
@@ -422,6 +513,21 @@ function cancelTask(taskId, csrfToken) {
 
     setInterval(tick, POLL_MS);
     setTimeout(tick, 1500);
+})();
+
+// Filtro client-side del historial CVE
+(function() {
+    const input = document.getElementById('cve-history-filter');
+    const table = document.getElementById('cve-history-table');
+    if (!input || !table) return;
+
+    input.addEventListener('input', () => {
+        const q = input.value.trim().toLowerCase();
+        table.querySelectorAll('tbody tr').forEach(tr => {
+            const text = tr.textContent.toLowerCase();
+            tr.style.display = (q === '' || text.includes(q)) ? '' : 'none';
+        });
+    });
 })();
 </script>
 <?php require __DIR__ . '/templates/footer.php'; ?>

@@ -52,6 +52,17 @@ try {
     $modelCatalog = [];
 }
 
+function resolveModelLabel(string $filename, array $catalog): string {
+    foreach ($catalog as $entry) {
+        $pattern = str_replace(['*', '?'], ['.*', '.'], $entry['pattern']);
+        $pattern = '/^' . str_replace('/', '\/', $pattern) . '$/i';
+        if (preg_match($pattern, $filename)) {
+            return $entry['label'] . ($entry['tier'] ? ' (' . $entry['tier'] . ')' : '');
+        }
+    }
+    return $filename;
+}
+
 try {
     $workers = Database::fetchAll(
         "SELECT h.*, k.name as worker_name, k.api_key,
@@ -220,7 +231,7 @@ require __DIR__ . '/templates/header.php';
             <td><?php echo htmlspecialchars($gpuText); ?></td>
             <td><?php echo $w['temperature_c'] !== null ? round($w['temperature_c'], 1) . '°C' : '—'; ?></td>
             <td><?php echo $w['disk_percent'] !== null ? round($w['disk_percent'], 1) . '%' : '—'; ?></td>
-            <td id="model-cell-<?php echo (int)$w['api_key_id']; ?>"><code><?php echo htmlspecialchars($w['model_loaded'] ?? '—'); ?></code></td>
+            <td id="model-cell-<?php echo (int)$w['api_key_id']; ?>"><code><?php echo htmlspecialchars(resolveModelLabel($w['model_loaded'] ?? '', $modelCatalog) ?: '—'); ?></code></td>
             <td><?php echo htmlspecialchars($uptime); ?></td>
             <td class="small"><?php echo htmlspecialchars($w['created_at']); ?></td>
             <td><button type="button" class="btn secondary small" onclick="toggleWorkerLogs(<?php echo (int)$w['api_key_id']; ?>)">📜</button></td>
@@ -353,9 +364,12 @@ require __DIR__ . '/templates/header.php';
             return;
         }
         models.forEach(function(m) {
+            const label = resolveModelLabel(m);
+            const displayName = m.replace(/\.gguf$/i, '');
             const opt = document.createElement('option');
             opt.value = m;
-            opt.textContent = resolveModelLabel(m);
+            opt.textContent = displayName;
+            opt.title = label; // tooltip con el nombre amigable
             modelSelect.appendChild(opt);
         });
         hint.textContent = models.length + ' modelo(s) disponible(s) en este worker.';

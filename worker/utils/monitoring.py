@@ -120,15 +120,28 @@ def _safe_boot_time() -> float:
 
 
 def get_available_models(models_dir: str) -> list[str]:
-    """Lista archivos .gguf en el directorio de modelos."""
+    """Lista archivos .gguf en el directorio de modelos.
+
+    Filtra mmproj y archivos auxiliares pequeños (< 500 MB).
+    """
     try:
         if not os.path.isdir(models_dir):
             return []
-        files = sorted(
-            f for f in os.listdir(models_dir)
-            if f.endswith(".gguf") and os.path.isfile(os.path.join(models_dir, f))
-        )
-        return files
+        files = []
+        for f in os.listdir(models_dir):
+            if not f.endswith(".gguf"):
+                continue
+            if "mmproj" in f.lower():
+                continue
+            path = os.path.join(models_dir, f)
+            if not os.path.isfile(path):
+                continue
+            # Ignorar archivos auxiliares pequeños (mmproj, shards parciales, etc.)
+            size_mb = os.path.getsize(path) / (1024 * 1024)
+            if size_mb < 500:
+                continue
+            files.append(f)
+        return sorted(files)
     except Exception as exc:
         logger.debug("Failed to list models: %s", exc)
         return []

@@ -58,6 +58,12 @@ require __DIR__ . '/templates/header.php';
         </div>
         <div class="actions">
             <button onclick="copyText()">📋 Copiar texto plano</button>
+            <a href="export_cve.php?id=<?php echo $taskId; ?>&format=md">
+                <button class="secondary" type="button">⬇️ Markdown</button>
+            </a>
+            <a href="export_cve.php?id=<?php echo $taskId; ?>&format=docx">
+                <button class="secondary" type="button">⬇️ Word (.docx)</button>
+            </a>
         </div>
         <textarea id="plain-text" class="visually-hidden"><?php echo htmlspecialchars($task['result_text'] ?? ''); ?></textarea>
     <?php endif; ?>

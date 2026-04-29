@@ -84,11 +84,13 @@ try {
     $html = ($result['result_html'] ?? '') . '<div class="cve-footer small" style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border);color:var(--text-muted);">🤖 Generado por: ' . htmlspecialchars($executedBy) . '</div>';
 
     Database::update('tasks', [
-        'status'       => 'completed',
-        'completed_at' => date('Y-m-d H:i:s'),
-        'result_html'  => $html,
-        'result_text'  => $result['result_text'] ?? '',
-        'executed_by'  => $executedBy,
+        'status'          => 'completed',
+        'completed_at'    => date('Y-m-d H:i:s'),
+        'result_html'     => $html,
+        'result_text'     => $result['result_text'] ?? '',
+        'executed_by'     => $executedBy,
+        'cvss_base_score' => $result['cvss_base_score'] ?? null,
+        'cvss_severity'   => $result['cvss_severity'] ?? null,
     ], 'id = ?', [$task['id']]);
 
     echo json_encode(['success' => true, 'processed' => 1, 'task_id' => $task['id']]);
@@ -121,11 +123,13 @@ try {
                 $html = ($result['result_html'] ?? '') . '<div class="cve-footer small" style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border);color:var(--text-muted);">🤖 Generado por: ' . htmlspecialchars($fallbackExecutedBy) . '</div>';
 
                 Database::update('tasks', [
-                    'status'       => 'completed',
-                    'completed_at' => date('Y-m-d H:i:s'),
-                    'result_html'  => $html,
-                    'result_text'  => $result['result_text'] ?? '',
-                    'executed_by'  => $fallbackExecutedBy,
+                    'status'          => 'completed',
+                    'completed_at'    => date('Y-m-d H:i:s'),
+                    'result_html'     => $html,
+                    'result_text'     => $result['result_text'] ?? '',
+                    'executed_by'     => $fallbackExecutedBy,
+                    'cvss_base_score' => $result['cvss_base_score'] ?? null,
+                    'cvss_severity'   => $result['cvss_severity'] ?? null,
                 ], 'id = ?', [$task['id']]);
 
                 echo json_encode(['success' => true, 'processed' => 1, 'task_id' => $task['id'], 'fallback' => true]);
