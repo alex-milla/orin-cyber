@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.10.17] — 2026-04-28
+
+### Fixed
+- **Tareas cloud ejecutaban en worker local (CRÍTICO)**: `validateInput()` en `task_cve.php` usaba el patrón por defecto `/^[\w\s\-.@:]+$/u` que **rechazaba la barra `/`** de los model IDs OpenRouter (ej: `deepseek/deepseek-r1:free`). Esto hacía que el assignment cayera siempre a `'worker'`, ignorando la selección del usuario. Ahora se valida con una regex específica: `/^provider:\d+:[\w\-.@:\/]+$/`.
+
 ## [v0.10.16] — 2026-04-28
 
 ### Added

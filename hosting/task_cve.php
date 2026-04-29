@@ -55,8 +55,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $execConfig = Database::fetchOne("SELECT value FROM config WHERE key = 'default_task_executor'");
             $assignment = $execConfig['value'] ?? 'worker';
 
-            $assignment = validateInput($_POST['executor'] ?? '', 255) ?: 'worker';
-            if ($assignment !== 'worker' && !str_starts_with($assignment, 'provider:')) {
+            $assignment = $_POST['executor'] ?? 'worker';
+            if ($assignment !== 'worker' && !preg_match('/^provider:\d+:[\w\-.@:\/]+$/', $assignment)) {
                 $assignment = 'worker';
             }
 
