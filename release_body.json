@@ -1,5 +1,5 @@
 {
-  "tag_name": "v0.10.27",
-  "name": "v0.10.27 - Multiple CVEs spawn individual queue tasks",
-  "body": "### Changed\n- **Múltiples CVEs crean tareas individuales**: `task_cve.php` ahora genera una tarea independiente en la cola por cada CVE introducido, en lugar de una sola tarea con `cve_list`. El worker las procesa de 1 en 1. El historial muestra cada CVE como una entrada separada."
+  "tag_name": "v0.10.38",
+  "name": "v0.10.38 — Catálogo NVIDIA NIM verificado contra API real",
+  "body": "### Fixed\n- **Catálogo NVIDIA NIM corregido con modelos verificados**: se reemplazaron los modelos que no existen en la API de NVIDIA NIM (`deepseek-ai/deepseek-r1`, `microsoft/phi-4`, `qwen/qwen2.5-72b-instruct`) por los IDs reales devueltos por la API (`deepseek-ai/deepseek-v3.2`, `deepseek-ai/deepseek-v4-pro`, `microsoft/phi-4-mini-instruct`, `qwen/qwen3-coder-480b-a35b-instruct`).\n\n### Added\n- **Validación real contra API de NVIDIA NIM**: el catálogo `models/nvidia-nim.json` ahora contiene únicamente modelos verificados mediante llamada real a `GET https://integrate.api.nvidia.com/v1/models`. Esto elimina los errores 404/410 por modelos inexistentes."
 }

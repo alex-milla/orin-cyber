@@ -228,6 +228,59 @@ switch ($action) {
         jsonResponse(['success' => true, 'imported' => $imported, 'skipped' => $skipped, 'errors' => $errors]);
         break;
 
+    case 'fetch_openrouter_models':
+        $data = getJsonInput();
+        $id = (int)($data['id'] ?? 0);
+        $filter = (string)($data['filter'] ?? 'all'); // 'all', 'free', 'paid'
+        if ($id <= 0) jsonResponse(['success' => false, 'error' => 'ID requerido'], 400);
+        $provider = Database::fetchOne(
+            "SELECT base_url, api_key_encrypted, timeout_seconds FROM external_providers WHERE id = ?",
+            [$id]
+        );
+        if (!$provider) jsonResponse(['success' => false, 'error' => 'Proveedor no encontrado'], 404);
+        $apiKey = decryptApiKey($provider['api_key_encrypted']);
+        $url = rtrim($provider['base_url'], '/') . '/models';
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => (int)$provider['timeout_seconds'],
+            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $apiKey],
+        ]);
+        $resp = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+        if ($resp === false) {
+            jsonResponse(['success' => false, 'error' => 'cURL: ' . $err]);
+        }
+        if ($code >= 400) {
+            jsonResponse(['success' => false, 'error' => 'HTTP ' . $code . ': ' . substr($resp, 0, 500)]);
+        }
+        $data = json_decode($resp, true);
+        $models = [];
+        $items = $data['data'] ?? [];
+        foreach ($items as $m) {
+            $modelId = $m['id'] ?? '';
+            $isFree = strpos($modelId, ':free') !== false;
+            if ($filter === 'free' && !$isFree) continue;
+            if ($filter === 'paid' && $isFree) continue;
+            $pricing = $m['pricing'] ?? [];
+            $promptPrice = isset($pricing['prompt']) ? (float)$pricing['prompt'] : null;
+            $completionPrice = isset($pricing['completion']) ? (float)$pricing['completion'] : null;
+            $context = (int)($m['context_length'] ?? 8192);
+            $models[] = [
+                'model_id' => $modelId,
+                'label' => $m['name'] ?? $modelId,
+                'context_window' => $context,
+                'cost_per_1k_input' => $promptPrice !== null ? round($promptPrice * 1000, 6) : null,
+                'cost_per_1k_output' => $completionPrice !== null ? round($completionPrice * 1000, 6) : null,
+                'is_active' => 1,
+                'tags' => $isFree ? ['free'] : [],
+            ];
+        }
+        jsonResponse(['success' => true, 'models' => $models, 'count' => count($models)]);
+        break;
+
     case 'usage_stats':
         $stats = Database::fetchAll(
             "SELECT p.label AS provider, m.label AS model,

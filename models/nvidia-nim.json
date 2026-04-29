@@ -1,0 +1,137 @@
+[
+  {
+    "model_id": "meta/llama-3.3-70b-instruct",
+    "label": "Llama 3.3 70B Instruct",
+    "context_window": 131072,
+    "cost_per_1k_input": null,
+    "cost_per_1k_output": null,
+    "is_active": 1,
+    "tags": ["recommended", "cybersecurity", "language generation"]
+  },
+  {
+    "model_id": "meta/llama-3.1-405b-instruct",
+    "label": "Llama 3.1 405B Instruct",
+    "context_window": 131072,
+    "cost_per_1k_input": null,
+    "cost_per_1k_output": null,
+    "is_active": 1,
+    "tags": ["recommended", "cybersecurity", "language generation"]
+  },
+  {
+    "model_id": "meta/llama-4-maverick-17b-128e-instruct",
+    "label": "Llama 4 Maverick 17B 128E Instruct",
+    "context_window": 131072,
+    "cost_per_1k_input": null,
+    "cost_per_1k_output": null,
+    "is_active": 1,
+    "tags": ["recommended", "cybersecurity", "language generation"]
+  },
+  {
+    "model_id": "nvidia/llama-3.1-nemotron-70b-instruct",
+    "label": "Llama 3.1 Nemotron 70B Instruct",
+    "context_window": 131072,
+    "cost_per_1k_input": null,
+    "cost_per_1k_output": null,
+    "is_active": 1,
+    "tags": ["recommended", "cybersecurity", "language generation"]
+  },
+  {
+    "model_id": "mistralai/mistral-large-3-675b-instruct-2512",
+    "label": "Mistral Large 3 675B Instruct",
+    "context_window": 131072,
+    "cost_per_1k_input": null,
+    "cost_per_1k_output": null,
+    "is_active": 1,
+    "tags": ["recommended", "cybersecurity", "language generation"]
+  },
+  {
+    "model_id": "mistralai/mistral-large",
+    "label": "Mistral Large",
+    "context_window": 131072,
+    "cost_per_1k_input": null,
+    "cost_per_1k_output": null,
+    "is_active": 1,
+    "tags": ["cybersecurity", "language generation"]
+  },
+  {
+    "model_id": "deepseek-ai/deepseek-v3.2",
+    "label": "DeepSeek V3.2",
+    "context_window": 131072,
+    "cost_per_1k_input": null,
+    "cost_per_1k_output": null,
+    "is_active": 1,
+    "tags": ["recommended", "cybersecurity", "reasoning", "language generation"]
+  },
+  {
+    "model_id": "deepseek-ai/deepseek-v4-pro",
+    "label": "DeepSeek V4 Pro",
+    "context_window": 131072,
+    "cost_per_1k_input": null,
+    "cost_per_1k_output": null,
+    "is_active": 1,
+    "tags": ["recommended", "cybersecurity", "reasoning", "language generation"]
+  },
+  {
+    "model_id": "microsoft/phi-4-mini-instruct",
+    "label": "Phi 4 Mini Instruct",
+    "context_window": 131072,
+    "cost_per_1k_input": null,
+    "cost_per_1k_output": null,
+    "is_active": 1,
+    "tags": ["cybersecurity", "language generation"]
+  },
+  {
+    "model_id": "microsoft/phi-4-multimodal-instruct",
+    "label": "Phi 4 Multimodal Instruct",
+    "context_window": 131072,
+    "cost_per_1k_input": null,
+    "cost_per_1k_output": null,
+    "is_active": 1,
+    "tags": ["cybersecurity", "language generation"]
+  },
+  {
+    "model_id": "google/gemma-3-27b-it",
+    "label": "Gemma 3 27B IT",
+    "context_window": 8192,
+    "cost_per_1k_input": null,
+    "cost_per_1k_output": null,
+    "is_active": 1,
+    "tags": ["cybersecurity", "language generation"]
+  },
+  {
+    "model_id": "qwen/qwen3-coder-480b-a35b-instruct",
+    "label": "Qwen3 Coder 480B A35B Instruct",
+    "context_window": 131072,
+    "cost_per_1k_input": null,
+    "cost_per_1k_output": null,
+    "is_active": 1,
+    "tags": ["recommended", "cybersecurity", "language generation"]
+  },
+  {
+    "model_id": "mistralai/mixtral-8x22b-instruct-v0.1",
+    "label": "Mixtral 8x22B Instruct",
+    "context_window": 65536,
+    "cost_per_1k_input": null,
+    "cost_per_1k_output": null,
+    "is_active": 1,
+    "tags": ["cybersecurity", "language generation"]
+  },
+  {
+    "model_id": "nvidia/nemotron-4-340b-instruct",
+    "label": "Nemotron 4 340B Instruct",
+    "context_window": 131072,
+    "cost_per_1k_input": null,
+    "cost_per_1k_output": null,
+    "is_active": 1,
+    "tags": ["recommended", "cybersecurity", "language generation"]
+  },
+  {
+    "model_id": "moonshotai/kimi-k2.5",
+    "label": "Kimi K2.5",
+    "context_window": 262144,
+    "cost_per_1k_input": null,
+    "cost_per_1k_output": null,
+    "is_active": 1,
+    "tags": ["cybersecurity", "language generation"]
+  }
+]

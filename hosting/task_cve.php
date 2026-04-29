@@ -258,7 +258,7 @@ require __DIR__ . '/templates/header.php';
                 </div>
             </div>
         </div>
-        <script src="assets/js/polling.js"></script>
+        <script src="assets/js/polling.js?v=2"></script>
     <?php elseif (!empty($taskIds)): ?>
         <div class="alert alert-success">
             <p><strong><?php echo count($taskIds); ?></strong> tareas individuales creadas (una por CVE):</p>

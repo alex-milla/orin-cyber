@@ -1,0 +1,7 @@
+{
+  "tag_name": "v0.10.34",
+  "name": "v0.10.34 — Plantilla box-drawing como default",
+  "body": "## [v0.10.34] — 2026-04-29\n\n### Fixed\n- **Plantilla box-drawing no se aplicaba por defecto**: la plantilla 'Informe tipo ASCII / Box-drawing' tenía `is_default = 0` y no había otra plantilla por defecto. Al crear una tarea sin seleccionar explícitamente una plantilla, `input_data` quedaba sin campo `template`. Esto provocaba que el Worker Local usara su formato estructurado nativo (Vulnerability Information, OSV.dev, EPSS, etc.) y el Virtual Worker usara su prompt por defecto (`CONTEXTO` / `IMPACTO` / `RECOMENDACIONES` / `NOTAS`). Ahora la plantilla box-drawing es la por defecto (`is_default = 1`).\n\n### Changed\n- **`db.php`**: en nuevas instalaciones, la plantilla por defecto se lee del archivo `plantilla-cve-boxdrawing.md` en lugar de la plantilla simple markdown anterior.",
+  "draft": false,
+  "prerelease": false
+}

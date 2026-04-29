@@ -20,8 +20,9 @@
 
     async function pollVirtualWorker() {
         try {
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
             const csrfInput = document.querySelector('input[name="csrf_token"]');
-            const csrf = csrfInput ? csrfInput.value : '';
+            const csrf = csrfMeta ? (csrfMeta.getAttribute('content') || '') : (csrfInput ? csrfInput.value : '');
             const res = await fetch('ajax_virtual_worker.php', {
                 method: 'POST',
                 headers: {

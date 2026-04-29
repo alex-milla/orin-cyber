@@ -3,12 +3,23 @@
  * para procesar tareas cloud pendientes sin depender de cron.
  */
 (function() {
-    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-    if (!csrfMeta) return;
-    const csrf = csrfMeta.getAttribute('content');
-    if (!csrf) return;
-
+    let csrf = '';
     const PULSE_INTERVAL = 15000; // 15s
+
+    function init() {
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        if (!csrfMeta) return;
+        csrf = csrfMeta.getAttribute('content') || '';
+        if (!csrf) return;
+        pulse();
+        setInterval(pulse, PULSE_INTERVAL);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 
     async function pulse() {
         try {
@@ -31,6 +42,4 @@
         }
     }
 
-    pulse();
-    setInterval(pulse, PULSE_INTERVAL);
 })();

@@ -576,6 +576,37 @@ require __DIR__ . '/templates/header.php';
     </form>
     <p id="model-msg" class="small mt-1"></p>
 
+    <h4 class="mt-4">🔄 Importar modelos desde OpenRouter</h4>
+    <p class="small">Conecta directamente con la API de OpenRouter, lista todos los modelos disponibles (free y/o de pago) y los importa masivamente. Los que ya existen se saltan automáticamente.</p>
+    <div class="flex gap-1 flex-wrap items-end mb-2">
+        <div>
+            <label class="small">Proveedor</label>
+            <select id="fetch-provider-select"></select>
+        </div>
+        <div>
+            <label class="small">Filtrar</label>
+            <select id="fetch-filter">
+                <option value="all">Todos (free + paid)</option>
+                <option value="free">Solo free</option>
+                <option value="paid">Solo de pago</option>
+            </select>
+        </div>
+        <button onclick="fetchOpenRouterModels()">🔄 Buscar en OpenRouter</button>
+    </div>
+    <div id="fetch-results" class="hidden" style="margin-bottom:1rem;">
+        <p class="small" id="fetch-status"></p>
+        <div style="max-height:300px;overflow:auto;border:1px solid var(--border);border-radius:6px;">
+            <table style="margin:0;">
+                <thead>
+                    <tr><th><input type="checkbox" id="fetch-select-all" onchange="toggleFetchAll(this)"></th><th>Model ID</th><th>Nombre</th><th>Context</th><th>$ / 1k in</th><th>$ / 1k out</th></tr>
+                </thead>
+                <tbody id="fetch-tbody"></tbody>
+            </table>
+        </div>
+        <button class="mt-2" onclick="importFetchedModels()">📥 Importar seleccionados</button>
+        <p id="fetch-import-msg" class="small mt-1"></p>
+    </div>
+
     <h4 class="mt-4">📥 Importar modelos desde JSON</h4>
     <p class="small">Selecciona un archivo .json o pega un array JSON para importar masivamente al proveedor seleccionado. Los que ya existen se saltan.</p>
     <form id="import-form" onsubmit="return importModels(this);" class="flex gap-1 flex-wrap items-end">
@@ -680,6 +711,97 @@ require __DIR__ . '/templates/header.php';
                 opt.textContent = p.label;
                 importSel.appendChild(opt);
             });
+        }
+        // Y el select de fetch desde OpenRouter
+        const fetchSel = document.getElementById('fetch-provider-select');
+        if (fetchSel) {
+            fetchSel.innerHTML = '';
+            providers.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.label;
+                fetchSel.appendChild(opt);
+            });
+        }
+    }
+
+    let _fetchedModels = [];
+
+    async function fetchOpenRouterModels() {
+        const providerId = document.getElementById('fetch-provider-select').value;
+        const filter = document.getElementById('fetch-filter').value;
+        const statusEl = document.getElementById('fetch-status');
+        const resultsEl = document.getElementById('fetch-results');
+        const tbody = document.getElementById('fetch-tbody');
+        if (!providerId) {
+            alert('Selecciona un proveedor primero.');
+            return;
+        }
+        statusEl.textContent = 'Consultando OpenRouter...';
+        resultsEl.classList.add('hidden');
+        tbody.innerHTML = '';
+        try {
+            const data = await apiFetch('api/v1/admin_providers.php?action=fetch_openrouter_models', {
+                method: 'POST', body: JSON.stringify({id: parseInt(providerId), filter: filter})
+            });
+            if (!data.success) {
+                statusEl.textContent = 'Error: ' + (data.error || 'Desconocido');
+                return;
+            }
+            _fetchedModels = data.models || [];
+            statusEl.textContent = `Encontrados ${_fetchedModels.length} modelos.`;
+            if (!_fetchedModels.length) {
+                resultsEl.classList.remove('hidden');
+                return;
+            }
+            tbody.innerHTML = _fetchedModels.map((m, i) => `
+                <tr>
+                    <td><input type="checkbox" class="fetch-model-check" data-idx="${i}" checked></td>
+                    <td class="small mono">${escapeHtml(m.model_id)}</td>
+                    <td>${escapeHtml(m.label)}</td>
+                    <td>${m.context_window ? m.context_window.toLocaleString() : '—'}</td>
+                    <td>${m.cost_per_1k_input !== null ? '$' + m.cost_per_1k_input.toFixed(6) : '—'}</td>
+                    <td>${m.cost_per_1k_output !== null ? '$' + m.cost_per_1k_output.toFixed(6) : '—'}</td>
+                </tr>
+            `).join('');
+            resultsEl.classList.remove('hidden');
+        } catch (err) {
+            statusEl.textContent = 'Error: ' + err.message;
+        }
+    }
+
+    function toggleFetchAll(checkbox) {
+        document.querySelectorAll('.fetch-model-check').forEach(cb => cb.checked = checkbox.checked);
+    }
+
+    async function importFetchedModels() {
+        const providerId = parseInt(document.getElementById('fetch-provider-select').value);
+        const msg = document.getElementById('fetch-import-msg');
+        const checks = document.querySelectorAll('.fetch-model-check:checked');
+        if (!checks.length) {
+            msg.style.color = '#c62828';
+            msg.textContent = 'Selecciona al menos un modelo.';
+            return;
+        }
+        const toImport = [];
+        checks.forEach(cb => {
+            const idx = parseInt(cb.dataset.idx);
+            if (_fetchedModels[idx]) toImport.push(_fetchedModels[idx]);
+        });
+        msg.style.color = '#888';
+        msg.textContent = 'Importando ' + toImport.length + ' modelos...';
+        try {
+            const data = await apiFetch('api/v1/admin_providers.php?action=import_models', {
+                method: 'POST', body: JSON.stringify({provider_id: providerId, models: toImport})
+            });
+            msg.style.color = '#2e7d32';
+            let txt = 'Importados: ' + data.imported + ', Saltados: ' + data.skipped;
+            if (data.errors.length) txt += ', Errores: ' + data.errors.join('; ');
+            msg.textContent = txt;
+            loadProvidersAdmin();
+        } catch (err) {
+            msg.style.color = '#c62828';
+            msg.textContent = err.message;
         }
     }
 

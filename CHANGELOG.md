@@ -1,5 +1,58 @@
 # Changelog
 
+## [v0.10.38] — 2026-04-29
+
+### Fixed
+- **Catálogo NVIDIA NIM corregido con modelos verificados**: se reemplazaron los modelos que no existen en la API de NVIDIA NIM (`deepseek-ai/deepseek-r1`, `microsoft/phi-4`, `qwen/qwen2.5-72b-instruct`) por los IDs reales devueltos por la API (`deepseek-ai/deepseek-v3.2`, `deepseek-ai/deepseek-v4-pro`, `microsoft/phi-4-mini-instruct`, `microsoft/phi-4-multimodal-instruct`, `qwen/qwen3-coder-480b-a35b-instruct`). También se añadieron modelos confirmados como `mistralai/mistral-large`, `moonshotai/kimi-k2.5` y `nvidia/nemotron-4-340b-instruct`.
+
+### Added
+- **Validación real contra API de NVIDIA NIM**: el catálogo `models/nvidia-nim.json` ahora contiene únicamente modelos verificados mediante llamada real a `GET https://integrate.api.nvidia.com/v1/models` con la API key del usuario. Esto elimina los errores 404/410 por modelos inexistentes.
+
+## [v0.10.37] — 2026-04-29
+
+### Fixed
+- **403 Forbidden persistente en polling**: `polling.js` (usado en `task_cve.php` y `task_result.php`) seguía obteniendo el CSRF token desde `input[name="csrf_token"]`, que no siempre existe en la página. Ahora lee primero del `<meta name="csrf-token">` (igual que `virtual_worker_pulse.js`), con fallback al input. Ambos scripts llevan `?v=2` para invalidar cache del navegador/Cloudflare.
+
+## [v0.10.36] — 2026-04-29
+
+### Fixed
+- **403 Forbidden en polling de Virtual Worker**: `virtual_worker_pulse.js` ejecutaba la búsqueda del `<meta name="csrf-token">` como IIFE inmediato, antes de que el DOM estuviera listo. El token llegaba vacío (`Content-Length: 11`), provocando que `verifyCsrf()` devolviera 403 y Cloudflare bloqueara la petición. Ahora espera explícitamente a `DOMContentLoaded`.
+
+### Added
+- **Catálogo `models/nvidia-nim.json`**: 13 modelos NVIDIA NIM cloud directo (sin pasar por OpenRouter) filtrados para ciberseguridad: Mistral Large 3, Llama 4 Maverick, Llama 3.3/3.1, Nemotron 70B/340B, DeepSeek R1, Phi 4, Gemma 3/2, Mixtral 8x22B, Qwen 2.5. Excluidos deprecated y modelos no-texto (embeddings, visión-only, rerankers).
+
+## [v0.10.35] — 2026-04-29
+
+### Added
+- **Auto-importación de modelos OpenRouter (free + paid)**: nuevo endpoint `fetch_openrouter_models` en `admin_providers.php` que consulta directamente `https://openrouter.ai/api/v1/models` y devuelve la lista completa con precios reales.
+- **UI de importación masiva en admin**: nueva sección "🔄 Importar modelos desde OpenRouter" en la pestaña Proveedores. Permite filtrar por `all` (todos), `free` (solo gratuitos) o `paid` (solo de pago), previsualizar en tabla con costos, seleccionar individualmente o en bloque, e importar masivamente. Los duplicados se saltan automáticamente.
+
+### Fixed
+- **Compatibilidad PHP**: reemplazado `str_contains()` (PHP 8+) por `strpos(...) !== false` para máxima compatibilidad con versiones anteriores de PHP.
+
+## [v0.10.34] — 2026-04-29
+
+### Fixed
+- **Plantilla box-drawing no se aplicaba por defecto**: la plantilla "Informe tipo ASCII / Box-drawing" tenía `is_default = 0` y no había otra plantilla por defecto. Al crear una tarea sin seleccionar explícitamente una plantilla, `input_data` quedaba sin campo `template`. Esto provocaba que el Worker Local usara su formato estructurado nativo (Vulnerability Information, OSV.dev, EPSS, etc.) y el Virtual Worker usara su prompt por defecto (`CONTEXTO` / `IMPACTO` / `RECOMENDACIONES` / `NOTAS`). Ahora la plantilla box-drawing es la por defecto (`is_default = 1`).
+
+### Changed
+- **`db.php`**: en nuevas instalaciones, la plantilla por defecto se lee del archivo `plantilla-cve-boxdrawing.md` en lugar de la plantilla simple markdown anterior.
+
+## [v0.10.33] — 2026-04-29
+
+### Fixed
+- **Plantillas personalizadas ignoradas por cloud AI**: los modelos cloud (OpenRouter/OpenAI free tier) tendían a ignorar las instrucciones de formato cuando la plantilla iba en el system prompt. Ahora el Virtual Worker coloca la plantilla en el **user prompt** con un system prompt genérico mínimo, alineando el comportamiento con cómo estos modelos realmente procesan las instrucciones.
+
+## [v0.10.32] — 2026-04-29
+
+### Fixed
+- **Botones Editar/Preview no respondían en admin**: el contenido de las plantillas se inyectaba directamente en atributos `onclick` mediante JSON sin escapar adecuadamente, rompiendo el HTML cuando el contenido tenía saltos de línea o comillas. Reemplazado por delegación de eventos con atributos `data-*`.
+
+## [v0.10.31] — 2026-04-29
+
+### Fixed
+- **CSRF "Token inválido" al guardar/borrar plantillas**: `ajax_admin.php` solo aceptaba `csrf_token` vía `$_POST`/`$_GET`. Ahora también acepta el header `X-CSRF-Token`. El JS de admin usa `FormData` en lugar de JSON para el envío.
+
 ## [v0.10.30] — 2026-04-29
 
 ### Fixed

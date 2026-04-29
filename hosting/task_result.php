@@ -47,7 +47,7 @@ require __DIR__ . '/templates/header.php';
                 </div>
             </div>
         </div>
-        <script src="assets/js/polling.js"></script>
+        <script src="assets/js/polling.js?v=2"></script>
     <?php elseif ($task['status'] === 'error'): ?>
         <div class="alert alert-error">
             <p><strong>Error:</strong> <?php echo nl2br(htmlspecialchars($task['error_message'] ?? 'Error desconocido')); ?></p>

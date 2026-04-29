@@ -1,0 +1,7 @@
+{
+  "tag_name": "v0.10.35",
+  "name": "v0.10.35 — Auto-import OpenRouter models (free + paid)",
+  "body": "## [v0.10.35] — 2026-04-29\n\n### Added\n- **Auto-importación de modelos OpenRouter (free + paid)**: nuevo endpoint `fetch_openrouter_models` en `admin_providers.php` que consulta directamente `https://openrouter.ai/api/v1/models` y devuelve la lista completa con precios reales.\n- **UI de importación masiva en admin**: nueva sección \"🔄 Importar modelos desde OpenRouter\" en la pestaña Proveedores. Permite filtrar por `all` (todos), `free` (solo gratuitos) o `paid` (solo de pago), previsualizar en tabla con costos, seleccionar individualmente o en bloque, e importar masivamente. Los duplicados se saltan automáticamente.\n\n### Fixed\n- **Compatibilidad PHP**: reemplazado `str_contains()` (PHP 8+) por `strpos(...) !== false` para máxima compatibilidad.",
+  "draft": false,
+  "prerelease": false
+}

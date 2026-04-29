@@ -269,15 +269,22 @@ class Database {
         // Plantilla por defecto CVE — solo si no existe ninguna para este task_type
         $existing = $db->query("SELECT 1 FROM report_templates WHERE task_type = 'cve_search' LIMIT 1")->fetch();
         if (!$existing) {
-            $defaultTemplate = "Eres un analista de ciberseguridad experto. Genera un informe en español sobre la vulnerabilidad proporcionada.\n\n" .
-                "Estructura obligatoria (usa exactamente estos títulos en markdown):\n" .
-                "## CONTEXTO\n" .
-                "## IMPACTO\n" .
-                "## RECOMENDACIONES\n" .
-                "## NOTAS\n\n" .
-                "Sé conciso (máximo 300 palabras). Usa markdown básico.";
+            $templateFile = dirname(__DIR__) . '/plantilla-cve-boxdrawing.md';
+            if (file_exists($templateFile)) {
+                $defaultTemplate = file_get_contents($templateFile);
+                $defaultName = 'Informe tipo ASCII / Box-drawing';
+            } else {
+                $defaultTemplate = "Eres un analista de ciberseguridad experto. Genera un informe en español sobre la vulnerabilidad proporcionada.\n\n" .
+                    "Estructura obligatoria (usa exactamente estos títulos en markdown):\n" .
+                    "## CONTEXTO\n" .
+                    "## IMPACTO\n" .
+                    "## RECOMENDACIONES\n" .
+                    "## NOTAS\n\n" .
+                    "Sé conciso (máximo 300 palabras). Usa markdown básico.";
+                $defaultName = 'Plantilla por defecto';
+            }
             $stmt = $db->prepare("INSERT INTO report_templates (task_type, name, content, is_default) VALUES (?, ?, ?, ?)");
-            $stmt->execute(['cve_search', 'Plantilla por defecto', $defaultTemplate, 1]);
+            $stmt->execute(['cve_search', $defaultName, $defaultTemplate, 1]);
         }
     }
 
