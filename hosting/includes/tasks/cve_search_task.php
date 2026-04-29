@@ -130,6 +130,45 @@ class CveSearchTaskPhp {
                "Sé conciso (máximo 300 palabras). Usa markdown básico.";
     }
 
+    private function mdToHtml(string $md): string {
+        // Escapar HTML primero para seguridad
+        $html = htmlspecialchars($md, ENT_NOQUOTES, 'UTF-8');
+
+        // Convertir headers: ## Título → <h2>Título</h2>
+        $html = preg_replace('/^#{2}\s+(.+)$/m', '<h2>$1</h2>', $html);
+        $html = preg_replace('/^#{3}\s+(.+)$/m', '<h3>$1</h3>', $html);
+
+        // Convertir negrita: **texto** → <strong>texto</strong>
+        $html = preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $html);
+
+        // Convertir cursiva: *texto* → <em>texto</em> (evitando los de listas)
+        $html = preg_replace('/(?<!\s)\*(.+?)\*(?!\s)/', '<em>$1</em>', $html);
+
+        // Convertir listas: - item o * item → <li>item</li>
+        $html = preg_replace('/^[\-\*]\s+(.+)$/m', '<li>$1</li>', $html);
+
+        // Doble salto de línea → nuevo párrafo
+        $html = str_replace("\n\n", '</p><p>', $html);
+        // Salto simple → <br>
+        $html = str_replace("\n", '<br>', $html);
+
+        // Envolver en párrafo si no empieza con tag de bloque
+        if (!str_starts_with(trim($html), '<')) {
+            $html = '<p>' . $html . '</p>';
+        } else {
+            $html = '<p>' . $html . '</p>';
+        }
+
+        // Corregir párrafos vacíos
+        $html = str_replace('<p></p>', '', $html);
+        $html = preg_replace('/<p>(<h[23]>)/', '$1', $html);
+        $html = preg_replace('/(<\/h[23]>)<\/p>/', '$1', $html);
+        $html = preg_replace('/<p>(<li>)/', '<ul>$1', $html);
+        $html = preg_replace('/(<\/li>)<\/p>/', '$1</ul>', $html);
+
+        return $html;
+    }
+
     private function renderHtml(array $enriched, string $report): string {
         $cveId = htmlspecialchars($enriched['cve_id']);
         $severity = htmlspecialchars($enriched['severity'] ?? 'N/A');
@@ -142,6 +181,8 @@ class CveSearchTaskPhp {
             $refs .= '<li><a href="' . htmlspecialchars($r) . '" target="_blank">' . htmlspecialchars($r) . '</a></li>';
         }
 
+        $bodyHtml = $this->mdToHtml($report);
+
         $html = <<<HTML
 <div class="cve-report">
   <h3>{$cveId}</h3>
@@ -152,7 +193,7 @@ class CveSearchTaskPhp {
     <span class="badge">Publicado: {$published}</span>
   </div>
   <div class="cve-body">
-        {$report}
+    {$bodyHtml}
   </div>
   <div class="cve-refs">
     <h4>Referencias</h4>

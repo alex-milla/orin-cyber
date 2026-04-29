@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.10.20] — 2026-04-29
+
+### Fixed
+- **Formato de informes CVE mejorado**: antes el LLM devolvía Markdown crudo que aparecía como un párrafo gigante sin formato. Ahora `CveSearchTaskPhp::mdToHtml()` convierte automáticamente `## Título` → `<h2>`, `**negrita**` → `<strong>`, listas `- item` → `<li>`, y respeta los saltos de línea. Añadidos estilos CSS para `.cve-report`, `.cve-body h2/h3`, listas y pie de página.
+
 ## [v0.10.19] — 2026-04-29
 
 ### Added
