@@ -1,0 +1,7 @@
+{
+  "tag_name": "v0.10.41",
+  "name": "v0.10.41 — Blue Team Intelligence Toolkit Fase 3 (Azure Sentinel + KQL)",
+  "body": "## [v0.10.41] — 2026-04-30\n\n### Added\n- **Blue Team Intelligence Toolkit — Fase 3**: Azure Sentinel sync + KQL hunting queries.\n  - Nuevo `worker/utils/azure_sentinel.py`: autenticación Azure CLI device code flow, ejecución de queries KQL contra Log Analytics, generación automática de queries KQL de hunting por IP/dominio/hash/URL/usuario/device.\n  - Nuevo task type `azure_sync`: sincroniza incidentes desde Sentinel directamente a la base de datos local.\n  - Nuevo endpoint REST `api/v1/azure_sync.php` (sync, status, hunting_queries).\n  - Sección **Azure Sentinel Sync** en `blue_team.php`: formulario para Workspace ID, días de lookback, número de incidente opcional, polling de estado en tiempo real.\n  - El task `incident_analysis` ahora genera automáticamente queries KQL de hunting para cada entidad extraída. Se muestran en el informe HTML y se persisten en `hunting_queries`.\n  - Post-procesamiento en `tasks.php`: al completar `azure_sync`, los incidentes extraídos se insertan automáticamente en `incidents`.",
+  "draft": false,
+  "prerelease": false
+}
