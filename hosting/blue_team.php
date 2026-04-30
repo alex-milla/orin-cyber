@@ -72,7 +72,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['incident_csv'])) {
                 // Vincular tarea con incidente
                 Database::update('incidents', ['blue_team_task_id' => $taskId], 'incident_id = ?', [$incidentId]);
 
-                $message = "Incidente {$incidentId} registrado. Análisis en curso (tarea #{$taskId}).";
+                // Redirigir a la página de resultado con polling
+                header("Location: task_result.php?id=" . $taskId);
+                exit;
             } catch (Exception $e) {
                 $error = 'Error al procesar: ' . $e->getMessage();
             }
