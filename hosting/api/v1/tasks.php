@@ -175,7 +175,6 @@ switch ($action) {
                     }
                 }
             }
-            }
         }
 
         jsonResponse(['success' => true, 'message' => 'Resultado recibido']);
