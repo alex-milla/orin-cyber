@@ -132,6 +132,49 @@ switch ($action) {
                     }
                 }
                 Database::update('incidents', $btUpdate, 'incident_id = ?', [$incidentId]);
+
+                // Guardar queries KQL de hunting
+                if (isset($data['hunting_queries']) && is_string($data['hunting_queries'])) {
+                    $hqs = json_decode($data['hunting_queries'], true);
+                    if (is_array($hqs)) {
+                        foreach ($hqs as $hq) {
+                            if (!empty($hq['kql'])) {
+                                Database::query(
+                                    "INSERT OR IGNORE INTO hunting_queries (incident_id, query_type, query_text, description) VALUES (?, ?, ?, ?)",
+                                    [$incidentId, $hq['type'] ?? 'kql', $hq['kql'], 'Auto-generada para ' . ($hq['target'] ?? '')]
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Post-procesamiento para tareas Azure Sync ────────────────────
+        if ($task && $task['task_type'] === 'azure_sync') {
+            $input = json_decode($task['input_data'] ?? '{}', true);
+            if (isset($data['azure_sync_extracted']) && is_string($data['azure_sync_extracted'])) {
+                $incidents = json_decode($data['azure_sync_extracted'], true);
+                if (is_array($incidents)) {
+                    foreach ($incidents as $inc) {
+                        if (empty($inc['incident_id'])) continue;
+                        $existing = Database::fetchOne("SELECT 1 FROM incidents WHERE incident_id = ?", [$inc['incident_id']]);
+                        if (!$existing) {
+                            Database::insert('incidents', [
+                                'incident_id' => $inc['incident_id'],
+                                'sentinel_number' => $inc['sentinel_number'] ?? null,
+                                'title' => $inc['title'] ?? '',
+                                'description' => $inc['description'] ?? '',
+                                'severity' => $inc['severity'] ?? 'Medium',
+                                'status' => $inc['status'] ?? 'open',
+                                'source' => 'sentinel',
+                                'created_time' => $inc['created_time'] ?? date('Y-m-d H:i:s'),
+                                'raw_data' => $inc['raw_data'] ?? '',
+                            ]);
+                        }
+                    }
+                }
+            }
             }
         }
 

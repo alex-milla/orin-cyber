@@ -12,6 +12,7 @@ from tasks.base import BaseTask
 from utils.llm_client import LlmClient
 from utils.formatter import markdown_to_html
 from utils.osint_client import get_osint_summary, enrich_ioc
+from utils.azure_sentinel import generate_hunting_kql, generate_entity_hunting_kql
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +147,7 @@ def _render_incident_html(
     entities: dict[str, set[str]],
     rows: list[dict],
     osint_data: dict[str, dict],
+    hunting_queries: list[dict],
 ) -> str:
     """Genera HTML del informe de incidente."""
 
@@ -258,6 +260,15 @@ def _render_incident_html(
         html += '</div>\n'
 
     # Stats
+    # Hunting queries
+    if hunting_queries:
+        html += '<div style="margin:1rem 0;border-left:4px solid #6a1b9a;padding:.75rem 1rem;background:var(--surface);border-radius:0 var(--radius-sm) var(--radius-sm) 0;">\n'
+        html += '<div style="font-weight:700;color:#6a1b9a;margin-bottom:.5rem;">🔎 Queries KQL de Hunting</div>\n'
+        for hq in hunting_queries:
+            html += f'<details style="margin:.5rem 0;"><summary style="cursor:pointer;font-weight:600;">{hq["type"].upper()}: <code>{hq["target"]}</code></summary>\n'
+            html += f'<pre style="background:var(--bg);padding:.75rem;border-radius:var(--radius-sm);overflow-x:auto;font-size:.8rem;margin-top:.5rem;"><code>{hq["kql"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")}</code></pre></details>\n'
+        html += '</div>\n'
+
     # OSINT section
     if osint_data:
         html += '<div style="margin:1rem 0;border-left:4px solid #1976d2;padding:.75rem 1rem;background:var(--surface);border-radius:0 var(--radius-sm) var(--radius-sm) 0;">\n'
@@ -351,8 +362,22 @@ class IncidentAnalysisTask(BaseTask):
         except Exception as exc:
             logger.warning("LLM call failed for %s: %s", incident_id, exc)
 
+        # Generar queries KQL de hunting para entidades extraídas
+        hunting_queries: list[dict] = []
+        for etype, vals in entities.items():
+            if not vals or etype not in ("ip", "domain", "hash_sha256", "hash_md5", "url", "email"):
+                continue
+            for val in sorted(vals)[:3]:
+                ioc_type = {"ip": "ip", "domain": "domain", "hash_sha256": "hash", "hash_md5": "hash", "url": "url", "email": "user"}.get(etype)
+                if ioc_type == "user":
+                    kql = generate_entity_hunting_kql(val, "user")
+                    hunting_queries.append({"target": val, "type": "user", "kql": kql})
+                elif ioc_type:
+                    kql = generate_hunting_kql(val, ioc_type)
+                    hunting_queries.append({"target": val, "type": ioc_type, "kql": kql})
+
         # Generar informe HTML
-        html = _render_incident_html(incident_id, title, severity, llm_analysis, entities, rows, osint_data)
+        html = _render_incident_html(incident_id, title, severity, llm_analysis, entities, rows, osint_data, hunting_queries)
 
         # Generar texto plano (Markdown)
         lines = [

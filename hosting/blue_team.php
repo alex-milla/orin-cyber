@@ -233,6 +233,98 @@ require_once __DIR__ . '/templates/header.php';
     </form>
 </div>
 
+<!-- ── Azure Sentinel Sync ─────────────────────────────────────────── -->
+<div class="card" style="margin-bottom:1.5rem;">
+    <h3>🌩️ Azure Sentinel Sync</h3>
+    <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:1rem;">
+        Sincroniza incidentes directamente desde Microsoft Sentinel usando Azure CLI device code flow.
+        Requiere que hayas ejecutado <code>az login --use-device-code</code> en la Orin previamente.
+    </p>
+    <form id="azure-sync-form" onsubmit="return false;" style="display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap;">
+        <input type="hidden" id="azure-csrf" value="<?php echo htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8'); ?>">
+        <div style="flex:1;min-width:200px;">
+            <label style="font-size:.8rem;color:var(--text-muted);">Workspace ID (GUID)</label>
+            <input type="text" id="azure-workspace" placeholder="12345678-1234-1234-1234-123456789abc" style="width:100%;">
+        </div>
+        <div>
+            <label style="font-size:.8rem;color:var(--text-muted);">Días atrás</label>
+            <input type="number" id="azure-days" value="7" min="1" max="30" style="width:80px;">
+        </div>
+        <div style="flex:1;min-width:150px;">
+            <label style="font-size:.8rem;color:var(--text-muted);">Nº Incidente (opcional)</label>
+            <input type="text" id="azure-incident" placeholder="Todos" style="width:100%;">
+        </div>
+        <button type="button" class="btn btn-primary" onclick="startAzureSync()">🔄 Sincronizar</button>
+    </form>
+    <div id="azure-sync-status" style="margin-top:1rem;display:none;">
+        <p><span class="spinner"></span> Sincronizando con Sentinel...</p>
+    </div>
+    <div id="azure-sync-result" style="margin-top:1rem;"></div>
+</div>
+
+<script>
+function startAzureSync() {
+    const workspace = document.getElementById('azure-workspace').value.trim();
+    const days = parseInt(document.getElementById('azure-days').value);
+    const incident = document.getElementById('azure-incident').value.trim();
+    const csrf = document.getElementById('azure-csrf').value;
+
+    if (!workspace) { alert('Introduce el Workspace ID'); return; }
+
+    const statusDiv = document.getElementById('azure-sync-status');
+    const resultDiv = document.getElementById('azure-sync-result');
+    statusDiv.style.display = 'block';
+    resultDiv.innerHTML = '';
+
+    fetch('api/v1/azure_sync.php?action=sync', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf},
+        body: JSON.stringify({workspace_id: workspace, days: days, incident_id: incident})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            resultDiv.innerHTML = '<div class="alert alert-success">Sync iniciada (tarea #' + data.task_id + '). Recarga la página en unos segundos para ver los incidentes.</div>';
+            pollAzureStatus(data.task_id);
+        } else {
+            statusDiv.style.display = 'none';
+            resultDiv.innerHTML = '<div class="alert alert-error">Error: ' + (data.error || 'desconocido') + '</div>';
+        }
+    })
+    .catch(e => {
+        statusDiv.style.display = 'none';
+        resultDiv.innerHTML = '<div class="alert alert-error">Error de red: ' + e + '</div>';
+    });
+}
+
+function pollAzureStatus(taskId) {
+    const statusDiv = document.getElementById('azure-sync-status');
+    const resultDiv = document.getElementById('azure-sync-result');
+
+    const interval = setInterval(() => {
+        fetch('api/v1/azure_sync.php?action=status&task_id=' + taskId)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) { clearInterval(interval); return; }
+            const task = data.task;
+            if (task.status === 'completed') {
+                clearInterval(interval);
+                statusDiv.style.display = 'none';
+                resultDiv.innerHTML = '<div class="alert alert-success">✅ Sync completada.</div>' + (task.result_html || '');
+            } else if (task.status === 'error') {
+                clearInterval(interval);
+                statusDiv.style.display = 'none';
+                resultDiv.innerHTML = '<div class="alert alert-error">Error: ' + (task.error_message || 'desconocido') + '</div>';
+            }
+        })
+        .catch(() => {});
+    }, 5000);
+
+    // Timeout después de 5 minutos
+    setTimeout(() => { clearInterval(interval); statusDiv.style.display = 'none'; }, 300000);
+}
+</script>
+
 <!-- ── Tabla de incidentes recientes ───────────────────────────────── -->
 <div class="card" style="margin-bottom:1.5rem;">
     <h3>📋 Incidentes Recientes</h3>
