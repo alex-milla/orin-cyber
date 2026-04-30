@@ -305,6 +305,7 @@ class IncidentAnalysisTask(BaseTask):
     task_type = "incident_analysis"
 
     def __init__(self, config_path: str = None):
+        self.config_path = config_path
         self.llm = LlmClient(config_path)
         with open(PROMPT_PATH, "r", encoding="utf-8") as f:
             self.prompt_template = f.read()
