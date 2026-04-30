@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.10.42] — 2026-04-30
+
+### Fixed
+- **Blue Team Toolkit — Fase 1-3**: múltiples fixes de estabilidad y UX.
+  - `IncidentAnalysisTask.__init__` faltaba `self.config_path = config_path`, causando `AttributeError` al consultar OSINT.
+  - `blue_team.php` ahora redirige automáticamente a `task_result.php` tras subir un CSV, mostrando polling en tiempo real sin necesidad de refrescar manualmente.
+  - Worker `TASK_REGISTRY` actualizado con `incident_analysis` y `azure_sync`; limpieza de `__pycache__` recomendada tras deploy.
+
 ## [v0.10.41] — 2026-04-30
 
 ### Added
