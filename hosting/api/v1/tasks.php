@@ -190,6 +190,14 @@ switch ($action) {
         jsonResponse(['success' => true, 'message' => 'Tarea cancelada']);
         break;
 
+    case 'config':
+        $pref = Database::fetchOne("SELECT value FROM config WHERE key = 'preferred_model'");
+        jsonResponse([
+            'success' => true,
+            'preferred_model' => $pref['value'] ?? null,
+        ]);
+        break;
+
     default:
-        jsonResponse(['error' => 'Acción no válida. Use pending, claim, result o cancel'], 400);
+        jsonResponse(['error' => 'Acción no válida. Use pending, claim, result, cancel o config'], 400);
 }

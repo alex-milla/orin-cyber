@@ -167,7 +167,7 @@ class ApiClient:
     def get_preferred_model(self) -> str | None:
         """Obtiene el modelo preferido configurado desde el panel de admin."""
         try:
-            data = self._request("GET", "/api/v1/worker_config.php")
+            data = self._request("GET", "/api/v1/tasks.php?action=config")
             if data:
                 return data.get("preferred_model")
         except requests.RequestException as exc:
