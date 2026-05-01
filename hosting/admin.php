@@ -113,6 +113,13 @@ try {
 }
 
 try {
+    $prefModelRow = Database::fetchOne("SELECT value FROM config WHERE key = 'preferred_model'");
+    $preferredModel = $prefModelRow['value'] ?? '';
+} catch (Throwable $e) {
+    $preferredModel = '';
+}
+
+try {
     $executorOptions = Database::fetchAll(
         "SELECT 'worker' as value, 'Worker local (Orin)' as label
          UNION ALL
@@ -292,6 +299,65 @@ require __DIR__ . '/templates/header.php';
         </tbody>
     </table>
     <?php endif; ?>
+
+    <h3 class="mt-4">🤖 Modelo del Chat (llama-server)</h3>
+    <p class="small">Selecciona el modelo con el que arrancará llama-server al inicio del worker. Se guarda en el hosting y se sincroniza automáticamente con el Orin.</p>
+    <form method="POST" action="ajax_admin.php?action=save_preferred_model" onsubmit="return savePreferredModel(this);" id="preferred-model-form">
+        <?php echo csrfInput(); ?>
+        <div class="flex gap-2 items-end flex-wrap">
+            <div style="min-width:280px;flex:1;">
+                <label class="small">Modelo activo</label>
+                <select name="model" id="preferred-model-select" required style="width:100%;">
+                    <option value="">— Selecciona un modelo —</option>
+                    <?php
+                    // Usar modelos del último heartbeat del worker local
+                    $localModels = [];
+                    if (!empty($workers)) {
+                        $localModels = json_decode($workers[0]['available_models'] ?? '[]', true) ?: [];
+                    }
+                    foreach ($localModels as $m):
+                        $display = preg_replace('/\.gguf$/i', '', $m);
+                        $label = resolveModelLabel($m, $modelCatalog);
+                    ?>
+                    <option value="<?php echo htmlspecialchars($m); ?>" <?php echo $preferredModel === $m ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($display); ?> <?php echo $label !== $m ? '(' . htmlspecialchars($label) . ')' : ''; ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <button type="submit">💾 Guardar y cambiar</button>
+        </div>
+        <p id="pref-model-msg" class="small mt-1"></p>
+        <?php if ($preferredModel): ?>
+        <p class="small" style="color:var(--text-muted);">
+            Modelo preferido guardado: <code><?php echo htmlspecialchars($preferredModel); ?></code>
+            <?php if (!empty($workers) && $workers[0]['model_loaded']): ?>
+                · Cargado ahora: <code><?php echo htmlspecialchars(resolveModelLabel($workers[0]['model_loaded'], $modelCatalog)); ?></code>
+            <?php endif; ?>
+        </p>
+        <?php endif; ?>
+    </form>
+    <script>
+    async function savePreferredModel(form) {
+        const fd = new FormData(form);
+        const msg = document.getElementById('pref-model-msg');
+        try {
+            const resp = await fetch(form.action, {method: 'POST', body: fd});
+            const data = await resp.json();
+            if (data.success) {
+                msg.className = 'alert alert-success mt-1';
+                msg.textContent = 'Modelo guardado. El worker lo aplicará en su próximo ciclo (máx. 15s). Si el worker está caído, se aplicará al reiniciar.';
+            } else {
+                msg.className = 'alert alert-error mt-1';
+                msg.textContent = data.error || 'Error';
+            }
+        } catch (err) {
+            msg.className = 'alert alert-error mt-1';
+            msg.textContent = 'Error de red: ' + err.message;
+        }
+        return false;
+    }
+    </script>
 
     <h3 class="mt-4">📡 Enviar comando a worker</h3>
     <p class="small">Los comandos se ejecutan en el próximo ciclo de polling del worker.</p>

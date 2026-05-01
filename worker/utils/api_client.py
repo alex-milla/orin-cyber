@@ -163,3 +163,13 @@ class ApiClient:
         except requests.RequestException as exc:
             logger.warning("Failed to send alerts: %s", exc)
         return None
+
+    def get_preferred_model(self) -> str | None:
+        """Obtiene el modelo preferido configurado desde el panel de admin."""
+        try:
+            data = self._request("GET", "/api/v1/worker_config.php")
+            if data:
+                return data.get("preferred_model")
+        except requests.RequestException as exc:
+            logger.debug("Preferred model fetch failed: %s", exc)
+        return None

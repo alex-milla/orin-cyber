@@ -130,6 +130,27 @@ switch ($action) {
         jsonResponse(['success' => true, 'command_id' => $cmdId]);
         break;
 
+    case 'save_preferred_model':
+        $model = trim($_POST['model'] ?? '');
+        if ($model === '') {
+            jsonResponse(['error' => 'Modelo requerido'], 400);
+        }
+        // Guardar preferencia en config para persistencia tras reinicio
+        Database::query("INSERT OR REPLACE INTO config (key, value) VALUES ('preferred_model', ?)", [$model]);
+
+        // Enviar comando change_model al worker local (el primero activo) para cambio en caliente
+        $workerKey = Database::fetchOne("SELECT id FROM api_keys WHERE is_active = 1 ORDER BY id ASC LIMIT 1");
+        if ($workerKey) {
+            Database::insert('worker_commands', [
+                'api_key_id' => $workerKey['id'],
+                'command' => 'change_model',
+                'payload' => json_encode(['model' => $model]),
+            ]);
+        }
+
+        jsonResponse(['success' => true]);
+        break;
+
     case 'command_status':
         $cmdId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
         if (!$cmdId) {

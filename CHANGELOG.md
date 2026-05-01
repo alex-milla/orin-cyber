@@ -1,5 +1,21 @@
 # Changelog
 
+## [v0.10.44] — 2026-05-01
+
+### Added
+- **Selector de modelo para el Chat desde el panel Admin**:
+  - Nueva sección "🤖 Modelo del Chat (llama-server)" en Admin → Workers.
+  - El administrador puede seleccionar cualquier modelo disponible en el worker local desde un dropdown.
+  - Al guardar, se almacena el modelo preferido en la BD del hosting (`config.preferred_model`) y se envía un comando `change_model` al worker para cambio en caliente.
+  - El worker, al arrancar, consulta el hosting por el modelo preferido **antes** de iniciar llama-server. Si difiere del `.current_model` local, lo actualiza y arranca con el modelo correcto. Esto garantiza persistencia tras reinicios del Orin.
+  - Nuevo endpoint `hosting/api/v1/worker_config.php` para que el worker lea su configuración remota.
+  - Nuevo método `ApiClient.get_preferred_model()` en el worker.
+
+## [v0.10.43] — 2026-04-30
+
+### Fixed
+- **Critical hotfix**: `hosting/api/v1/tasks.php` tenía una llave de cierre (`}`) de más en el post-procesamiento de `azure_sync`. Esto provocaba un **parse error** en PHP, haciendo que el endpoint `tasks.php?action=pending` devolviera **500** y el worker nunca recibiera tareas. Todos los incidentes Blue Team se quedaban en estado *Pendiente*.
+
 ## [v0.10.42] — 2026-04-30
 
 ### Fixed

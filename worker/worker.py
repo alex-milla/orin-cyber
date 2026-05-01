@@ -571,7 +571,20 @@ def main(config_path: Optional[str] = None) -> None:
     except Exception:
         host, port = "localhost", "8080"
 
+    # Crear API client antes de arrancar llama-server para consultar modelo preferido
+    api = ApiClient(config_path or DEFAULT_CONFIG)
+
+    # Consultar modelo preferido desde el panel de admin (persiste tras reinicio)
     current_model = _load_current_model(config)
+    try:
+        preferred_model = api.get_preferred_model()
+        if preferred_model and preferred_model != current_model:
+            _save_current_model(preferred_model)
+            current_model = preferred_model
+            logger.info("Modelo preferido desde panel admin: %s (persistido)", current_model)
+    except Exception as exc:
+        logger.debug("No se pudo consultar modelo preferido: %s", exc)
+
     if not _llama_server_is_ready(host, port):
         logger.warning("llama-server no responde. Intentando iniciar automáticamente...")
         _free_jetson_memory(logger)
@@ -581,8 +594,6 @@ def main(config_path: Optional[str] = None) -> None:
             logger.error("No se pudo iniciar llama-server automáticamente. Las tareas de LLM fallarán.")
     else:
         logger.info("llama-server ya está respondiendo en %s:%s", host, port)
-
-    api = ApiClient(config_path or DEFAULT_CONFIG)
     poll_interval = config.getint("worker", "poll_interval", fallback=15)
     task_timeout = config.getint("worker", "task_timeout", fallback=120)
     heartbeat_interval = config.getint("worker", "heartbeat_interval", fallback=30)

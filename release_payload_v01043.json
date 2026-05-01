@@ -1,0 +1,7 @@
+{
+  "tag_name": "v0.10.43",
+  "name": "v0.10.43 — Hotfix: syntax error en tasks.php",
+  "body": "## [v0.10.43] — 2026-04-30\n\n### Fixed\n- **Critical hotfix**: `hosting/api/v1/tasks.php` tenía una llave de cierre (`}`) de más en el post-procesamiento de `azure_sync`. Esto provocaba un **parse error** en PHP, haciendo que el endpoint `tasks.php?action=pending` devolviera **500** y el worker nunca recibiera tareas.\n- Todos los incidentes Blue Team se quedaban en estado *Pendiente* porque el worker no podía consultar el endpoint de tareas.",
+  "draft": false,
+  "prerelease": false
+}
