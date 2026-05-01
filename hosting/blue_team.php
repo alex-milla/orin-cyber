@@ -353,15 +353,15 @@ function pollAzureStatus(taskId) {
                     <td><?php echo htmlspecialchars($inc['title'] ?? ''); ?></td>
                     <td>
                         <?php
-                        $sevColor = match(strtoupper($inc['severity'] ?? '')) {
-                            'CRITICAL' => '#c62828',
-                            'HIGH' => '#f57c00',
-                            'MEDIUM' => '#f9a825',
-                            'LOW' => '#2e7d32',
-                            default => '#78909c',
+                        $sevClass = match(strtoupper($inc['severity'] ?? '')) {
+                            'CRITICAL' => 'severity-critical',
+                            'HIGH'     => 'severity-high',
+                            'MEDIUM'   => 'severity-medium',
+                            'LOW'      => 'severity-low',
+                            default    => 'severity-info',
                         };
                         ?>
-                        <span style="display:inline-block;background:<?php echo $sevColor; ?>;color:#fff;padding:.15rem .5rem;border-radius:4px;font-size:.8rem;font-weight:600;"><?php echo htmlspecialchars($inc['severity'] ?? 'N/A'); ?></span>
+                        <span class="badge <?php echo $sevClass; ?>"><?php echo htmlspecialchars($inc['severity'] ?? 'N/A'); ?></span>
                     </td>
                     <td>
                         <?php
@@ -377,14 +377,14 @@ function pollAzureStatus(taskId) {
                     <td>
                         <?php if ($inc['llm_verdict']): ?>
                             <?php
-                            $vColor = match($inc['llm_verdict']) {
-                                'True Positive' => '#c62828',
-                                'False Positive' => '#2e7d32',
-                                'Needs Review' => '#f57c00',
-                                default => '#78909c',
+                            $vClass = match($inc['llm_verdict']) {
+                                'True Positive'  => 'verdict-true-positive',
+                                'False Positive' => 'verdict-false-positive',
+                                'Needs Review'   => 'verdict-needs-review',
+                                default          => 'severity-info',
                             };
                             ?>
-                            <span style="display:inline-block;background:<?php echo $vColor; ?>;color:#fff;padding:.15rem .5rem;border-radius:4px;font-size:.8rem;font-weight:600;"><?php echo htmlspecialchars($inc['llm_verdict']); ?></span>
+                            <span class="badge <?php echo $vClass; ?>"><?php echo htmlspecialchars($inc['llm_verdict']); ?></span>
                         <?php else: ?>
                             <em style="color:var(--text-muted);">Pendiente</em>
                         <?php endif; ?>
@@ -431,13 +431,14 @@ function pollAzureStatus(taskId) {
                     <td>
                         <?php
                         $risk = (float)($ent['current_risk_score'] ?? 0);
-                        $riskColor = $risk > 0.8 ? '#c62828' : ($risk > 0.5 ? '#f57c00' : '#2e7d32');
+                        $riskClass = $risk > 0.8 ? 'risk-critical' : ($risk > 0.5 ? 'risk-high' : 'risk-low');
+                        $textRiskClass = $risk > 0.8 ? 'text-risk-critical' : ($risk > 0.5 ? 'text-risk-high' : 'text-risk-low');
                         ?>
                         <div style="display:flex;align-items:center;gap:.5rem;">
                             <div style="flex:1;background:var(--bg);border-radius:4px;height:8px;overflow:hidden;">
-                                <div style="width:<?php echo round($risk * 100); ?>%;background:<?php echo $riskColor; ?>;height:100%;"></div>
+                                <div class="<?php echo $riskClass; ?>" style="width:<?php echo round($risk * 100); ?>%;height:100%;"></div>
                             </div>
-                            <span style="font-size:.8rem;font-weight:600;color:<?php echo $riskColor; ?>;"><?php echo round($risk * 100); ?>%</span>
+                            <span class="<?php echo $textRiskClass; ?>" style="font-size:.8rem;font-weight:600;"><?php echo round($risk * 100); ?>%</span>
                         </div>
                     </td>
                     <td style="font-size:.85rem;color:var(--text-muted);"><?php echo htmlspecialchars(substr($ent['first_seen'] ?? '', 0, 16)); ?></td>
@@ -517,15 +518,15 @@ function pollAzureStatus(taskId) {
                     <td><span class="badge"><?php echo htmlspecialchars($ioc['ioc_type']); ?></span></td>
                     <td>
                         <?php
-                        $iocStatusColors = [
-                            'sospechosa' => '#f9a825',
-                            'confirmada_maliciosa' => '#c62828',
-                            'falsa_alarma' => '#2e7d32',
-                            'whitelist' => '#78909c',
-                        ];
-                        $iocStatusColor = $iocStatusColors[$ioc['status']] ?? '#78909c';
+                        $iocClass = match($ioc['status']) {
+                            'sospechosa'           => 'ioc-sospechosa',
+                            'confirmada_maliciosa' => 'ioc-confirmada-maliciosa',
+                            'falsa_alarma'         => 'ioc-falsa-alarma',
+                            'whitelist'            => 'ioc-whitelist',
+                            default                => 'severity-info',
+                        };
                         ?>
-                        <span style="display:inline-block;background:<?php echo $iocStatusColor; ?>;color:#fff;padding:.15rem .5rem;border-radius:4px;font-size:.8rem;font-weight:600;">
+                        <span class="badge <?php echo $iocClass; ?>">
                             <?php echo htmlspecialchars($ioc['status']); ?>
                         </span>
                     </td>

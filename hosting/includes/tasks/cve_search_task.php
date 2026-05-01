@@ -613,25 +613,25 @@ class CveSearchTaskPhp {
         // Badge de severidad
         $sevBadge = '';
         if ($severity && $severity !== 'N/A') {
-            $sevColors = [
-                'CRITICAL' => '#c62828',
-                'HIGH' => '#f57c00',
-                'MEDIUM' => '#f9a825',
-                'LOW' => '#2e7d32',
-            ];
-            $color = $sevColors[strtoupper($severity)] ?? '#78909c';
-            $sevBadge = "<span style='display:inline-block;background:{$color};color:#fff;padding:.2rem .6rem;border-radius:4px;font-size:.85rem;font-weight:600;'>{$severity}</span>";
+            $sevClass = match(strtoupper($severity)) {
+                'CRITICAL' => 'severity-critical',
+                'HIGH'     => 'severity-high',
+                'MEDIUM'   => 'severity-medium',
+                'LOW'      => 'severity-low',
+                default    => 'severity-info',
+            };
+            $sevBadge = "<span class='badge {$sevClass}'>{$severity}</span>";
         }
 
         // Badge de prioridad
-        $priColors = [
-            'A+' => '#c62828',
-            'A' => '#f57c00',
-            'B' => '#f9a825',
-            'C' => '#1976d2',
-        ];
-        $priColor = $priColors[$priority] ?? '#78909c';
-        $priBadge = "<span style='display:inline-block;background:{$priColor};color:#fff;padding:.25rem .8rem;border-radius:4px;font-size:1.1rem;font-weight:700;'>{$priority}</span>";
+        $priClass = match($priority) {
+            'A+' => 'priority-aplus',
+            'A'  => 'priority-a',
+            'B'  => 'priority-b',
+            'C'  => 'priority-c',
+            default => 'severity-info',
+        };
+        $priBadge = "<span class='badge {$priClass}' style='font-size:1.1rem;padding:.25rem .8rem;'>{$priority}</span>";
 
         $section = function(string $title, string $content, string $icon = ''): string {
             return "<div style='margin:1.25rem 0;border-left:4px solid var(--accent);padding:.75rem 1rem;background:var(--surface);border-radius:0 var(--radius-sm) var(--radius-sm) 0;'>"

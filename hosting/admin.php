@@ -265,7 +265,7 @@ require __DIR__ . '/templates/header.php';
                 <strong>Logs — <?php echo htmlspecialchars($w['worker_name']); ?></strong>
                 <span class="small" style="color:var(--text-muted)">Actualiza con cada heartbeat (~30s)</span>
             </div>
-            <pre id="logs-pre-<?php echo (int)$w['api_key_id']; ?>" style="max-height:300px;overflow:auto;background:#0d1117;color:#c9d1d9;padding:.75rem;border-radius:6px;font-size:12px;line-height:1.4;margin:0;"></pre>
+            <pre id="logs-pre-<?php echo (int)$w['api_key_id']; ?>" style="max-height:300px;overflow:auto;background:var(--bg);color:var(--text);padding:.75rem;border-radius:6px;font-size:12px;line-height:1.4;margin:0;"></pre>
         </div>
     </div>
     <?php endforeach; ?>
@@ -682,7 +682,7 @@ require __DIR__ . '/templates/header.php';
             <select name="provider_id" id="import-provider-select" required></select>
         </div>
         <div style="flex:1;min-width:300px;">
-            <label class="small">Archivo JSON <span class="small" style="color:#888">(opcional — se carga en el campo de abajo)</span></label>
+            <label class="small">Archivo JSON <span class="small" style="color:var(--text-muted)">(opcional — se carga en el campo de abajo)</span></label>
             <input type="file" id="import-file" accept=".json,application/json" onchange="loadJsonFile(this)" style="font-size:12px;">
             <textarea name="json" rows="6" placeholder='[&#10;  {"model_id":"nvidia/nemotron-3-super-120b-a12b:free","label":"Nemotron 3 Super 120B (Free)","context_window":262144},&#10;  {"model_id":"z-ai/glm-4.5-air:free","label":"GLM 4.5 Air (Free)","context_window":131072}&#10;]' required style="font-family:monospace;font-size:12px;width:100%;margin-top:4px;"></textarea>
         </div>
@@ -717,13 +717,10 @@ require __DIR__ . '/templates/header.php';
         let tags;
         try { tags = JSON.parse(tagsJson); } catch(e) { return ''; }
         if (!Array.isArray(tags)) return '';
-        const colors = {
-            cybersecurity: 'background:#fff3e0;color:#f57c00;border:1px solid #f57c00;',
-            reasoning: 'background:#e3f2fd;color:#1976d2;border:1px solid #1976d2;',
-            recommended: 'background:#e8f5e9;color:#2e7d32;border:1px solid #2e7d32;',
-            free: 'background:#f5f5f5;color:#888;border:1px solid #ccc;'
-        };
-        return tags.map(t => `<span class="badge" style="${colors[t]||colors.free}font-size:0.7rem;padding:0.1rem 0.35rem;margin:0 0.15rem 0 0;">${t}</span>`).join('');
+        return tags.map(t => {
+            const cls = 'tag-' + (t || 'free');
+            return `<span class="badge ${cls}" style="font-size:0.7rem;padding:0.1rem 0.35rem;margin:0 0.15rem 0 0;">${t}</span>`;
+        }).join('');
     }
 
     function renderProviders(providers, models) {
@@ -845,7 +842,7 @@ require __DIR__ . '/templates/header.php';
         const msg = document.getElementById('fetch-import-msg');
         const checks = document.querySelectorAll('.fetch-model-check:checked');
         if (!checks.length) {
-            msg.style.color = '#c62828';
+            msg.style.color = '#DC2626';
             msg.textContent = 'Selecciona al menos un modelo.';
             return;
         }
@@ -854,19 +851,19 @@ require __DIR__ . '/templates/header.php';
             const idx = parseInt(cb.dataset.idx);
             if (_fetchedModels[idx]) toImport.push(_fetchedModels[idx]);
         });
-        msg.style.color = '#888';
+        msg.style.color = 'var(--text-muted)';
         msg.textContent = 'Importando ' + toImport.length + ' modelos...';
         try {
             const data = await apiFetch('api/v1/admin_providers.php?action=import_models', {
                 method: 'POST', body: JSON.stringify({provider_id: providerId, models: toImport})
             });
-            msg.style.color = '#2e7d32';
+            msg.style.color = '#16A34A';
             let txt = 'Importados: ' + data.imported + ', Saltados: ' + data.skipped;
             if (data.errors.length) txt += ', Errores: ' + data.errors.join('; ');
             msg.textContent = txt;
             loadProvidersAdmin();
         } catch (err) {
-            msg.style.color = '#c62828';
+            msg.style.color = '#DC2626';
             msg.textContent = err.message;
         }
     }
@@ -915,13 +912,13 @@ require __DIR__ . '/templates/header.php';
             await apiFetch('api/v1/admin_providers.php?action=create_provider', {
                 method: 'POST', body: JSON.stringify(payload)
             });
-            msg.style.color = '#2e7d32';
+            msg.style.color = '#16A34A';
             msg.textContent = 'Proveedor añadido.';
             form.reset();
             loadProvidersAdmin();
             loadUsageStats();
         } catch (err) {
-            msg.style.color = '#c62828';
+            msg.style.color = '#DC2626';
             msg.textContent = err.message;
         }
         return false;
@@ -944,12 +941,12 @@ require __DIR__ . '/templates/header.php';
             await apiFetch('api/v1/admin_providers.php?action=create_model', {
                 method: 'POST', body: JSON.stringify(payload)
             });
-            msg.style.color = '#2e7d32';
+            msg.style.color = '#16A34A';
             msg.textContent = 'Modelo añadido.';
             form.reset();
             loadProvidersAdmin();
         } catch (err) {
-            msg.style.color = '#c62828';
+            msg.style.color = '#DC2626';
             msg.textContent = err.message;
         }
         return false;
@@ -984,7 +981,7 @@ require __DIR__ . '/templates/header.php';
         const msg = document.getElementById('import-msg');
         const providerId = parseInt(document.getElementById('import-provider-select').value);
         if (!providerId) {
-            msg.style.color = '#c62828';
+            msg.style.color = '#DC2626';
             msg.textContent = 'Selecciona un proveedor.';
             return false;
         }
@@ -993,7 +990,7 @@ require __DIR__ . '/templates/header.php';
             models = JSON.parse(form.querySelector('textarea[name=json]').value);
             if (!Array.isArray(models)) throw new Error('El JSON debe ser un array');
         } catch (e) {
-            msg.style.color = '#c62828';
+            msg.style.color = '#DC2626';
             msg.textContent = 'JSON inválido: ' + e.message;
             return false;
         }
@@ -1001,13 +998,13 @@ require __DIR__ . '/templates/header.php';
             const data = await apiFetch('api/v1/admin_providers.php?action=import_models', {
                 method: 'POST', body: JSON.stringify({provider_id: providerId, models: models})
             });
-            msg.style.color = '#2e7d32';
+            msg.style.color = '#16A34A';
             let txt = 'Importados: ' + data.imported + ', Saltados (ya existían): ' + data.skipped;
             if (data.errors.length) txt += ', Errores: ' + data.errors.join('; ');
             msg.textContent = txt;
             loadProvidersAdmin();
         } catch (err) {
-            msg.style.color = '#c62828';
+            msg.style.color = '#DC2626';
             msg.textContent = err.message;
         }
         return false;
@@ -1190,11 +1187,11 @@ require __DIR__ . '/templates/header.php';
             });
             const data = await resp.json();
             if (!resp.ok || data.error) throw new Error(data.error || 'Error desconocido');
-            msg.style.color = '#2e7d32';
+            msg.style.color = '#16A34A';
             msg.textContent = 'Plantilla guardada.';
             setTimeout(() => location.reload(), 600);
         } catch (err) {
-            msg.style.color = '#c62828';
+            msg.style.color = '#DC2626';
             msg.textContent = err.message;
         }
         return false;
@@ -1354,8 +1351,8 @@ function log(msg, type = 'info') {
     el.classList.add('visible');
     const div = document.createElement('div');
     div.style.margin = '0.25rem 0';
-    if (type === 'error') div.style.color = '#c62828';
-    if (type === 'success') div.style.color = '#2e7d32';
+    if (type === 'error') div.style.color = '#DC2626';
+    if (type === 'success') div.style.color = '#16A34A';
     div.textContent = msg;
     el.appendChild(div);
 }
@@ -1489,10 +1486,10 @@ async function savePat(form) {
     const data = await resp.json();
     const msg = document.getElementById('pat-msg');
     if (data.success) {
-        msg.style.color = '#2e7d32';
+        msg.style.color = '#16A34A';
         msg.textContent = 'PAT guardado.';
     } else {
-        msg.style.color = '#c62828';
+        msg.style.color = '#DC2626';
         msg.textContent = data.error || 'Error';
     }
 }
@@ -1598,10 +1595,10 @@ async function saveExecutor(form) {
     const data = await resp.json();
     const msg = document.getElementById('exec-msg');
     if (data.success) {
-        msg.style.color = '#2e7d32';
+        msg.style.color = '#16A34A';
         msg.textContent = 'Ejecutor por defecto guardado.';
     } else {
-        msg.style.color = '#c62828';
+        msg.style.color = '#DC2626';
         msg.textContent = data.error || 'Error';
     }
 }
@@ -1613,11 +1610,11 @@ async function toggleReg(form) {
     const data = await resp.json();
     const msg = document.getElementById('reg-msg');
     if (data.success) {
-        msg.style.color = '#2e7d32';
+        msg.style.color = '#16A34A';
         msg.textContent = data.enabled ? 'Registro abierto.' : 'Registro cerrado.';
         setTimeout(() => location.reload(), 1000);
     } else {
-        msg.style.color = '#c62828';
+        msg.style.color = '#DC2626';
         msg.textContent = data.error || 'Error';
     }
 }
@@ -1629,12 +1626,12 @@ async function addUser(form) {
     const data = await resp.json();
     const msg = document.getElementById('user-msg');
     if (data.success) {
-        msg.style.color = '#2e7d32';
+        msg.style.color = '#16A34A';
         msg.textContent = 'Usuario creado.';
         form.reset();
         setTimeout(() => location.reload(), 1000);
     } else {
-        msg.style.color = '#c62828';
+        msg.style.color = '#DC2626';
         msg.textContent = data.error || 'Error al crear usuario';
     }
 }

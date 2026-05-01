@@ -29,10 +29,10 @@
 
     --success: #2e7d32;
     --success-bg: #e8f5e9;
-    --warning: #f57c00;
-    --warning-bg: #fff3e0;
-    --error: #c62828;
-    --error-bg: #ffebee;
+    --warning: #CA8A04;
+    --warning-bg: #fffbeb;
+    --error: #DC2626;
+    --error-bg: #fef2f2;
     --info: #1976d2;
     --info-bg: #e3f2fd;
     --primary-bg: #e8eaf6;
@@ -68,10 +68,10 @@
 
     --success: #66bb6a;
     --success-bg: #1b3a1c;
-    --warning: #ffa726;
-    --warning-bg: #3e2723;
-    --error: #ef5350;
-    --error-bg: #3e1c1c;
+    --warning: #fbbf24;
+    --warning-bg: #3f2c06;
+    --error: #f87171;
+    --error-bg: #450a0a;
     --info: #42a5f5;
     --info-bg: #1a2f4a;
     --primary-bg: #1a1d3a;
@@ -287,9 +287,9 @@ input, select, textarea {
 }
 
 input:focus, select:focus, textarea:focus {
-    outline: none;
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(0, 131, 143, 0.12);
 }
 
 input[type="checkbox"] {
@@ -430,7 +430,7 @@ td code, td .mono {
 }
 .badge-inactive {
     background: var(--bg);
-    color: var(--muted);
+    color: var(--text-muted);
     text-decoration: line-through;
     opacity: 0.7;
 }
@@ -763,11 +763,49 @@ pre {
     background: #6c757d;
     white-space: nowrap;
 }
-.cvss-badge.sev-low      { background: #4caf50; }
-.cvss-badge.sev-medium   { background: #ff9800; }
-.cvss-badge.sev-high     { background: #f44336; }
-.cvss-badge.sev-critical { background: #b71c1c; }
-.cvss-badge.sev-none     { background: #6c757d; color: #eee; }
+.cvss-badge.sev-low      { background: #16A34A; }
+.cvss-badge.sev-medium   { background: #CA8A04; }
+.cvss-badge.sev-high     { background: #EA580C; }
+.cvss-badge.sev-critical { background: #DC2626; }
+.cvss-badge.sev-none     { background: #64748B; color: #fff; }
+
+/* ---------- Severity badges (standard palette) ---------- */
+.severity-critical, .badge.severity-critical { background: #DC2626; color: #fff; }
+.severity-high,     .badge.severity-high     { background: #EA580C; color: #fff; }
+.severity-medium,   .badge.severity-medium   { background: #CA8A04; color: #000; }
+.severity-low,      .badge.severity-low      { background: #16A34A; color: #fff; }
+.severity-info,     .badge.severity-info     { background: #2563EB; color: #fff; }
+
+/* ---------- Verdict badges ---------- */
+.verdict-true-positive { background: #DC2626; color: #fff; }
+.verdict-false-positive { background: #16A34A; color: #fff; }
+.verdict-needs-review { background: #CA8A04; color: #000; }
+
+/* ---------- IOC status badges ---------- */
+.ioc-sospechosa { background: #CA8A04; color: #000; }
+.ioc-confirmada-maliciosa { background: #DC2626; color: #fff; }
+.ioc-falsa-alarma { background: #16A34A; color: #fff; }
+.ioc-whitelist { background: #64748B; color: #fff; }
+
+/* ---------- Risk score colors ---------- */
+.risk-critical { background: #DC2626; }
+.risk-high { background: #EA580C; }
+.risk-low { background: #16A34A; }
+.text-risk-critical { color: #DC2626; }
+.text-risk-high { color: #EA580C; }
+.text-risk-low { color: #16A34A; }
+
+/* ---------- Priority badges ---------- */
+.priority-aplus, .priority-a\+ { background: #DC2626; color: #fff; }
+.priority-a { background: #EA580C; color: #fff; }
+.priority-b { background: #CA8A04; color: #000; }
+.priority-c { background: #2563EB; color: #fff; }
+
+/* ---------- Model tags ---------- */
+.tag-cybersecurity { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning); }
+.tag-reasoning { background: var(--info-bg); color: var(--info); border: 1px solid var(--info); }
+.tag-recommended { background: var(--success-bg); color: var(--success); border: 1px solid var(--success); }
+.tag-free { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border-strong); }
 
 /* ---------- CVE Report ---------- */
 .cve-report {
