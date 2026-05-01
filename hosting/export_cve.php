@@ -1,6 +1,26 @@
 <?php
 declare(strict_types=1);
 
+// Capturar CUALQUIER error (fatal, excepción, warning) y mostrarlo
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
+
+set_error_handler(function ($severity, $message, $file, $line) {
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+
+set_exception_handler(function (Throwable $e) {
+    http_response_code(500);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "ERROR en export_cve.php:\n\n";
+    echo get_class($e) . ": " . $e->getMessage() . "\n";
+    echo "Archivo: " . $e->getFile() . "\n";
+    echo "Línea: " . $e->getLine() . "\n\n";
+    echo "Traceback:\n" . $e->getTraceAsString() . "\n";
+    exit;
+});
+
 require_once __DIR__ . '/includes/config.php';
 require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/auth.php';
@@ -75,8 +95,17 @@ exit;
  */
 function buildProfessionalDocx(string $reportText, string $cveId, array $task, string $lang): string {
     $tmpFile = tempnam(sys_get_temp_dir(), 'orinsec_docx_');
+    if ($tmpFile === false) {
+        throw new RuntimeException('No se pudo crear archivo temporal con tempnam()');
+    }
+    if (!class_exists('ZipArchive')) {
+        throw new RuntimeException('La extensión ZipArchive no está disponible en este servidor');
+    }
     $zip = new ZipArchive();
-    $zip->open($tmpFile, ZipArchive::OVERWRITE);
+    $openResult = $zip->open($tmpFile, ZipArchive::OVERWRITE);
+    if ($openResult !== true) {
+        throw new RuntimeException('ZipArchive::open() falló con código: ' . $openResult);
+    }
 
     // ── 1. [Content_Types].xml ──────────────────────────────────────────
     $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -195,7 +224,7 @@ XML;
 
     foreach ($lines as $line) {
         $line = rtrim($line);
-        if ($line === '' || str_contains($line, '═') || str_contains($line, '╔') || str_contains($line, '╚')) {
+        if ($line === '' || strpos($line, '═') !== false || strpos($line, '╔') !== false || strpos($line, '╚') !== false) {
             continue;
         }
 
@@ -294,7 +323,7 @@ function renderSectionXml(string $sectionTitle, array $contentLines): string {
         $xml .= '</w:tbl>';
     } else {
         // Renderizar como párrafos normales o lista
-        $isList = count($contentLines) > 1 && count(array_filter($contentLines, fn($l) => preg_match('/^[•\-\*\d]/u', $l))) > 1;
+        $isList = count($contentLines) > 1 && count(array_filter($contentLines, function($l) { return preg_match('/^[•\-\*\d]/u', $l); })) > 1;
 
         foreach ($contentLines as $line) {
             $line = stripEmojis($line);
@@ -304,7 +333,7 @@ function renderSectionXml(string $sectionTitle, array $contentLines): string {
                 // Link
                 $url = wordEscape($line);
                 $xml .= "<w:p><w:pPr><w:spacing w:after=\"80\"/></w:pPr><w:r><w:rPr><w:color w:val=\"0563C1\"/><w:u w:val=\"single\"/></w:rPr><w:t>{$url}</w:t></w:r></w:p>\n";
-            } elseif (str_starts_with($line, '[') && str_ends_with($line, ']')) {
+            } elseif (strpos($line, '[') === 0 && substr($line, -1) === ']') {
                 // Placeholder
                 $xml .= "<w:p><w:pPr><w:spacing w:after=\"80\"/></w:pPr><w:r><w:rPr><w:color w:val=\"999999\"/><w:i/></w:rPr><w:t>" . wordEscape($line) . "</w:t></w:r></w:p>\n";
             } else {
