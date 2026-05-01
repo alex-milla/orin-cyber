@@ -25,15 +25,15 @@ class CveSearchTaskPhp {
         // 1. Enriquecer datos
         $enriched = $this->enrichCve($cveId, $language);
 
-        // 2. Pedir al LLM SOLO el análisis de riesgo
+        // 2. Pedir al LLM JSON con description + analysis
         $customTemplate = trim((string)($input['template'] ?? ''));
-        $llmAnalysis = $this->getLlmAnalysis($enriched, $language, $customTemplate);
+        $llmTexts = $this->getLlmTexts($enriched, $language, $customTemplate);
 
         // 3. Construir reporte box-drawing determinístico
-        $reportText = $this->buildBoxDrawingReport($enriched, $language, $llmAnalysis);
+        $reportText = $this->buildBoxDrawingReport($enriched, $language, $llmTexts);
 
         // 4. Renderizar HTML visual determinístico
-        $html = $this->renderHtml($enriched, $llmAnalysis, $language);
+        $html = $this->renderHtml($enriched, $llmTexts, $language);
 
         return [
             'result_html'     => $html,
@@ -136,15 +136,17 @@ class CveSearchTaskPhp {
         ];
     }
 
-    private function getLlmAnalysis(array $enriched, string $language, string $customTemplate = ''): string {
+    private function getLlmTexts(array $enriched, string $language, string $customTemplate = ''): array {
         $cve = $enriched;
         $epss = $enriched['epss'];
         $kev = $enriched['kev'];
         $github = $enriched['github'];
 
         $cveId = $cve['cve_id'];
-        $desc = $cve['description'];
+        $descEn = $cve['description_en'] ?: $cve['description'];
         $vector = $cve['vector'];
+        $score = $cve['cvss_score'];
+        $severity = $cve['severity'];
         $epssStr = $epss ? "{$epss['score_percent']}%" : 'N/A';
         $kevStr = $kev ? 'YES' : 'NO';
         $exploitCount = $github ? count($github) : 0;
@@ -152,58 +154,111 @@ class CveSearchTaskPhp {
         if ($customTemplate) {
             $systemPrompt = $customTemplate;
         } elseif ($language === 'es') {
-            $systemPrompt = "Eres un analista senior de ciberseguridad. Responde de forma concisa y técnica.";
+            $systemPrompt = "Eres un analista senior de ciberseguridad. Responde ÚNICAMENTE con JSON válido.";
         } else {
-            $systemPrompt = "You are a senior cybersecurity analyst. Respond concisely and technically.";
+            $systemPrompt = "You are a senior cybersecurity analyst. Respond ONLY with valid JSON.";
         }
 
         if ($language === 'es') {
             $userPrompt = (
-                "Genera un análisis de riesgo técnico conciso para la vulnerabilidad {$cveId}.\n\n"
-                . "DATOS DE REFERENCIA (NO repitas estos valores en tu análisis):\n"
-                . "- Descripción: " . substr($desc, 0, 400) . "\n"
-                . "- Vector: {$vector}\n"
-                . "- EPSS: {$epssStr}\n"
-                . "- CISA KEV: {$kevStr}\n"
-                . "- Exploits públicos: {$exploitCount}\n\n"
+                "Toma estos datos extraídos de fuentes oficiales:\n\n"
+                . "cve_id: {$cveId}\n"
+                . "published: " . ($cve['published'] ?: 'N/A') . "\n"
+                . "cvss_score: " . ($score !== null ? (string)$score : 'N/A') . "\n"
+                . "cvss_severity: {$severity}\n"
+                . "cvss_vector: {$vector}\n"
+                . "description_en: " . substr($descEn, 0, 500) . "\n"
+                . "public_exploits_count: {$exploitCount}\n"
+                . "epss_score: {$epssStr}\n"
+                . "cisa_kev: {$kevStr}\n\n"
+                . "Genera un JSON con exactamente estas claves:\n"
+                . '- "description_es": traducción técnica al español de la descripción (máx. 3 frases claras).\n'
+                . '- "risk_assessment_es": análisis técnico conciso del impacto y riesgo (máx. 150 palabras).\n\n'
                 . "REGLAS:\n"
-                . "1. Máximo 150 palabras.\n"
-                . "2. NO repitas el score CVSS, la severidad, el EPSS ni el estado KEV.\n"
-                . "3. NO inventes versiones de parche ni fechas.\n"
-                . "4. Enfócate en: vector de explotación real, condiciones necesarias, impacto para la organización.\n"
-                . "5. Usa [INFERIDO] solo para consecuencias lógicas obvias.\n"
-                . "6. Responde en español.\n\n"
-                . "Escribe SOLO el párrafo de análisis, sin títulos ni formato adicional."
+                . "1. NO repitas el score CVSS, la severidad, el EPSS ni el estado KEV en el análisis.\n"
+                . "2. NO inventes versiones de parche ni fechas.\n"
+                . "3. Enfócate en: vector de explotación real, condiciones necesarias, impacto para la organización.\n"
+                . "4. Usa [INFERIDO] solo para consecuencias lógicas obvias.\n"
+                . "5. Responde ÚNICAMENTE con el JSON válido. Sin markdown, sin comentarios, sin texto adicional.\n\n"
+                . 'Ejemplo: {"description_es": "...", "risk_assessment_es": "..."}'
             );
         } else {
             $userPrompt = (
-                "Generate a concise technical risk analysis for vulnerability {$cveId}.\n\n"
-                . "REFERENCE DATA (DO NOT repeat these values in your analysis):\n"
-                . "- Description: " . substr($desc, 0, 400) . "\n"
-                . "- Vector: {$vector}\n"
-                . "- EPSS: {$epssStr}\n"
-                . "- CISA KEV: {$kevStr}\n"
-                . "- Public exploits: {$exploitCount}\n\n"
+                "Here is the official vulnerability data:\n\n"
+                . "cve_id: {$cveId}\n"
+                . "published: " . ($cve['published'] ?: 'N/A') . "\n"
+                . "cvss_score: " . ($score !== null ? (string)$score : 'N/A') . "\n"
+                . "cvss_severity: {$severity}\n"
+                . "cvss_vector: {$vector}\n"
+                . "description_en: " . substr($descEn, 0, 500) . "\n"
+                . "public_exploits_count: {$exploitCount}\n"
+                . "epss_score: {$epssStr}\n"
+                . "cisa_kev: {$kevStr}\n\n"
+                . "Generate a JSON with exactly these keys:\n"
+                . '- "description_en": refined technical description (max 3 sentences).\n'
+                . '- "risk_assessment_en": concise technical risk analysis (max 150 words).\n\n'
                 . "RULES:\n"
-                . "1. Maximum 150 words.\n"
-                . "2. DO NOT repeat CVSS score, severity, EPSS or KEV status.\n"
-                . "3. DO NOT invent patch versions or dates.\n"
-                . "4. Focus on: real exploitation vector, required conditions, organizational impact.\n"
-                . "5. Use [INFERRED] only for obvious logical consequences.\n"
-                . "6. Respond in English.\n\n"
-                . "Write ONLY the analysis paragraph, no titles or additional formatting."
+                . "1. DO NOT repeat CVSS score, severity, EPSS or KEV status in the analysis.\n"
+                . "2. DO NOT invent patch versions or dates.\n"
+                . "3. Focus on: real exploitation vector, required conditions, organizational impact.\n"
+                . "4. Use [INFERRED] only for obvious logical consequences.\n"
+                . "5. Respond ONLY with valid JSON. No markdown, no comments, no extra text.\n\n"
+                . 'Example: {"description_en": "...", "risk_assessment_en": "..."}'
             );
         }
 
+        $raw = '';
         try {
-            $analysis = $this->worker->chat($systemPrompt, $userPrompt, [
+            $raw = $this->worker->chat($systemPrompt, $userPrompt, [
                 'temperature' => 0.2,
                 'max_tokens'  => 2048,
             ]);
-            return trim($analysis);
         } catch (Throwable $e) {
-            return '';
+            return ['description' => '', 'analysis' => ''];
         }
+
+        return $this->parseLlmJson($raw, $language);
+    }
+
+    private function parseLlmJson(string $raw, string $language): array {
+        $result = ['description' => '', 'analysis' => ''];
+        if (!$raw) {
+            return $result;
+        }
+
+        $text = trim($raw);
+        if (str_starts_with($text, '```json')) {
+            $text = substr($text, 7);
+        }
+        if (str_starts_with($text, '```')) {
+            $text = substr($text, 3);
+        }
+        if (str_ends_with($text, '```')) {
+            $text = substr($text, 0, -3);
+        }
+        $text = trim($text);
+
+        $data = json_decode($text, true);
+        if (!is_array($data)) {
+            // Fallback regex
+            if (preg_match('/"description_[a-z]+":\s*"([^"]+)"/', $text, $m)) {
+                $result['description'] = str_replace('\\n', "\n", $m[1]);
+            }
+            if (preg_match('/"risk_assessment_[a-z]+":\s*"([^"]+)"/', $text, $m)) {
+                $result['analysis'] = str_replace('\\n', "\n", $m[1]);
+            }
+            return $result;
+        }
+
+        if ($language === 'es') {
+            $result['description'] = $data['description_es'] ?? '';
+            $result['analysis'] = $data['risk_assessment_es'] ?? '';
+        } else {
+            $result['description'] = $data['description_en'] ?? ($data['description'] ?? '');
+            $result['analysis'] = $data['risk_assessment_en'] ?? ($data['risk_assessment'] ?? '');
+        }
+
+        return $result;
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -449,13 +504,13 @@ class CveSearchTaskPhp {
     // Report builder (determinístico)
     // ─────────────────────────────────────────────────────────────────────
 
-    private function buildBoxDrawingReport(array $e, string $lang, string $llmAnalysis): string {
+    private function buildBoxDrawingReport(array $e, string $lang, array $llmTexts): string {
         $cveId = $e['cve_id'];
         $published = $e['published'] ?: 'N/A';
         $score = $e['cvss_score'];
         $severity = $e['severity'];
         $vector = $e['vector'];
-        $description = $e['description'];
+        $description = $llmTexts['description'] ?: $e['description'];
         $refs = $e['references'];
         $epss = $e['epss'];
         $kev = $e['kev'];
@@ -496,6 +551,7 @@ class CveSearchTaskPhp {
         }
 
         // Análisis del LLM
+        $llmAnalysis = $llmTexts['analysis'] ?? '';
         if (!$llmAnalysis) {
             $llmAnalysis = '  [No AI analysis available]';
         } else {
@@ -539,13 +595,13 @@ class CveSearchTaskPhp {
     // HTML renderer
     // ─────────────────────────────────────────────────────────────────────
 
-    private function renderHtml(array $enriched, string $llmAnalysis, string $language): string {
+    private function renderHtml(array $enriched, array $llmTexts, string $language): string {
         $cveId = htmlspecialchars($enriched['cve_id']);
         $published = htmlspecialchars($enriched['published'] ?: 'N/A');
         $score = $enriched['cvss_score'];
         $severity = htmlspecialchars($enriched['severity']);
         $vector = htmlspecialchars($enriched['vector']);
-        $description = htmlspecialchars($enriched['description']);
+        $description = htmlspecialchars($llmTexts['description'] ?: $enriched['description']);
         $refs = $enriched['references'];
         $epss = $enriched['epss'];
         $kev = $enriched['kev'];
@@ -642,6 +698,7 @@ class CveSearchTaskPhp {
         $html .= $section('CISA KEV Catalog', $kevContent, '🛡️');
 
         // AI Analysis
+        $llmAnalysis = $llmTexts['analysis'] ?? '';
         if ($llmAnalysis) {
             $analysisHtml = nl2br(htmlspecialchars($llmAnalysis, ENT_NOQUOTES, 'UTF-8'));
             $analysisHtml = preg_replace('#(https?://[^\s\)\]\>\"\'\`]+)#', '<a href="$1" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline;">$1</a>', $analysisHtml);

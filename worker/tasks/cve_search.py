@@ -1,15 +1,16 @@
 """Tarea: búsqueda de CVEs y generación de informe con LLM.
 
-Arquitectura de fuentes (best practices):
-  1. CVE.org / CVE Services  → fuente canónica (registro oficial)
-  2. NVD API v2              → enriquecimiento (CVSS, CPE, CWE)
-  3. CISA KEV                → priorización operativa
-  4. EPSS / GitHub / OSV     → datos complementarios
+Flujo (basado en best practices + patrón Copilot):
+  1. Recolectar datos oficiales: CVE.org (canónico) → NVD (enriquecimiento) → EPSS → CISA KEV → GitHub → OSV
+  2. Normalizar y fusionar campos
+  3. Pedir al LLM que genere JSON con: description_es / risk_assessment_es
+  4. Parsear JSON de respuesta
+  5. Construir reporte determinístico (texto plano box-drawing + HTML visual)
 """
 
 import json
 import logging
-import os
+import re
 from typing import Any
 
 from tasks.base import BaseTask
@@ -26,7 +27,6 @@ logger = logging.getLogger(__name__)
 
 
 def _calc_priority(score: float | None, epss_score: float | None, kev_listed: bool) -> str:
-    """Calcula prioridad de parcheo basada en datos objetivos."""
     if kev_listed:
         return "A+"
     if score is not None and epss_score is not None:
@@ -47,7 +47,6 @@ def _calc_priority(score: float | None, epss_score: float | None, kev_listed: bo
 
 
 def _merge_references(*ref_lists: list) -> list[str]:
-    """Fusiona listas de referencias eliminando duplicados."""
     seen = set()
     merged = []
     for lst in ref_lists:
@@ -60,8 +59,8 @@ def _merge_references(*ref_lists: list) -> list[str]:
     return merged
 
 
-def _build_report_text(entry: dict, language: str = "es", llm_analysis: str = "") -> str:
-    """Construye el informe completo con box-drawing, inyectando el análisis del LLM."""
+def _build_report_text(entry: dict, llm_texts: dict, language: str = "es") -> str:
+    """Construye el informe completo con box-drawing, inyectando textos del LLM."""
     cve = entry["cve"]
     epss = entry.get("epss")
     kev = entry.get("kev")
@@ -75,7 +74,11 @@ def _build_report_text(entry: dict, language: str = "es", llm_analysis: str = ""
     vector = cve.get("vector", "N/A")
     refs = cve.get("references", [])
 
-    desc_text = cve.get("description", "No data found")
+    # Descripción: preferir la del LLM (traducción), luego datos oficiales
+    desc_text = llm_texts.get("description", "")
+    if not desc_text:
+        desc_text = cve.get("description", "No data found")
+
     score_str = str(score) if score is not None else "N/A"
 
     # Exploits
@@ -115,12 +118,12 @@ def _build_report_text(entry: dict, language: str = "es", llm_analysis: str = ""
         ref_block = "└ N/A"
 
     # Análisis del LLM
-    if not llm_analysis:
-        llm_analysis = "  [No AI analysis available]"
+    analysis = llm_texts.get("analysis", "").strip()
+    if not analysis:
+        analysis = "  [No AI analysis available]"
     else:
-        # Indentar cada línea del análisis
-        lines = llm_analysis.strip().split("\n")
-        llm_analysis = "\n".join(f"│  {line}" for line in lines)
+        lines = analysis.split("\n")
+        analysis = "\n".join(f"│  {line}" for line in lines)
 
     return (
         f"╔═══════════════════════╗\n"
@@ -143,7 +146,7 @@ def _build_report_text(entry: dict, language: str = "es", llm_analysis: str = ""
         f"└{kev_str}\n\n"
         f"┌───[ 🤖 AI-Powered Risk Assessment ]\n"
         f"│\n"
-        f"{llm_analysis}\n"
+        f"{analysis}\n"
         f"│\n"
         f"└────────────────────────────────────────\n\n"
         f"┌───[ ⚠️ Patching Priority Rating ]\n"
@@ -157,16 +160,17 @@ def _build_report_text(entry: dict, language: str = "es", llm_analysis: str = ""
 
 
 def _build_llm_prompt(entry: dict, language: str = "es") -> str:
-    """Construye el prompt que le pide al LLM SOLO el análisis de riesgo."""
+    """Prompt que pide al LLM que devuelva JSON con description_es y risk_assessment_es."""
     cve = entry["cve"]
     epss = entry.get("epss")
     kev = entry.get("kev")
     github = entry.get("github")
-    osv = entry.get("osv")
 
     cve_id = cve.get("cve_id", "Unknown")
-    desc = cve.get("description", "N/A")
+    desc_en = cve.get("description_en", cve.get("description", "N/A"))
     vector = cve.get("vector", "N/A")
+    score = cve.get("score")
+    severity = cve.get("severity", "N/A")
 
     epss_str = f"{epss['score_percent']}%" if epss else "N/A"
     kev_str = "YES" if kev else "NO"
@@ -174,44 +178,89 @@ def _build_llm_prompt(entry: dict, language: str = "es") -> str:
 
     if language == "es":
         return (
-            f"Eres un analista senior de ciberseguridad. Genera un análisis de riesgo técnico conciso "
-            f"para la vulnerabilidad {cve_id}.\n\n"
-            f"DATOS DE REFERENCIA (NO repitas estos valores en tu análisis):\n"
-            f"- Descripción: {desc[:400]}\n"
-            f"- Vector: {vector}\n"
-            f"- EPSS: {epss_str}\n"
-            f"- CISA KEV: {kev_str}\n"
-            f"- Exploits públicos: {exploit_count}\n"
-            f"- OSV: {len(osv['affected_packages']) if osv and osv.get('affected_packages') else 0} paquetes afectados\n\n"
+            f"Eres un analista senior de ciberseguridad. Toma estos datos extraídos de fuentes oficiales:\n\n"
+            f"cve_id: {cve_id}\n"
+            f"published: {cve.get('published', 'N/A')}\n"
+            f"cvss_score: {score if score is not None else 'N/A'}\n"
+            f"cvss_severity: {severity}\n"
+            f"cvss_vector: {vector}\n"
+            f"description_en: {desc_en[:500]}\n"
+            f"public_exploits_count: {exploit_count}\n"
+            f"epss_score: {epss_str}\n"
+            f"cisa_kev: {kev_str}\n\n"
+            f"Genera un JSON con exactamente estas claves:\n"
+            f'- "description_es": traducción técnica al español de la descripción (máx. 3 frases claras).\n'
+            f'- "risk_assessment_es": análisis técnico conciso del impacto y riesgo (máx. 150 palabras).\n\n'
             f"REGLAS:\n"
-            f"1. Máximo 150 palabras.\n"
-            f"2. NO repitas el score CVSS, la severidad, el EPSS ni el estado KEV.\n"
-            f"3. NO inventes versiones de parche ni fechas.\n"
-            f"4. Enfócate en: vector de explotación real, condiciones necesarias, impacto para la organización.\n"
-            f"5. Usa [INFERIDO] solo para consecuencias lógicas obvias.\n"
-            f"6. Responde en español.\n\n"
-            f"Escribe SOLO el párrafo de análisis, sin títulos ni formato adicional."
+            f"1. NO repitas el score CVSS, la severidad, el EPSS ni el estado KEV en el análisis de riesgo.\n"
+            f"2. NO inventes versiones de parche ni fechas.\n"
+            f"3. Enfócate en: vector de explotación real, condiciones necesarias, impacto para la organización.\n"
+            f"4. Usa [INFERIDO] solo para consecuencias lógicas obvias.\n"
+            f"5. Responde ÚNICAMENTE con el JSON válido. Sin markdown, sin comentarios, sin texto adicional.\n\n"
+            f'Ejemplo de formato de respuesta: {{"description_es": "...", "risk_assessment_es": "..."}}'
         )
     else:
         return (
-            f"You are a senior cybersecurity analyst. Generate a concise technical risk analysis "
-            f"for vulnerability {cve_id}.\n\n"
-            f"REFERENCE DATA (DO NOT repeat these values in your analysis):\n"
-            f"- Description: {desc[:400]}\n"
-            f"- Vector: {vector}\n"
-            f"- EPSS: {epss_str}\n"
-            f"- CISA KEV: {kev_str}\n"
-            f"- Public exploits: {exploit_count}\n"
-            f"- OSV: {len(osv['affected_packages']) if osv and osv.get('affected_packages') else 0} affected packages\n\n"
+            f"You are a senior cybersecurity analyst. Here is the official data:\n\n"
+            f"cve_id: {cve_id}\n"
+            f"published: {cve.get('published', 'N/A')}\n"
+            f"cvss_score: {score if score is not None else 'N/A'}\n"
+            f"cvss_severity: {severity}\n"
+            f"cvss_vector: {vector}\n"
+            f"description_en: {desc_en[:500]}\n"
+            f"public_exploits_count: {exploit_count}\n"
+            f"epss_score: {epss_str}\n"
+            f"cisa_kev: {kev_str}\n\n"
+            f"Generate a JSON with exactly these keys:\n"
+            f'- "description_en": refined technical description (max 3 sentences).\n'
+            f'- "risk_assessment_en": concise technical risk analysis (max 150 words).\n\n'
             f"RULES:\n"
-            f"1. Maximum 150 words.\n"
-            f"2. DO NOT repeat CVSS score, severity, EPSS or KEV status.\n"
-            f"3. DO NOT invent patch versions or dates.\n"
-            f"4. Focus on: real exploitation vector, required conditions, organizational impact.\n"
-            f"5. Use [INFERRED] only for obvious logical consequences.\n"
-            f"6. Respond in English.\n\n"
-            f"Write ONLY the analysis paragraph, no titles or additional formatting."
+            f"1. DO NOT repeat CVSS score, severity, EPSS or KEV status in the risk analysis.\n"
+            f"2. DO NOT invent patch versions or dates.\n"
+            f"3. Focus on: real exploitation vector, required conditions, organizational impact.\n"
+            f"4. Use [INFERRED] only for obvious logical consequences.\n"
+            f"5. Respond ONLY with valid JSON. No markdown, no comments, no extra text.\n\n"
+            f'Example response format: {{"description_en": "...", "risk_assessment_en": "..."}}'
         )
+
+
+def _parse_llm_json(raw: str, language: str) -> dict[str, str]:
+    """Extrae description y analysis del JSON devuelto por el LLM."""
+    result = {"description": "", "analysis": ""}
+    if not raw:
+        return result
+
+    # Limpiar posible markdown de código
+    text = raw.strip()
+    if text.startswith("```json"):
+        text = text[7:]
+    if text.startswith("```"):
+        text = text[3:]
+    if text.endswith("```"):
+        text = text[:-3]
+    text = text.strip()
+
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        # Fallback: intentar extraer con regex
+        logger.warning("LLM did not return valid JSON, attempting regex fallback")
+        desc_match = re.search(r'"description_[a-z]+":\s*"([^"]+)"', text)
+        analysis_match = re.search(r'"risk_assessment_[a-z]+":\s*"([^"]+)"', text)
+        if desc_match:
+            result["description"] = desc_match.group(1).replace("\\n", "\n")
+        if analysis_match:
+            result["analysis"] = analysis_match.group(1).replace("\\n", "\n")
+        return result
+
+    if language == "es":
+        result["description"] = data.get("description_es", "")
+        result["analysis"] = data.get("risk_assessment_es", "")
+    else:
+        result["description"] = data.get("description_en", data.get("description", ""))
+        result["analysis"] = data.get("risk_assessment_en", data.get("risk_assessment", ""))
+
+    return result
 
 
 class CveSearchTask(BaseTask):
@@ -221,13 +270,10 @@ class CveSearchTask(BaseTask):
         self.llm = LlmClient(config_path)
 
     def _enrich_cve(self, cve_id: str, language: str = "es") -> dict | None:
-        """Enriquece un CVE consultando fuentes oficiales y complementarias."""
         logger.info("Enriching %s (lang=%s)", cve_id, language)
 
-        # ── Fuente canónica: CVE.org ──────────────────────────────────────
         cve_org_data = get_cve_org(cve_id)
 
-        # ── Fallback a NVD si CVE.org no responde ─────────────────────────
         nvd_data = None
         if not cve_org_data:
             logger.warning("CVE.org failed for %s, falling back to NVD", cve_id)
@@ -252,10 +298,8 @@ class CveSearchTask(BaseTask):
         if not cve_org_data:
             return None
 
-        # ── Enriquecimiento NVD ───────────────────────────────────────────
         nvd_enrich = get_cve_enrichment(cve_id)
 
-        # Fusionar datos
         cve = {
             "cve_id": cve_org_data["cve_id"],
             "state": cve_org_data.get("state", "UNKNOWN"),
@@ -274,7 +318,6 @@ class CveSearchTask(BaseTask):
             "cpes": nvd_enrich.get("cpes", []) if nvd_enrich else [],
         }
 
-        # CVSS: preferir CNA, luego NVD
         score = severity = vector = cvss_version = None
         cna_metrics = cve_org_data.get("metrics_cna")
         if cna_metrics:
@@ -293,7 +336,6 @@ class CveSearchTask(BaseTask):
         cve["vector"] = vector or "N/A"
         cve["cvss_version"] = cvss_version or ""
 
-        # ── Fuentes complementarias ───────────────────────────────────────
         epss = get_epss(cve_id)
         kev = get_kev(cve_id)
         github = find_exploits(cve_id, max_results=5)
@@ -330,13 +372,11 @@ class CveSearchTask(BaseTask):
             language = "es"
         custom_template = input_data.get("template", "").strip()
 
-        # Normalizar cve_list
         if not cve_list and cve_id:
             cve_list = [cve_id]
 
         cves = []
 
-        # ── Modo batch por CVE IDs ────────────────────────────────────────
         if cve_list:
             logger.debug("CVE lookup by IDs: %s", cve_list)
             for cid in cve_list[:20]:
@@ -375,45 +415,45 @@ class CveSearchTask(BaseTask):
                 "result_text": msg,
             }
 
-        # ── Generar informe ───────────────────────────────────────────────
         if len(cves) == 1:
             return self._generate_single(cves[0], language, custom_template)
         else:
             return self._generate_batch(cves, language)
 
     def _generate_single(self, entry: dict, language: str, custom_template: str = "") -> dict[str, str]:
-        """Genera informe para un único CVE: código construye la estructura, LLM solo el análisis."""
         cve_data = entry["cve"]
         cve_id = cve_data.get("cve_id", "Unknown")
 
-        # 1. Pedir al LLM SOLO el análisis de riesgo
+        # 1. Pedir al LLM JSON con description + analysis
         prompt = _build_llm_prompt(entry, language)
-        logger.info("Calling LLM for risk analysis of %s", cve_id)
+        logger.info("Calling LLM for JSON analysis of %s", cve_id)
 
         if custom_template:
             system_prompt = custom_template
         else:
             system_prompt = (
-                "Eres un analista senior de ciberseguridad. Responde de forma concisa y técnica."
+                "Eres un analista senior de ciberseguridad. Responde ÚNICAMENTE con JSON válido."
                 if language == "es" else
-                "You are a senior cybersecurity analyst. Respond concisely and technically."
+                "You are a senior cybersecurity analyst. Respond ONLY with valid JSON."
             )
 
         try:
-            llm_analysis = self.llm.chat(
+            llm_raw = self.llm.chat(
                 system_prompt=system_prompt,
                 user_prompt=prompt,
             )
-            llm_analysis = llm_analysis.strip()
         except Exception as exc:
             logger.warning("LLM call failed for %s: %s", cve_id, exc)
-            llm_analysis = ""
+            llm_raw = ""
 
-        # 2. Construir el reporte completo con box-drawing (determinístico)
-        report_text = _build_report_text(entry, language, llm_analysis)
+        # 2. Parsear JSON de respuesta
+        llm_texts = _parse_llm_json(llm_raw, language)
 
-        # 3. Convertir a HTML visual determinístico
-        result_html = render_cve_html(entry, llm_analysis, language)
+        # 3. Construir reporte determinístico
+        report_text = _build_report_text(entry, llm_texts, language)
+
+        # 4. Renderizar HTML visual
+        result_html = render_cve_html(entry, llm_texts, language)
 
         return {
             "result_html": result_html,
@@ -423,7 +463,6 @@ class CveSearchTask(BaseTask):
         }
 
     def _generate_batch(self, entries: list, language: str) -> dict[str, str]:
-        """Genera informe comparativo para múltiples CVEs (sin LLM)."""
         from utils.formatter import render_cve_report_batch
         html = render_cve_report_batch(entries)
 

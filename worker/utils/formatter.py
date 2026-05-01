@@ -101,7 +101,7 @@ def _section(title: str, content: str, icon: str = "") -> str:
 </div>'''
 
 
-def render_cve_html(entry: dict, llm_analysis: str, language: str = "es") -> str:
+def render_cve_html(entry: dict, llm_texts: dict, language: str = "es") -> str:
     """Genera HTML visual determinístico similar al resultado del chat."""
     cve = entry["cve"]
     epss = entry.get("epss")
@@ -115,7 +115,8 @@ def render_cve_html(entry: dict, llm_analysis: str, language: str = "es") -> str
     score = cve.get("score")
     severity = cve.get("severity", "N/A")
     vector = cve.get("vector", "N/A")
-    description = cve.get("description", "No data found")
+    # Preferir descripción del LLM (traducción), luego datos oficiales
+    description = llm_texts.get("description", "") or cve.get("description", "No data found")
     refs = cve.get("references", [])
 
     score_str = str(score) if score is not None else "N/A"
@@ -195,6 +196,7 @@ def render_cve_html(entry: dict, llm_analysis: str, language: str = "es") -> str
     html += _section("CISA KEV Catalog", kev_content, "🛡️")
 
     # ── AI Analysis ─────────────────────────────────────────────────────
+    llm_analysis = llm_texts.get("analysis", "")
     if llm_analysis:
         analysis_html = markdown_to_html(llm_analysis)
     else:
