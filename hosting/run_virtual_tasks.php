@@ -70,10 +70,11 @@ $executedBy = "{$providerLabel} → {$modelId}";
 
 function runVirtualTask(int $taskId, int $providerId, string $modelId, array $taskData): array {
     $worker = new VirtualWorker($providerId, $modelId, null);
-    $taskClass = match ($taskData['task_type']) {
-        'cve_search' => CveSearchTaskPhp::class,
-        default => throw new RuntimeException("task_type desconocido: {$taskData['task_type']}"),
-    };
+    if ($taskData['task_type'] === 'cve_search') {
+        $taskClass = CveSearchTaskPhp::class;
+    } else {
+        throw new RuntimeException("task_type desconocido: {$taskData['task_type']}");
+    }
     $instance = new $taskClass($worker);
     $input = json_decode($taskData['input_data'], true) ?: [];
     return $instance->run($input);

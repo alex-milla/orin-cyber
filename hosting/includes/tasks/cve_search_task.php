@@ -227,13 +227,13 @@ class CveSearchTaskPhp {
         }
 
         $text = trim($raw);
-        if (str_starts_with($text, '```json')) {
+        if (strpos($text, '```json') === 0) {
             $text = substr($text, 7);
         }
-        if (str_starts_with($text, '```')) {
+        if (strpos($text, '```') === 0) {
             $text = substr($text, 3);
         }
-        if (str_ends_with($text, '```')) {
+        if (substr($text, -3) === '```') {
             $text = substr($text, 0, -3);
         }
         $text = trim($text);
@@ -414,7 +414,7 @@ class CveSearchTaskPhp {
         foreach ($item['weaknesses'] ?? [] as $w) {
             foreach ($w['description'] ?? [] as $d) {
                 $val = $d['value'] ?? '';
-                if (str_starts_with($val, 'CWE-') && !in_array($val, $cwes, true)) $cwes[] = $val;
+                if (strpos($val, 'CWE-') === 0 && !in_array($val, $cwes, true)) $cwes[] = $val;
             }
         }
 
@@ -613,24 +613,24 @@ class CveSearchTaskPhp {
         // Badge de severidad
         $sevBadge = '';
         if ($severity && $severity !== 'N/A') {
-            $color = match (strtoupper($severity)) {
+            $sevColors = [
                 'CRITICAL' => '#c62828',
                 'HIGH' => '#f57c00',
                 'MEDIUM' => '#f9a825',
                 'LOW' => '#2e7d32',
-                default => '#78909c',
-            };
+            ];
+            $color = $sevColors[strtoupper($severity)] ?? '#78909c';
             $sevBadge = "<span style='display:inline-block;background:{$color};color:#fff;padding:.2rem .6rem;border-radius:4px;font-size:.85rem;font-weight:600;'>{$severity}</span>";
         }
 
         // Badge de prioridad
-        $priColor = match ($priority) {
+        $priColors = [
             'A+' => '#c62828',
             'A' => '#f57c00',
             'B' => '#f9a825',
             'C' => '#1976d2',
-            default => '#78909c',
-        };
+        ];
+        $priColor = $priColors[$priority] ?? '#78909c';
         $priBadge = "<span style='display:inline-block;background:{$priColor};color:#fff;padding:.25rem .8rem;border-radius:4px;font-size:1.1rem;font-weight:700;'>{$priority}</span>";
 
         $section = function(string $title, string $content, string $icon = ''): string {
@@ -708,23 +708,21 @@ class CveSearchTaskPhp {
         $html .= $section('AI-Powered Risk Assessment', $analysisHtml, '🤖');
 
         // Priority
-        if ($language === 'es') {
-            $urgency = match ($priority) {
-                'A+' => 'Requiere parche inmediato.',
-                'A' => 'Requiere parche urgente.',
-                'B' => 'Requiere parche programado.',
-                'C' => 'Requiere parche planificado.',
-                default => 'Bajo riesgo, parche opcional.',
-            };
-        } else {
-            $urgency = match ($priority) {
-                'A+' => 'Immediate patching required.',
-                'A' => 'Urgent patching required.',
-                'B' => 'Scheduled patching required.',
-                'C' => 'Planned patching required.',
-                default => 'Low risk, optional patch.',
-            };
-        }
+        $urgMapEs = [
+            'A+' => 'Requiere parche inmediato.',
+            'A' => 'Requiere parche urgente.',
+            'B' => 'Requiere parche programado.',
+            'C' => 'Requiere parche planificado.',
+        ];
+        $urgMapEn = [
+            'A+' => 'Immediate patching required.',
+            'A' => 'Urgent patching required.',
+            'B' => 'Scheduled patching required.',
+            'C' => 'Planned patching required.',
+        ];
+        $urgency = ($language === 'es')
+            ? ($urgMapEs[$priority] ?? 'Bajo riesgo, parche opcional.')
+            : ($urgMapEn[$priority] ?? 'Low risk, optional patch.');
         $priorityContent = "<div style='display:grid;grid-template-columns:140px 1fr;gap:.4rem;align-items:center;'>"
             . "<div style='color:var(--text-muted);font-weight:600;'>⚠️ Priority:</div><div>{$priBadge}</div>"
             . "<div style='color:var(--text-muted);font-weight:600;'>🚨 Urgencia:</div><div>{$urgency}</div>"
