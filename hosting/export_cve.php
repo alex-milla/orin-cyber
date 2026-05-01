@@ -158,6 +158,15 @@ function buildDocumentXml(string $reportText, string $cveId, array $task, string
     $taskLabel = $lang === 'en' ? 'Task' : 'Tarea';
     $dateLabel = $lang === 'en' ? 'Date' : 'Fecha';
 
+    // Escapar para XML seguro
+    $escTitle      = wordEscape($title);
+    $escCveId      = wordEscape($cveId);
+    $escTaskLabel  = wordEscape($taskLabel);
+    $escDateLabel  = wordEscape($dateLabel);
+    $escTaskId     = wordEscape((string)$task['id']);
+    $escCreatedAt  = wordEscape((string)$task['created_at']);
+    $escGenerated  = wordEscape($generated);
+
     // ── Portada ─────────────────────────────────────────────────────────
     $xml = <<<XML
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -165,13 +174,13 @@ function buildDocumentXml(string $reportText, string $cveId, array $task, string
 <w:body>
 
 <!-- Portada -->
-<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr><w:r><w:t>{$title}</w:t></w:r></w:p>
+<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr><w:r><w:t>{$escTitle}</w:t></w:r></w:p>
 <w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="400"/></w:pPr>
-  <w:r><w:rPr><w:rFonts w:ascii="Calibri Light" w:hAnsi="Calibri Light"/><w:b/><w:sz w:val="72"/><w:szCs w:val="72"/><w:color w:val="C00000"/></w:rPr><w:t xml:space="preserve">{$cveId}</w:t></w:r>
+  <w:r><w:rPr><w:rFonts w:ascii="Calibri Light" w:hAnsi="Calibri Light"/><w:b/><w:sz w:val="72"/><w:szCs w:val="72"/><w:color w:val="C00000"/></w:rPr><w:t xml:space="preserve">{$escCveId}</w:t></w:r>
 </w:p>
 
 <w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="200"/></w:pPr>
-  <w:r><w:rPr><w:color w:val="666666"/></w:rPr><w:t xml:space="preserve">{$taskLabel}: #{$task['id']}  |  {$dateLabel}: {$task['created_at']}</w:t></w:r>
+  <w:r><w:rPr><w:color w:val="666666"/></w:rPr><w:t xml:space="preserve">{$escTaskLabel}: #{$escTaskId}  |  {$escDateLabel}: {$escCreatedAt}</w:t></w:r>
 </w:p>
 
 <w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="12" w:space="1" w:color="2E74B5"/></w:pBdr><w:spacing w:after="400"/></w:pPr></w:p>
@@ -225,7 +234,7 @@ XML;
 <w:p><w:pPr><w:spacing w:before="400"/></w:pPr></w:p>
 <w:p><w:pPr><w:pBdr><w:top w:val="single" w:sz="4" w:space="1" w:color="BFBFBF"/></w:pBdr><w:spacing w:before="200"/></w:pPr></w:p>
 <w:p><w:pPr><w:jc w:val="center"/></w:pPr>
-  <w:r><w:rPr><w:color w:val="999999"/><w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">{$generated} — OrinSec Cyber Intelligence</w:t></w:r>
+  <w:r><w:rPr><w:color w:val="999999"/><w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">{$escGenerated} — OrinSec Cyber Intelligence</w:t></w:r>
 </w:p>
 
 <w:sectPr>
@@ -262,9 +271,7 @@ function renderSectionXml(string $sectionTitle, array $contentLines): string {
 
     if ($isTable && count($rows) >= 2) {
         // Renderizar como tabla profesional
-        $xml .= "<w:tbl><w:tblPr><w:tblStyle w:val=\"TableGrid\"/><w:tblW w:w=\"5000\" w:type=\"pct\"/><w:tblLook w:val="
-            . '"04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"'/>
-            . '</w:tblPr><w:tblGrid>';
+        $xml .= '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="5000" w:type="pct"/><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr><w:tblGrid>';
         $xml .= '<w:gridCol w:w="2880"/><w:gridCol w:w="7200"/></w:tblGrid>';
 
         foreach ($rows as $i => $row) {
