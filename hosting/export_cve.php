@@ -86,26 +86,35 @@ $html .= '<div class="cveid">' . htmlspecialchars($cveId) . '</div>';
 $html .= '<div class="meta">' . htmlspecialchars($taskLabel) . ': #' . htmlspecialchars((string)$task['id']) . ' &nbsp;|&nbsp; ' . htmlspecialchars($dateLabel) . ': ' . htmlspecialchars((string)$task['created_at']) . '</div>';
 $html .= '<hr>';
 
-// Parsear secciones box-drawing
+// Parsear secciones del reporte (robusto: no depende de caracteres Unicode exactos)
 $sections = [];
 $current = '';
 $content = [];
 $lines = explode("\n", str_replace("\r", "", $body));
 foreach ($lines as $line) {
     $line = rtrim($line);
-    if ($line === '' || strpos($line, '═') !== false || strpos($line, '╔') !== false || strpos($line, '╚') !== false) continue;
-    if (preg_match('/^[┌├└]──-\[\s*([^\]]+)\s*\]/u', $line, $m)) {
+    if ($line === '') continue;
+    
+    // Detectar titulo de seccion: cualquier linea con [ ... ]
+    if (preg_match('/\[\s*([^\]]+)\s*\]/u', $line, $m)) {
         if ($current && $content) $sections[] = ['title' => $current, 'lines' => $content];
         $current = trim($m[1]);
         $content = [];
         continue;
     }
-    if (preg_match('/^[┌├├└│├┤├─╞╡╞═\s]+$/u', $line)) continue;
-    $clean = preg_replace('/^[│├└]\s*/u', '', $line);
-    $clean = ltrim($clean);
+    
+    // Ignorar lineas puras de borde/decoration (solo caracteres graficos + espacios)
+    if (preg_match('/^[\x{2500}-\x{257F}\x{2550}-\x{256C}\s]+$/u', $line)) continue;
+    
+    // Quitar prefijos comunes de lista/borde: |, +, -, *, espacios, tabs
+    $clean = preg_replace('/^[\s│┃┆┇┊┋├┤┌┐└┘┬┴┼┿╂╋┠┨┯┷┠┨├┤┼\-\*•►▸→⇒]+/u', '', $line);
     if ($clean !== '') $content[] = $clean;
 }
 if ($current && $content) $sections[] = ['title' => $current, 'lines' => $content];
+// Si no se detectaron secciones, poner todo el body como una sola seccion
+if (empty($sections) && $body !== '') {
+    $sections[] = ['title' => 'Contenido', 'lines' => explode("\n", str_replace("\r", "", $body))];
+}
 
 foreach ($sections as $sec) {
     $secTitle = preg_replace('/[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}\x{1F1E0}-\x{1F1FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]/u', '', $sec['title']);
