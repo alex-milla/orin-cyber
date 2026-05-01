@@ -101,38 +101,167 @@ def _section(title: str, content: str, icon: str = "") -> str:
 </div>'''
 
 
-def box_drawing_to_html(report_text: str, cve_data: dict | None = None) -> str:
-    """Convierte un informe en texto plano con box-drawing a HTML que preserve el formato.
+def render_cve_html(entry: dict, llm_analysis: str, language: str = "es") -> str:
+    """Genera HTML visual determinístico similar al resultado del chat."""
+    cve = entry["cve"]
+    epss = entry.get("epss")
+    kev = entry.get("kev")
+    github = entry.get("github")
+    osv = entry.get("osv")
+    priority = entry.get("priority", "D")
 
-    El texto se envuelve en un bloque <pre> con estilos CSS para mantener la alineación
-    de los caracteres de dibujo de cajas, mientras que las URLs se hacen clicables.
-    """
-    if not report_text:
-        return "<p>Sin contenido.</p>"
+    cve_id = cve.get("cve_id", "Unknown")
+    published = cve.get("published", "N/A")
+    score = cve.get("score")
+    severity = cve.get("severity", "N/A")
+    vector = cve.get("vector", "N/A")
+    description = cve.get("description", "No data found")
+    refs = cve.get("references", [])
 
-    # Escapar HTML
-    html = report_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    score_str = str(score) if score is not None else "N/A"
+    sev_badge = _severity_badge(severity) if severity != "N/A" else ""
 
-    # Convertir URLs a enlaces clickeables dentro del texto plano
-    html = re.sub(
-        r'(https?://[^\s\)\]\>\"\'\`]+)',
-        r'<a href="\1" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline;">\1</a>',
-        html,
-    )
-
-    severity = cve_data.get("severity", "") if cve_data else ""
-
-    # Badge de severidad opcional arriba del reporte
-    badge_html = ""
-    if severity and severity != "N/A":
-        badge_html = f'<div style="margin-bottom:.5rem;">{_severity_badge(severity)}</div>'
-
-    return f'''<div class="cve-report" style="font-family:var(--font-base);color:var(--text);max-width:900px;margin:0 auto;">
-  <div style="text-align:center;margin-bottom:1rem;">
-    {badge_html}
+    # ── Header box-drawing ──────────────────────────────────────────────
+    html = f'''<div class="cve-report" style="font-family:var(--font-base);color:var(--text);max-width:900px;margin:0 auto;padding:1rem;">
+  <div style="text-align:center;margin-bottom:1.5rem;">
+    <pre style="display:inline-block;text-align:left;margin:0 auto;font-family:'Consolas','Monaco','Courier New',monospace;font-size:1.1rem;line-height:1.4;background:var(--bg);padding:.5rem 1rem;border-radius:var(--radius);border:1px solid var(--border);">╔══════════════════════════╗
+║ CVE ID: {cve_id:<20} ║
+╚══════════════════════════╝</pre>
   </div>
-  <pre style="white-space:pre-wrap;word-wrap:break-word;font-family:'Consolas','Monaco','Courier New',monospace;font-size:.95rem;line-height:1.5;background:var(--bg);padding:1.25rem;border-radius:var(--radius);border:1px solid var(--border);overflow-x:auto;">{html}</pre>
-</div>'''
+'''
+
+    # ── Vulnerability Information ───────────────────────────────────────
+    info_rows = f"""
+      <div style="display:grid;grid-template-columns:140px 1fr;gap:.4rem;align-items:start;">
+        <div style="color:var(--text-muted);font-weight:600;">📅 Published:</div>
+        <div>{published}</div>
+        <div style="color:var(--text-muted);font-weight:600;">🔺 Base Score:</div>
+        <div>{score_str} {sev_badge}</div>
+        <div style="color:var(--text-muted);font-weight:600;">⚙️ Vector:</div>
+        <div><code style="font-size:.85rem;background:var(--bg);padding:.1rem .4rem;border-radius:4px;">{vector}</code></div>
+        <div style="color:var(--text-muted);font-weight:600;">📝 Description:</div>
+        <div>{description}</div>
+      </div>
+    """
+    html += _section("Vulnerability information", info_rows, "🔍")
+
+    # ── Public Exploits ─────────────────────────────────────────────────
+    if github and isinstance(github, list) and len(github) > 0:
+        exploit_content = "<ul style='margin:0;padding-left:1.2rem;'>"
+        for repo in github[:5]:
+            name = repo.get("name", "Unknown")
+            url = repo.get("url", "#")
+            exploit_content += f"<li><a href='{url}' target='_blank' rel='noopener' style='color:var(--primary);text-decoration:underline;'>{name}</a></li>"
+        exploit_content += "</ul>"
+        exploit_total = len(github)
+    else:
+        exploit_content = "<p class='small'>No exploits found</p>"
+        exploit_total = "N/A"
+    exploit_rows = f"""
+      <div style="display:grid;grid-template-columns:140px 1fr;gap:.4rem;">
+        <div style="color:var(--text-muted);font-weight:600;">🔎 Total:</div>
+        <div>{exploit_total}</div>
+        <div style="color:var(--text-muted);font-weight:600;">📝 Lista:</div>
+        <div>{exploit_content}</div>
+      </div>
+    """
+    html += _section("Public Exploits", exploit_rows, "🎯")
+
+    # ── EPSS ────────────────────────────────────────────────────────────
+    if epss:
+        epss_content = f"📊 EPSS Score: <strong>{epss['score_percent']}%</strong> Probability of exploitation."
+    else:
+        epss_content = "📊 EPSS Score: N/A"
+    html += _section("Exploit Prediction Score (EPSS)", f"<p style='margin:0;'>{epss_content}</p>", "📊")
+
+    # ── CISA KEV ────────────────────────────────────────────────────────
+    if kev:
+        kev_content = f"""
+          <div style="display:grid;grid-template-columns:140px 1fr;gap:.4rem;">
+            <div style="color:var(--text-muted);font-weight:600;">🛡️ Sí/No:</div>
+            <div><span style="color:var(--error);font-weight:700;">✅ LISTED</span></div>
+            <div style="color:var(--text-muted);font-weight:600;">🏢 Vendor:</div>
+            <div>{kev.get('vendor', 'N/A')}</div>
+            <div style="color:var(--text-muted);font-weight:600;">📦 Product:</div>
+            <div>{kev.get('product', 'N/A')}</div>
+            <div style="color:var(--text-muted);font-weight:600;">📅 Added:</div>
+            <div>{kev.get('date_added', 'N/A')}</div>
+            <div style="color:var(--text-muted);font-weight:600;">🔒 Ransomware:</div>
+            <div>{kev.get('ransomware', 'N/A')}</div>
+          </div>
+        """
+    else:
+        kev_content = "<p style='margin:0;'>🛡️ Sí/No: <span style='color:var(--error);font-weight:700;'>❌ No data found</span></p>"
+    html += _section("CISA KEV Catalog", kev_content, "🛡️")
+
+    # ── AI Analysis ─────────────────────────────────────────────────────
+    if llm_analysis:
+        analysis_html = markdown_to_html(llm_analysis)
+    else:
+        analysis_html = "<p class='small'>[No AI analysis available]</p>"
+    html += _section("AI-Powered Risk Assessment", analysis_html, "🤖")
+
+    # ── Priority ────────────────────────────────────────────────────────
+    if language == "es":
+        urgency_text = {
+            "A+": "Requiere parche inmediato.",
+            "A": "Requiere parche urgente.",
+            "B": "Requiere parche programado.",
+            "C": "Requiere parche planificado.",
+            "D": "Bajo riesgo, parche opcional.",
+        }.get(priority, "Requiere parche.")
+    else:
+        urgency_text = {
+            "A+": "Immediate patching required.",
+            "A": "Urgent patching required.",
+            "B": "Scheduled patching required.",
+            "C": "Planned patching required.",
+            "D": "Low risk, optional patch.",
+        }.get(priority, "Patching required.")
+
+    priority_content = f"""
+      <div style="display:grid;grid-template-columns:140px 1fr;gap:.4rem;align-items:center;">
+        <div style="color:var(--text-muted);font-weight:600;">⚠️ Priority:</div>
+        <div>{_priority_badge(priority)}</div>
+        <div style="color:var(--text-muted);font-weight:600;">🚨 Urgencia:</div>
+        <div>{urgency_text}</div>
+      </div>
+    """
+    html += _section("Patching Priority Rating", priority_content, "⚠️")
+
+    # ── References ──────────────────────────────────────────────────────
+    if refs:
+        ref_content = "<ul style='margin:0;padding-left:1.2rem;'>"
+        for url in refs[:10]:
+            ref_content += f"<li><a href='{url}' target='_blank' rel='noopener' style='color:var(--primary);text-decoration:underline;'>🔗 {url}</a></li>"
+        ref_content += "</ul>"
+    else:
+        ref_content = "<p class='small'>N/A</p>"
+    html += _section("Further References", ref_content, "🔗")
+
+    # ── Notas ───────────────────────────────────────────────────────────
+    if language == "es":
+        notes = f"""
+          <ul style='margin:0;padding-left:1.2rem;'>
+            <li><strong>Descripción:</strong> Basada en datos oficiales de CVE.org y NVD.</li>
+            <li><strong>EPSS:</strong> Basado en datos de FIRST.org.</li>
+            <li><strong>CISA KEV:</strong> Consultado en el catálogo de vulnerabilidades conocidas de CISA.</li>
+            <li><strong>Parche Prioridad:</strong> Determinada por CVSS Base Score + EPSS + CISA KEV.</li>
+          </ul>
+        """
+    else:
+        notes = f"""
+          <ul style='margin:0;padding-left:1.2rem;'>
+            <li><strong>Description:</strong> Based on official CVE.org and NVD data.</li>
+            <li><strong>EPSS:</strong> Based on FIRST.org data.</li>
+            <li><strong>CISA KEV:</strong> Queried from CISA Known Exploited Vulnerabilities catalog.</li>
+            <li><strong>Patch Priority:</strong> Determined by CVSS Base Score + EPSS + CISA KEV.</li>
+          </ul>
+        """
+    html += _section("Notas", notes, "📝")
+
+    html += '</div>'
+    return html
 
 
 def render_cve_report_batch(enriched: list) -> str:
@@ -149,7 +278,6 @@ def render_cve_report_batch(enriched: list) -> str:
   </div>
 '''
 
-    # Tabla comparativa
     html += '''<div style="overflow-x:auto;margin-bottom:1.5rem;">
   <table style="width:100%;border-collapse:collapse;font-size:.9rem;">
     <thead>
@@ -190,7 +318,6 @@ def render_cve_report_batch(enriched: list) -> str:
 </div>
 '''
 
-    # Detalle individual
     for entry in enriched:
         cve = entry.get("cve", {})
         epss = entry.get("epss")
@@ -224,3 +351,13 @@ def render_cve_report_batch(enriched: list) -> str:
 *Modo batch: datos objetivos de CVE.org, NVD, EPSS, CISA KEV y OSV.dev. El análisis detallado del LLM está disponible para búsquedas individuales.*
 </p></div>'''
     return html
+
+
+def wrap_html_document(body_html: str, title: str = "Informe OrinSec") -> str:
+    """Envuelve contenido HTML en un documento mínimo."""
+    return f"""<div class="orin-report">
+  <h1>{title}</h1>
+  {body_html}
+  <hr>
+  <p class="small" style="color:#666;">Generado por OrinSec — IA local asistida</p>
+</div>"""

@@ -20,7 +20,7 @@ from scrapers.cisa_kev import get_kev
 from scrapers.github_exploits import find_exploits
 from scrapers.osv import query_osv
 from utils.llm_client import LlmClient
-from utils.formatter import box_drawing_to_html
+from utils.formatter import render_cve_html
 
 logger = logging.getLogger(__name__)
 
@@ -412,8 +412,8 @@ class CveSearchTask(BaseTask):
         # 2. Construir el reporte completo con box-drawing (determinístico)
         report_text = _build_report_text(entry, language, llm_analysis)
 
-        # 3. Convertir a HTML
-        result_html = box_drawing_to_html(report_text, cve_data)
+        # 3. Convertir a HTML visual determinístico
+        result_html = render_cve_html(entry, llm_analysis, language)
 
         return {
             "result_html": result_html,

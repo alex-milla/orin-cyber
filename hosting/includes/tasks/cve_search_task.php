@@ -32,8 +32,8 @@ class CveSearchTaskPhp {
         // 3. Construir reporte box-drawing determinístico
         $reportText = $this->buildBoxDrawingReport($enriched, $language, $llmAnalysis);
 
-        // 4. Renderizar HTML
-        $html = $this->renderHtml($reportText, $enriched);
+        // 4. Renderizar HTML visual determinístico
+        $html = $this->renderHtml($enriched, $llmAnalysis, $language);
 
         return [
             'result_html'     => $html,
@@ -539,18 +539,23 @@ class CveSearchTaskPhp {
     // HTML renderer
     // ─────────────────────────────────────────────────────────────────────
 
-    private function renderHtml(string $reportText, array $enriched): string {
-        $severity = htmlspecialchars($enriched['severity'] ?? '');
+    private function renderHtml(array $enriched, string $llmAnalysis, string $language): string {
+        $cveId = htmlspecialchars($enriched['cve_id']);
+        $published = htmlspecialchars($enriched['published'] ?: 'N/A');
+        $score = $enriched['cvss_score'];
+        $severity = htmlspecialchars($enriched['severity']);
+        $vector = htmlspecialchars($enriched['vector']);
+        $description = htmlspecialchars($enriched['description']);
+        $refs = $enriched['references'];
+        $epss = $enriched['epss'];
+        $kev = $enriched['kev'];
+        $github = $enriched['github'];
+        $priority = $enriched['priority'];
 
-        $html = htmlspecialchars($reportText, ENT_NOQUOTES, 'UTF-8');
+        $scoreStr = $score !== null ? (string)$score : 'N/A';
 
-        $html = preg_replace(
-            '#(https?://[^\s\)\]\>\"\'\`]+)#',
-            '<a href="$1" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline;">$1</a>',
-            $html
-        );
-
-        $badgeHtml = '';
+        // Badge de severidad
+        $sevBadge = '';
         if ($severity && $severity !== 'N/A') {
             $color = match (strtoupper($severity)) {
                 'CRITICAL' => '#c62828',
@@ -559,13 +564,149 @@ class CveSearchTaskPhp {
                 'LOW' => '#2e7d32',
                 default => '#78909c',
             };
-            $badgeHtml = "<div style='margin-bottom:.5rem;'><span style='display:inline-block;background:{$color};color:#fff;padding:.2rem .6rem;border-radius:4px;font-size:.85rem;font-weight:600;'>{$severity}</span></div>";
+            $sevBadge = "<span style='display:inline-block;background:{$color};color:#fff;padding:.2rem .6rem;border-radius:4px;font-size:.85rem;font-weight:600;'>{$severity}</span>";
         }
 
-        return "<div class='cve-report' style='font-family:var(--font-base);color:var(--text);max-width:900px;margin:0 auto;'>"
-            . "<div style='text-align:center;margin-bottom:1rem;'>{$badgeHtml}</div>"
-            . "<pre style='white-space:pre-wrap;word-wrap:break-word;font-family:\"Consolas\",\"Monaco\",\"Courier New\",monospace;font-size:.95rem;line-height:1.5;background:var(--bg);padding:1.25rem;border-radius:var(--radius);border:1px solid var(--border);overflow-x:auto;'>{$html}</pre>"
+        // Badge de prioridad
+        $priColor = match ($priority) {
+            'A+' => '#c62828',
+            'A' => '#f57c00',
+            'B' => '#f9a825',
+            'C' => '#1976d2',
+            default => '#78909c',
+        };
+        $priBadge = "<span style='display:inline-block;background:{$priColor};color:#fff;padding:.25rem .8rem;border-radius:4px;font-size:1.1rem;font-weight:700;'>{$priority}</span>";
+
+        $section = function(string $title, string $content, string $icon = ''): string {
+            return "<div style='margin:1.25rem 0;border-left:4px solid var(--accent);padding:.75rem 1rem;background:var(--surface);border-radius:0 var(--radius-sm) var(--radius-sm) 0;'>"
+                . "<div style='font-weight:700;color:var(--primary);margin-bottom:.5rem;font-size:1.05rem;'>{$icon} {$title}</div>"
+                . "<div style='line-height:1.6;'>{$content}</div>"
+                . "</div>";
+        };
+
+        // Header box-drawing
+        $html = "<div class='cve-report' style='font-family:var(--font-base);color:var(--text);max-width:900px;margin:0 auto;padding:1rem;'>"
+            . "<div style='text-align:center;margin-bottom:1.5rem;'>"
+            . "<pre style='display:inline-block;text-align:left;margin:0 auto;font-family:\"Consolas\",\"Monaco\",\"Courier New\",monospace;font-size:1.1rem;line-height:1.4;background:var(--bg);padding:.5rem 1rem;border-radius:var(--radius);border:1px solid var(--border);'>╔══════════════════════════╗\n║ CVE ID: {$cveId:<20} ║\n╚══════════════════════════╝</pre>"
             . "</div>";
+
+        // Vulnerability Information
+        $info = "<div style='display:grid;grid-template-columns:140px 1fr;gap:.4rem;align-items:start;'>"
+            . "<div style='color:var(--text-muted);font-weight:600;'>📅 Published:</div><div>{$published}</div>"
+            . "<div style='color:var(--text-muted);font-weight:600;'>🔺 Base Score:</div><div>{$scoreStr} {$sevBadge}</div>"
+            . "<div style='color:var(--text-muted);font-weight:600;'>⚙️ Vector:</div><div><code style='font-size:.85rem;background:var(--bg);padding:.1rem .4rem;border-radius:4px;'>{$vector}</code></div>"
+            . "<div style='color:var(--text-muted);font-weight:600;'>📝 Description:</div><div>{$description}</div>"
+            . "</div>";
+        $html .= $section('Vulnerability information', $info, '🔍');
+
+        // Public Exploits
+        if ($github && is_array($github) && count($github) > 0) {
+            $exploitList = "<ul style='margin:0;padding-left:1.2rem;'>";
+            foreach (array_slice($github, 0, 5) as $repo) {
+                $name = htmlspecialchars($repo['name'] ?? 'Unknown');
+                $url = htmlspecialchars($repo['url'] ?? '#');
+                $exploitList .= "<li><a href='{$url}' target='_blank' rel='noopener' style='color:var(--primary);text-decoration:underline;'>{$name}</a></li>";
+            }
+            $exploitList .= "</ul>";
+            $exploitTotal = count($github);
+        } else {
+            $exploitList = "<p class='small'>No exploits found</p>";
+            $exploitTotal = 'N/A';
+        }
+        $exploit = "<div style='display:grid;grid-template-columns:140px 1fr;gap:.4rem;'>"
+            . "<div style='color:var(--text-muted);font-weight:600;'>🔎 Total:</div><div>{$exploitTotal}</div>"
+            . "<div style='color:var(--text-muted);font-weight:600;'>📝 Lista:</div><div>{$exploitList}</div>"
+            . "</div>";
+        $html .= $section('Public Exploits', $exploit, '🎯');
+
+        // EPSS
+        if ($epss) {
+            $epssContent = "📊 EPSS Score: <strong>{$epss['score_percent']}%</strong> Probability of exploitation.";
+        } else {
+            $epssContent = "📊 EPSS Score: N/A";
+        }
+        $html .= $section('Exploit Prediction Score (EPSS)', "<p style='margin:0;'>{$epssContent}</p>", '📊');
+
+        // CISA KEV
+        if ($kev) {
+            $kevContent = "<div style='display:grid;grid-template-columns:140px 1fr;gap:.4rem;'>"
+                . "<div style='color:var(--text-muted);font-weight:600;'>🛡️ Sí/No:</div><div><span style='color:var(--error);font-weight:700;'>✅ LISTED</span></div>"
+                . "<div style='color:var(--text-muted);font-weight:600;'>🏢 Vendor:</div><div>" . htmlspecialchars($kev['vendor']) . "</div>"
+                . "<div style='color:var(--text-muted);font-weight:600;'>📦 Product:</div><div>" . htmlspecialchars($kev['product']) . "</div>"
+                . "<div style='color:var(--text-muted);font-weight:600;'>📅 Added:</div><div>" . htmlspecialchars($kev['date_added']) . "</div>"
+                . "<div style='color:var(--text-muted);font-weight:600;'>🔒 Ransomware:</div><div>" . htmlspecialchars($kev['ransomware']) . "</div>"
+                . "</div>";
+        } else {
+            $kevContent = "<p style='margin:0;'>🛡️ Sí/No: <span style='color:var(--error);font-weight:700;'>❌ No data found</span></p>";
+        }
+        $html .= $section('CISA KEV Catalog', $kevContent, '🛡️');
+
+        // AI Analysis
+        if ($llmAnalysis) {
+            $analysisHtml = nl2br(htmlspecialchars($llmAnalysis, ENT_NOQUOTES, 'UTF-8'));
+            $analysisHtml = preg_replace('#(https?://[^\s\)\]\>\"\'\`]+)#', '<a href="$1" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline;">$1</a>', $analysisHtml);
+        } else {
+            $analysisHtml = "<p class='small'>[No AI analysis available]</p>";
+        }
+        $html .= $section('AI-Powered Risk Assessment', $analysisHtml, '🤖');
+
+        // Priority
+        if ($language === 'es') {
+            $urgency = match ($priority) {
+                'A+' => 'Requiere parche inmediato.',
+                'A' => 'Requiere parche urgente.',
+                'B' => 'Requiere parche programado.',
+                'C' => 'Requiere parche planificado.',
+                default => 'Bajo riesgo, parche opcional.',
+            };
+        } else {
+            $urgency = match ($priority) {
+                'A+' => 'Immediate patching required.',
+                'A' => 'Urgent patching required.',
+                'B' => 'Scheduled patching required.',
+                'C' => 'Planned patching required.',
+                default => 'Low risk, optional patch.',
+            };
+        }
+        $priorityContent = "<div style='display:grid;grid-template-columns:140px 1fr;gap:.4rem;align-items:center;'>"
+            . "<div style='color:var(--text-muted);font-weight:600;'>⚠️ Priority:</div><div>{$priBadge}</div>"
+            . "<div style='color:var(--text-muted);font-weight:600;'>🚨 Urgencia:</div><div>{$urgency}</div>"
+            . "</div>";
+        $html .= $section('Patching Priority Rating', $priorityContent, '⚠️');
+
+        // References
+        if ($refs) {
+            $refContent = "<ul style='margin:0;padding-left:1.2rem;'>";
+            foreach (array_slice($refs, 0, 10) as $url) {
+                $u = htmlspecialchars($url);
+                $refContent .= "<li><a href='{$u}' target='_blank' rel='noopener' style='color:var(--primary);text-decoration:underline;'>🔗 {$u}</a></li>";
+            }
+            $refContent .= "</ul>";
+        } else {
+            $refContent = "<p class='small'>N/A</p>";
+        }
+        $html .= $section('Further References', $refContent, '🔗');
+
+        // Notas
+        if ($language === 'es') {
+            $notes = "<ul style='margin:0;padding-left:1.2rem;'>"
+                . "<li><strong>Descripción:</strong> Basada en datos oficiales de CVE.org y NVD.</li>"
+                . "<li><strong>EPSS:</strong> Basado en datos de FIRST.org.</li>"
+                . "<li><strong>CISA KEV:</strong> Consultado en el catálogo de vulnerabilidades conocidas de CISA.</li>"
+                . "<li><strong>Parche Prioridad:</strong> Determinada por CVSS Base Score + EPSS + CISA KEV.</li>"
+                . "</ul>";
+        } else {
+            $notes = "<ul style='margin:0;padding-left:1.2rem;'>"
+                . "<li><strong>Description:</strong> Based on official CVE.org and NVD data.</li>"
+                . "<li><strong>EPSS:</strong> Based on FIRST.org data.</li>"
+                . "<li><strong>CISA KEV:</strong> Queried from CISA Known Exploited Vulnerabilities catalog.</li>"
+                . "<li><strong>Patch Priority:</strong> Determined by CVSS Base Score + EPSS + CISA KEV.</li>"
+                . "</ul>";
+        }
+        $html .= $section('Notas', $notes, '📝');
+
+        $html .= '</div>';
+        return $html;
     }
 
     private function fetchJson(string $url, int $timeout = 15): ?array {
