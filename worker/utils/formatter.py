@@ -11,49 +11,68 @@ def markdown_to_html(text: str) -> str:
     text = re.sub(r"^## (.+)$", r"<h2>\1</h2>", text, flags=re.MULTILINE)
     text = re.sub(r"^# (.+)$", r"<h1>\1</h1>", text, flags=re.MULTILINE)
 
+    # ▸ Títulos de sección (prompts box-drawing CVE)
+    text = re.sub(r"^▸ (.+)$", r"<h3>▸ \1</h3>", text, flags=re.MULTILINE)
+
     text = re.sub(r"\*\*\*(.+?)\*\*\*", r"<strong><em>\1</em></strong>", text)
     text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
     text = re.sub(r"\*(.+?)\*", r"<em>\1</em>", text)
 
-    # Procesar listas
+    # Procesar listas (bullet y numeradas)
     lines = text.split("\n")
     new_lines = []
     in_list = False
+    list_type = None  # 'ul' or 'ol'
     for line in lines:
-        if line.strip().startswith("- ") or line.strip().startswith("* "):
-            if not in_list:
+        sline = line.strip()
+        if sline.startswith("- ") or sline.startswith("* "):
+            if not in_list or list_type != 'ul':
+                if in_list:
+                    new_lines.append(f"</{list_type}>")
                 new_lines.append("<ul>")
                 in_list = True
-            item = line.strip()[2:]
+                list_type = 'ul'
+            item = sline[2:]
+            new_lines.append(f"<li>{item}</li>")
+        elif re.match(r"^\d+\.\s", sline):
+            if not in_list or list_type != 'ol':
+                if in_list:
+                    new_lines.append(f"</{list_type}>")
+                new_lines.append("<ol>")
+                in_list = True
+                list_type = 'ol'
+            item = re.sub(r"^\d+\.\s", "", sline)
             new_lines.append(f"<li>{item}</li>")
         else:
             if in_list:
-                new_lines.append("</ul>")
+                new_lines.append(f"</{list_type}>")
                 in_list = False
+                list_type = None
             new_lines.append(line)
     if in_list:
-        new_lines.append("</ul>")
+        new_lines.append(f"</{list_type}>")
     text = "\n".join(new_lines)
 
-    # Agrupar líneas consecutivas de texto en un solo <p>
+    # Agrupar líneas consecutivas de texto en párrafos,
+    # pero preservar saltos de línea explícitos con <br>
     paragraphs = []
     current_para = []
     for line in text.splitlines():
         stripped = line.strip()
         if not stripped:
             if current_para:
-                paragraphs.append("<p>" + " ".join(current_para) + "</p>")
+                paragraphs.append("<p>" + "<br>\n".join(current_para) + "</p>")
                 current_para = []
             paragraphs.append("")
         elif stripped.startswith("<"):
             if current_para:
-                paragraphs.append("<p>" + " ".join(current_para) + "</p>")
+                paragraphs.append("<p>" + "<br>\n".join(current_para) + "</p>")
                 current_para = []
             paragraphs.append(stripped)
         else:
             current_para.append(stripped)
     if current_para:
-        paragraphs.append("<p>" + " ".join(current_para) + "</p>")
+        paragraphs.append("<p>" + "<br>\n".join(current_para) + "</p>")
 
     text = "\n".join(paragraphs)
 
