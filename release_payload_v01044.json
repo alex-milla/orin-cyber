@@ -1,0 +1,7 @@
+{
+  "tag_name": "v0.10.44",
+  "name": "v0.10.44 — Selector de modelo para Chat desde Admin + persistencia tras reinicio",
+  "body": "## [v0.10.44] — 2026-05-01\n\n### Added\n- **Selector de modelo para el Chat desde el panel Admin**:\n  - Nueva sección \"🤖 Modelo del Chat (llama-server)\" en Admin → Workers.\n  - El administrador puede seleccionar cualquier modelo disponible en el worker local desde un dropdown.\n  - Al guardar, se almacena el modelo preferido en la BD del hosting (`config.preferred_model`) y se envía un comando `change_model` al worker para cambio en caliente.\n  - El worker, al arrancar, consulta el hosting por el modelo preferido **antes** de iniciar llama-server. Si difiere del `.current_model` local, lo actualiza y arranca con el modelo correcto. Esto garantiza persistencia tras reinicios del Orin.\n  - Nuevo endpoint `hosting/api/v1/worker_config.php` para que el worker lea su configuración remota.\n  - Nuevo método `ApiClient.get_preferred_model()` en el worker.",
+  "draft": false,
+  "prerelease": false
+}

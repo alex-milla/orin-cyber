@@ -7,8 +7,6 @@ require_once __DIR__ . '/includes/auth.php';
 
 requireAuth();
 
-$tunnelUrl = 'https://chat-orin.cyberintelligence.dev';
-
 $pageTitle = 'Chat — OrinSec';
 require_once __DIR__ . '/templates/header.php';
 ?>
@@ -20,21 +18,7 @@ require_once __DIR__ . '/templates/header.php';
     <select id="provider-select" style="min-width: 280px;"></select>
 </div>
 
-<div id="local-panel">
-    <p class="text-muted">Interfaz directa del modelo local a través de Cloudflare Tunnel (protegido con MFA).</p>
-    <div style="margin-top: 1.5rem; padding: 2rem; border: 2px dashed var(--border); border-radius: .75rem; text-align: center; background: var(--bg-secondary);">
-        <p style="font-size: 1.1rem; margin-bottom: 1.5rem;">
-            El chat local se abre en una ventana segura protegida por Cloudflare Access.<br>
-            Se te pedirá un código de verificación por email.
-        </p>
-        <a href="<?php echo htmlspecialchars($tunnelUrl, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="font-size: 1.1rem; padding: .75rem 1.5rem;">
-            🚀 Abrir Chat Local en nueva pestaña
-        </a>
-    </div>
-</div>
-
-<div id="external-panel" class="hidden">
-    <p class="text-muted">Chat con modelos en la nube vía API externa.</p>
+<div id="chat-panel">
     <div class="chat-wrap" style="display: flex; flex-direction: column; gap: .75rem; width: 100%; min-height: 60vh; max-height: calc(100vh - 280px); margin-top: .5rem;">
         <div class="chat-messages" id="chat-messages" style="flex: 1 1 auto; min-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: .5rem; padding: 1rem; background: var(--bg-secondary);"></div>
         <div class="chat-input-area" style="display: flex; gap: .5rem; align-items: flex-end;">
@@ -59,7 +43,6 @@ require_once __DIR__ . '/templates/header.php';
 .chat-message.user .bubble { background: var(--primary); color: #fff; }
 .chat-message.assistant .bubble { background: var(--bg-tertiary); color: var(--text); }
 .chat-message .meta { font-size: .7rem; color: var(--text-muted); margin-top: .15rem; }
-.hidden { display: none !important; }
 </style>
 
 <script>
@@ -67,8 +50,6 @@ require_once __DIR__ . '/templates/header.php';
     'use strict';
 
     const providerSelect = document.getElementById('provider-select');
-    const localPanel = document.getElementById('local-panel');
-    const externalPanel = document.getElementById('external-panel');
     const messagesEl = document.getElementById('chat-messages');
     const inputEl = document.getElementById('chat-input');
     const sendBtn = document.getElementById('chat-send');
@@ -98,26 +79,8 @@ require_once __DIR__ . '/templates/header.php';
 
     function setStatus(text) { statusEl.textContent = text; }
 
-    function togglePanels() {
-        const val = providerSelect.value;
-        const sel = JSON.parse(val || '{}');
-        if (sel.type === 'local') {
-            localPanel.classList.remove('hidden');
-            externalPanel.classList.add('hidden');
-        } else {
-            localPanel.classList.add('hidden');
-            externalPanel.classList.remove('hidden');
-        }
-    }
-
     async function loadProviders() {
-        // Opción local
-        const localOpt = document.createElement('option');
-        localOpt.value = JSON.stringify({type: 'local'});
-        localOpt.textContent = '🏠 Local — Orin';
-        providerSelect.appendChild(localOpt);
-
-        let hasExternal = false;
+        let hasOptions = false;
         try {
             const resp = await fetch('api/v1/chat_external.php', { credentials: 'same-origin' });
             const data = await resp.json();
@@ -136,22 +99,22 @@ require_once __DIR__ . '/templates/header.php';
                     const provider = providersById[pid];
                     if (!provider) return;
                     const group = document.createElement('optgroup');
-                    group.label = '☁️ ' + provider.label;
+                    const prefix = parseInt(pid) === 0 ? '🏠 ' : '☁️ ';
+                    group.label = prefix + provider.label;
                     byProvider[pid].forEach(m => {
                         const opt = document.createElement('option');
                         opt.value = JSON.stringify({
-                            type: 'external',
                             provider_id: parseInt(pid),
                             model_id: m.model_id
                         });
                         opt.textContent = m.label;
                         group.appendChild(opt);
-                        hasExternal = true;
+                        hasOptions = true;
                     });
                     providerSelect.appendChild(group);
                 });
 
-                if (data.providers.length && !hasExternal) {
+                if (data.providers.length && !hasOptions) {
                     const hint = document.createElement('option');
                     hint.disabled = true;
                     hint.textContent = '⚠️ Hay proveedores pero sin modelos (configúralos en Admin → Proveedores)';
@@ -159,10 +122,10 @@ require_once __DIR__ . '/templates/header.php';
                 }
             }
         } catch (e) {
-            console.warn('No se pudieron cargar proveedores externos:', e);
+            console.warn('No se pudieron cargar proveedores:', e);
             const errOpt = document.createElement('option');
             errOpt.disabled = true;
-            errOpt.textContent = '❌ Error cargando proveedores cloud';
+            errOpt.textContent = '❌ Error cargando proveedores';
             providerSelect.appendChild(errOpt);
         }
 
@@ -174,9 +137,7 @@ require_once __DIR__ . '/templates/header.php';
         }
         providerSelect.addEventListener('change', () => {
             localStorage.setItem('orinsec_provider', providerSelect.value);
-            togglePanels();
         });
-        togglePanels();
     }
 
     async function sendMessage() {
@@ -184,12 +145,24 @@ require_once __DIR__ . '/templates/header.php';
         if (!text) return;
 
         const selection = JSON.parse(providerSelect.value || '{}');
-        if (selection.type !== 'external') return;
+        if (!selection.provider_id && selection.provider_id !== 0) {
+            setStatus('Selecciona un modelo primero.');
+            return;
+        }
+
+        // Detectar URLs en el mensaje y avisar
+        const urlPattern = /https?:\/\/\S+/g;
+        const detectedUrls = text.match(urlPattern) || [];
+        if (detectedUrls.length > 0) {
+            setStatus('Leyendo ' + detectedUrls.length + ' URL(s)...');
+        }
 
         inputEl.value = '';
         addMessage('user', text);
         sendBtn.disabled = true;
-        setStatus('Enviando...');
+        if (detectedUrls.length === 0) {
+            setStatus('Enviando...');
+        }
         const assistantBubble = addMessage('assistant', '...');
 
         try {

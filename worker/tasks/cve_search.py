@@ -13,7 +13,7 @@ from scrapers.cisa_kev import get_kev
 from scrapers.github_exploits import find_exploits
 from scrapers.osv import query_osv
 from utils.llm_client import LlmClient
-from utils.formatter import render_cve_report
+from utils.formatter import markdown_to_html
 
 logger = logging.getLogger(__name__)
 
@@ -75,76 +75,25 @@ class CveSearchTask(BaseTask):
             "priority": priority,
         }
 
-    def _analyze_single(self, entry: dict) -> tuple[str, dict | None]:
-        """Analiza un CVE con el LLM. Devuelve (report_text, llm_analysis)."""
-        context = json.dumps([entry], indent=2, ensure_ascii=False)
-        cve_data = entry.get("cve", {})
-        cve_id = cve_data.get("cve_id", "Unknown")
-
-        logger.info("Llamando al LLM para %s", cve_id)
-        try:
-            llm_analysis = self.llm.chat_json(
-                system_prompt=self.prompt_template,
-                user_prompt=(
-                    "Analiza los siguientes datos de CVEs y responde ÚNICAMENTE con el JSON solicitado. "
-                    f"Datos estructurados:\n{context}"
-                ),
-            )
-        except Exception as exc:
-            logger.warning("LLM call failed for %s: %s", cve_id, exc)
-            llm_analysis = None
-
-        if llm_analysis and isinstance(llm_analysis, dict):
-            desc_translated = llm_analysis.get("contexto_es", "").strip()
-            if desc_translated:
-                cve_data["description_es"] = desc_translated
-
-            lines = [f"## ANÁLISIS DE RIESGO — {cve_id}", ""]
-            lines.append(f"**Contexto:** {desc_translated or cve_data.get('description', 'No disponible')}")
-            lines.append("")
-            impacto = llm_analysis.get("impacto", "").strip()
-            if impacto:
-                lines.append(f"**Impacto:** {impacto}")
-                lines.append("")
-            recs = llm_analysis.get("recomendaciones", [])
-            if recs:
-                lines.append("**Recomendaciones:**")
-                for r in recs:
-                    lines.append(f"- {r}")
-                lines.append("")
-            notas = llm_analysis.get("notas", "").strip()
-            if notas:
-                lines.append(f"**Notas:** {notas}")
-            report_text = "\n".join(lines)
-            logger.info("LLM JSON analysis parsed successfully for %s", cve_id)
-            return report_text, llm_analysis
-
-        # Fallback
-        logger.warning("LLM did not return valid JSON for %s, generating fallback", cve_id)
-        report_text = self._build_fallback_text([entry])
-        return report_text, None
-
-    def _build_fallback_text(self, enriched: list[dict]) -> str:
-        """Genera texto plano de fallback cuando el LLM no responde."""
-        lines = ["## ANÁLISIS DE RIESGO — BATCH CVE", ""]
-        for entry in enriched:
-            cve = entry["cve"]
-            epss = entry.get("epss")
-            kev = entry.get("kev")
-            osv = entry.get("osv")
-            priority = entry.get("priority", "D")
-            lines.append(f"### {cve.get('cve_id', 'Unknown')}")
-            lines.append(f"- Descripción: {cve.get('description', 'No disponible')[:200]}")
-            lines.append(f"- CVSS: {cve.get('score', 'N/A')} ({cve.get('severity', 'N/A')})")
-            lines.append(f"- EPSS: {epss['score_percent'] if epss else 'N/A'}%")
-            lines.append(f"- CISA KEV: {'SÍ' if kev else 'No'}")
-            lines.append(f"- OSV.dev: {len(osv['affected_packages']) if osv else 'N/A'} paquetes")
-            lines.append(f"- Prioridad: {priority}")
-            lines.append("")
-        lines.append("**Recomendaciones:**")
-        lines.append("1. Verificar boletín oficial del fabricante para cada CVE.")
-        lines.append("2. Aplicar controles compensatorios: aislamiento, restricción de privilegios, monitoreo.")
-        lines.append("3. Priorizar según ratings mostrados.")
+    def _build_compact_context(self, entry: dict) -> str:
+        """Construye un bloque de contexto compacto en texto plano para el LLM."""
+        cve = entry["cve"]
+        epss = entry.get("epss") or {}
+        kev = entry.get("kev")
+        osv = entry.get("osv") or {}
+        lines = [
+            f"CVE: {cve.get('cve_id')}",
+            f"Descripción: {cve.get('description', 'N/A')[:500]}",
+            f"CVSS: {cve.get('score', 'N/A')} ({cve.get('severity', 'N/A')}) — {cve.get('vector', '')}",
+            f"Publicado: {cve.get('published', '')[:10]}",
+            f"EPSS: {epss.get('score_percent', 'N/A')}% probabilidad explotación",
+        ]
+        if kev:
+            lines.append(f"CISA KEV: SÍ — Acción requerida: {kev.get('required_action', '')[:200]}")
+        else:
+            lines.append("CISA KEV: No listado")
+        if osv.get("fixed_in"):
+            lines.append(f"OSV fixed_in: {osv['fixed_in']}")
         return "\n".join(lines)
 
     def execute(self, input_data: dict[str, Any]) -> dict[str, str]:
@@ -202,37 +151,35 @@ class CveSearchTask(BaseTask):
                 continue
             enriched.append(self._enrich_cve(cve))
 
-        # ── Modo plantilla personalizada (Markdown libre) ─────────────────
-        if custom_template:
-            return self._execute_custom_template(enriched, custom_template)
+        # ── Generar informe con una sola ruta ─────────────────────────────
+        template = custom_template if custom_template else self.prompt_template
+        return self._execute(enriched, template)
 
-        # ── Modo JSON estructurado (comportamiento original) ──────────────
-        return self._execute_structured(enriched)
-
-    def _execute_custom_template(self, enriched: list, template: str) -> dict[str, str]:
-        """Genera informe usando una plantilla Markdown personalizada."""
-        from utils.formatter import markdown_to_html
-
+    def _execute(self, enriched: list, template: str) -> dict[str, str]:
+        """Genera informe usando una plantilla Markdown (libre o por defecto)."""
         html_parts = []
         text_parts = []
 
         for entry in enriched:
             cve_data = entry.get("cve", {})
             cve_id = cve_data.get("cve_id", "Unknown")
-            context = json.dumps([entry], indent=2, ensure_ascii=False)
+            context = self._build_compact_context(entry)
 
-            logger.info("Llamando al LLM (plantilla personalizada) para %s", cve_id)
+            logger.info("Llamando al LLM para %s", cve_id)
             try:
                 report_text = self.llm.chat(
                     system_prompt=template,
                     user_prompt=(
                         "Analiza los siguientes datos de la vulnerabilidad y responde siguiendo la plantilla proporcionada.\n\n"
-                        f"Datos estructurados:\n{context}"
+                        f"Datos:\n{context}"
                     ),
                 )
             except Exception as exc:
                 logger.warning("LLM call failed for %s: %s", cve_id, exc)
-                report_text = f"## Error al generar informe para {cve_id}\n\nEl modelo no respondió correctamente. Datos disponibles:\n\n```json\n{context}\n```"
+                report_text = (
+                    f"## Error al generar informe para {cve_id}\n\n"
+                    f"El modelo no respondió correctamente. Datos disponibles:\n\n```\n{context}\n```"
+                )
 
             text_parts.append(report_text)
 
@@ -276,51 +223,6 @@ class CveSearchTask(BaseTask):
         full_text = "\n\n".join(text_parts)
 
         # Extraer score/severity del primer CVE para persistencia
-        first_cvss_score = None
-        first_severity = None
-        if enriched:
-            first_cve = enriched[0].get("cve", {})
-            first_cvss_score = first_cve.get("score")
-            first_severity = first_cve.get("severity")
-
-        return {
-            "result_html": result_html,
-            "result_text": full_text,
-            "cvss_score": first_cvss_score,
-            "severity": first_severity,
-        }
-
-    def _execute_structured(self, enriched: list) -> dict[str, str]:
-        """Genera informe con el formato JSON estructurado original."""
-        html_parts = []
-        text_parts = []
-
-        for entry in enriched:
-            report_text, _ = self._analyze_single(entry)
-            text_parts.append(report_text)
-            try:
-                html_parts.append(render_cve_report([entry], report_text))
-            except Exception as exc:
-                logger.exception("render failed for %s: %s", entry.get("cve", {}).get("cve_id"), exc)
-                safe_text = report_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                html_parts.append(f"<pre style='white-space:pre-wrap;'>{safe_text}</pre>")
-
-        # ── Combinar todo en un único reporte ─────────────────────────────
-        total = len(html_parts)
-        result_html = f'''<div class="cve-report" style="font-family:var(--font-base);color:var(--text);max-width:900px;margin:0 auto;">
-  <div style="text-align:center;margin-bottom:1.5rem;">
-    <div style="display:inline-block;border:2px solid var(--primary);padding:.75rem 2rem;border-radius:var(--radius);">
-      <span style="font-size:1.4rem;font-weight:700;color:var(--primary);">Batch CVE Report</span>
-    </div>
-    <p style="color:var(--text-muted);margin-top:.5rem;">{total} CVE(s) analizado(s)</p>
-  </div>
-'''
-        result_html += "\n<hr style='margin:2rem 0;border:none;border-top:2px solid var(--border);'>\n".join(html_parts)
-        result_html += "</div>"
-
-        full_text = "\n\n".join(text_parts)
-
-        # Extraer score/severity del primer CVE para persistencia en el hosting
         first_cvss_score = None
         first_severity = None
         if enriched:
