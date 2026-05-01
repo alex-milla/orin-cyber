@@ -1,7 +1,0 @@
-{
-  "tag_name": "v0.7.9",
-  "name": "v0.7.9 — Debug console.log en pollCommandStatus",
-  "body": "## [v0.7.9] — 2026-04-28\n\n### Changed\n- `hosting/admin.php`: añadidos `console.log` / `console.warn` / `console.error` en `pollCommandStatus` para permitir diagnóstico en tiempo real desde la consola del navegador (F12). Esto ayudará a identificar por qué el polling no detecta el estado `ready` cuando el modelo ya ha cargado.",
-  "draft": false,
-  "prerelease": false
-}

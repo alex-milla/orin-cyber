@@ -1,7 +1,0 @@
-{
-  "tag_name": "v0.10.36",
-  "name": "v0.10.36 — Fix CSRF 403 + Catálogo NVIDIA NIM",
-  "body": "## [v0.10.36] — 2026-04-29\n\n### Fixed\n- **403 Forbidden en polling de Virtual Worker**: `virtual_worker_pulse.js` ejecutaba la búsqueda del `<meta name=\"csrf-token\">` como IIFE inmediato, antes de que el DOM estuviera listo. El token llegaba vacío, provocando que `verifyCsrf()` devolviera 403. Ahora espera explícitamente a `DOMContentLoaded`.\n\n### Added\n- **Catálogo `models/nvidia-nim.json`**: 13 modelos NVIDIA NIM cloud directo filtrados para ciberseguridad.",
-  "draft": false,
-  "prerelease": false
-}

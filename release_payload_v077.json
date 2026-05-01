@@ -1,7 +1,0 @@
-{
-  "tag_name": "v0.7.7",
-  "name": "v0.7.7 — Fix validateInput en heartbeat logs",
-  "body": "## [v0.7.7] — 2026-04-28\n\n### Fixed\n- **Hosting heartbeat.php**: `validateInput` rechazaba caracteres especiales presentes en los logs del worker (`[`, `]`, `%`, `/`, etc.), guardando siempre `NULL`. Ahora se usa `substr` directamente para limitar a 20KB sin filtrar caracteres.\n\n### Added\n- `hosting/dev/check_logs.php`: script de diagnóstico temporal para verificar si los `recent_logs` llegan correctamente a la base de datos sin necesidad de acceso SSH/sqlite3.",
-  "draft": false,
-  "prerelease": false
-}

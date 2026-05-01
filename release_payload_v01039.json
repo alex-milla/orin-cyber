@@ -1,7 +1,0 @@
-{
-  "tag_name": "v0.10.39",
-  "name": "v0.10.39 — Blue Team Intelligence Toolkit Fase 1",
-  "body": "## [v0.10.39] — 2026-04-30\n\n### Added\n- **Blue Team Intelligence Toolkit — Fase 1**: nueva funcionalidad SOC para análisis de incidentes, tracking de entidades e inteligencia de IOCs.\n  - Nuevas tablas SQLite: `entities`, `incidents`, `incident_entities`, `entity_timeline`, `iocs`, `ioc_incidents`, `hunting_queries`.\n  - Nueva página web `blue_team.php` con dashboard, tarjetas de resumen, formulario de upload CSV, tabla de incidentes y entidades monitoreadas.\n  - Nuevo endpoint REST `api/v1/blue_team.php` para listar/obtener incidentes y entidades.\n  - Nuevo task type `incident_analysis` en el worker: parsea CSV con Polars, extrae entidades (IPs, dominios, emails, hashes) vía regex, llama al LLM local para veredicto TP/FP + MITRE ATT&CK.\n  - Prompt LLM optimizado para modelos 4B: genera JSON estructurado con veredicto, confianza, tactic, technique, justificación, entidades riesgosas y recomendaciones.\n  - Post-procesamiento automático: cuando el worker termina el análisis, `tasks.php` actualiza `incidents.llm_verdict`, `mitre_tactic`, `result_html` y `result_text`.\n  - Link en navbar \"🛡️ Blue Team\" bajo el menú Herramientas.\n\n### Dependencies\n- Worker: añadidos `polars>=1.0.0` y `networkx>=3.0` a `requirements.txt`.",
-  "draft": false,
-  "prerelease": false
-}

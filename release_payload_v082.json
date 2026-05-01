@@ -1,7 +1,0 @@
-{
-  "tag_name": "v0.8.2",
-  "name": "v0.8.2 — Chat: CSS, diagnóstico y robustez endpoint",
-  "body": "## [v0.8.2] — 2026-04-28\n\n### Fixed\n- **Chat**: CSS corregido para que quepa dentro de la pantalla.\n- **Chat**: endpoint envuelto en try/catch + error handlers para devolver siempre JSON.\n- **Chat**: diagnóstico en consola del navegador (URL, status, respuesta cruda).\n- **Chat**: pollTask parsea body manualmente evitando doble-consumo del stream.",
-  "draft": false,
-  "prerelease": false
-}

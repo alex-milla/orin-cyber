@@ -1,7 +1,0 @@
-{
-  "tag_name": "v0.8.0",
-  "name": "v0.8.0 — Chat integrado vía worker",
-  "body": "## [v0.8.0] — 2026-04-28\n\n### Added\n- **Chat integrado en la app web** (vía worker):\n  - Nueva tarea `chat` en el worker que envía mensajes a `llama-server` local y devuelve la respuesta al hosting.\n  - Endpoint REST `api/v1/chat.php` protegido por sesión de usuario.\n  - Página `chat.php` con interfaz visual, historial y polling automático cada 3 s hasta recibir respuesta.\n  - Enlace en el menú de Herramientas del header.\n\n---\n\n**Nota de despliegue:** tras actualizar el hosting y el worker, reiniciar el worker para que registre la nueva tarea.",
-  "draft": false,
-  "prerelease": false
-}

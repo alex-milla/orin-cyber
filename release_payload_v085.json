@@ -1,7 +1,0 @@
-{
-  "tag_name": "v0.8.5",
-  "name": "v0.8.5 — Hotfix: botón de chat no respondía",
-  "body": "## [v0.8.5] — 2026-04-28\n\n### Fixed\n- **Chat**: eliminado `DOMContentLoaded` del script. Al estar al final del `<body>`, el evento ya se había disparado antes de registrar el listener, por lo que la IIFE nunca se ejecutaba y el botón no respondía.",
-  "draft": false,
-  "prerelease": false
-}

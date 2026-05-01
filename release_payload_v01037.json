@@ -1,7 +1,0 @@
-{
-  "tag_name": "v0.10.37",
-  "name": "v0.10.37 — Hotfix: polling.js CSRF 403",
-  "body": "## [v0.10.37] — 2026-04-29\n\n### Fixed\n- **403 Forbidden persistente en polling**: `polling.js` (usado en `task_cve.php` y `task_result.php`) seguía obteniendo el CSRF token desde `input[name=\"csrf_token\"]`, que no siempre existe en la página. Ahora lee primero del `<meta name=\"csrf-token\">`, con fallback al input.",
-  "draft": false,
-  "prerelease": false
-}

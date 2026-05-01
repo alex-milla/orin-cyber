@@ -1,7 +1,0 @@
-{
-  "tag_name": "v0.7.8",
-  "name": "v0.7.8 — Fix polling timeout + diagnóstico report_command_status",
-  "body": "## [v0.7.8] — 2026-04-28\n\n### Fixed\n- **Hosting commands.php**: `validateInput` en el `message` del comando rechazaba caracteres especiales (`(`, `)`, `/`, etc.), guardando mensajes vacíos. Ahora usa `substr` sin filtrado.\n- **Hosting ajax_admin.php**: el endpoint `command_status` devolvía `null` cuando el status de la BD era NULL, en lugar de `'pending'`. El JS no coincidía con `'ready'`/`'error'` y se quedaba en timeout. Cambiado `??` por `?:`.\n- **Worker api_client.py**: `report_command_status` ahora loggea a **WARNING** (visible en el panel de logs) cuando el hosting rechaza o falla al reportar estado.",
-  "draft": false,
-  "prerelease": false
-}

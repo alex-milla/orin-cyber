@@ -1,7 +1,0 @@
-{
-  "tag_name": "v0.10.40",
-  "name": "v0.10.40 — Blue Team Intelligence Toolkit Fase 2 (OSINT + IOC Tracker)",
-  "body": "## [v0.10.40] — 2026-04-30\n\n### Added\n- **Blue Team Intelligence Toolkit — Fase 2**: integración OSINT + IOC Tracker.\n  - Nuevo `worker/utils/osint_client.py`: consulta VirusTotal, AbuseIPDB, URLhaus y AlienVault OTX con caché SQLite local, rate limiting automático y TTL por fuente.\n  - El task `incident_analysis` ahora enriquece automáticamente cada entidad con OSINT antes de enviar al LLM. El informe HTML incluye tabla de scores VT/AbuseIPDB/URLhaus/OTX.\n  - Prompt LLM actualizado: ahora también clasifica el incidente como **GENÉRICO** o **DIRIGIDO** con confianza.\n  - Nueva sección **IOC Tracker** en `blue_team.php`: estadísticas por estado, tabla de IOCs con VT/AbuseIPDB scores, formulario para añadir IOC manual, cambio de estado inline.\n  - Nuevo endpoint REST `api/v1/ioc_tracker.php` (list, get, add, update_status, delete, stats).\n  - Nueva sección `[osint]` en `config.ini.example` para API keys de VT, AbuseIPDB y OTX.\n\n### Changed\n- `tasks.php` post-procesamiento: ahora también captura `blue_team_classification` (GENÉRICO/DIRIGIDO).",
-  "draft": false,
-  "prerelease": false
-}
