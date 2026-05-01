@@ -560,7 +560,7 @@ class CveSearchTaskPhp {
         }
 
         return "╔═══════════════════════╗\n"
-            . "║ CVE ID: {$cveId:<17} ║\n"
+            . "║ CVE ID: " . sprintf('%-17s', $cveId) . " ║\n"
             . "╚═══════════════════════╝\n\n"
             . "┌───[ 🔍 Vulnerability information ]\n"
             . "│\n"
@@ -643,7 +643,7 @@ class CveSearchTaskPhp {
         // Header box-drawing
         $html = "<div class='cve-report' style='font-family:var(--font-base);color:var(--text);max-width:900px;margin:0 auto;padding:1rem;'>"
             . "<div style='text-align:center;margin-bottom:1.5rem;'>"
-            . "<pre style='display:inline-block;text-align:left;margin:0 auto;font-family:\"Consolas\",\"Monaco\",\"Courier New\",monospace;font-size:1.1rem;line-height:1.4;background:var(--bg);padding:.5rem 1rem;border-radius:var(--radius);border:1px solid var(--border);'>╔══════════════════════════╗\n║ CVE ID: {$cveId:<20} ║\n╚══════════════════════════╝</pre>"
+            . "<pre style='display:inline-block;text-align:left;margin:0 auto;font-family:\"Consolas\",\"Monaco\",\"Courier New\",monospace;font-size:1.1rem;line-height:1.4;background:var(--bg);padding:.5rem 1rem;border-radius:var(--radius);border:1px solid var(--border);'>╔══════════════════════════╗\n║ CVE ID: " . sprintf('%-20s', $cveId) . " ║\n╚══════════════════════════╝</pre>"
             . "</div>";
 
         // Vulnerability Information
