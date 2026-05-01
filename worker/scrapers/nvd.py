@@ -122,6 +122,55 @@ def get_cve_by_id(cve_id: str) -> dict | None:
     return parsed
 
 
+def get_cve_enrichment(cve_id: str) -> dict[str, Any] | None:
+    """Consulta NVD para enriquecer un CVE ya conocido por CVE.org.
+
+    Retorna datos complementarios: CVSS, CPE, CWE, referencias adicionales.
+    """
+    key = f"nvd:enrich:{cve_id.upper()}"
+    cached = cache_get(key)
+    if cached is not None:
+        logger.info("NVD enrichment cache hit for %s", cve_id)
+        return cached
+
+    items = _query_nvd({"cveId": cve_id.upper()})
+    if not items:
+        return None
+
+    parsed = _parse_cve_item(items[0])
+    cve = items[0].get("cve") or {} if isinstance(items[0], dict) else {}
+
+    # Extraer CPEs
+    cpes = []
+    configurations = cve.get("configurations", [])
+    for conf in configurations:
+        for node in conf.get("nodes", []):
+            for match in node.get("cpeMatch", []):
+                criteria = match.get("criteria", "")
+                if criteria and criteria not in cpes:
+                    cpes.append(criteria)
+
+    # Extraer CWEs
+    cwes = []
+    for weakness in cve.get("weaknesses", []):
+        for desc in weakness.get("description", []):
+            val = desc.get("value", "")
+            if val.startswith("CWE-") and val not in cwes:
+                cwes.append(val)
+
+    result = {
+        "cvss_score": parsed.get("score"),
+        "severity": parsed.get("severity"),
+        "vector": parsed.get("vector"),
+        "cvss_version": parsed.get("cvss_version"),
+        "references": parsed.get("references", []),
+        "cpes": cpes[:10],
+        "cwes": cwes,
+    }
+    cache_set(key, result, ttl_seconds=24 * 3600)
+    return result
+
+
 def get_recent_cves(hours: int = 48, max_results: int = 50) -> list[dict[str, Any]]:
     """Busca CVEs publicados en las últimas N horas."""
     from datetime import datetime, timezone, timedelta

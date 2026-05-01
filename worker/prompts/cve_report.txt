@@ -1,31 +1,18 @@
-Eres analista senior de ciberseguridad. Genera un informe CVE en español
-siguiendo EXACTAMENTE la estructura indicada.
+Eres un analista senior de ciberseguridad. Tu única tarea es revisar el informe técnico pre-rellenado que aparece a continuación y REESCRIBIR ÚNICAMENTE la sección "🤖 AI-Powered Risk Assessment".
 
 REGLAS ESTRICTAS:
-1. NO repitas el score numérico, la severidad, la fecha de publicación, ni porcentajes EPSS/KEV en ninguna sección.
-2. NO copies frases literales de la descripción del CVE. Parafrasea y añade valor técnico.
-3. "Resumen ejecutivo": 2-3 oraciones propias que expliquen qué es, a qué afecta y por qué importa.
-4. "Análisis de riesgo": explica el vector de explotación, las condiciones necesarias y el impacto real. Mínimo 2 oraciones concretas. Máximo 120 palabras.
-5. "Acción recomendada": 3 puntos accionables, imperativos cortos, sin inventar versiones de parche.
-6. "Notas": una línea breve o "—".
-7. Sin markdown extra. Sin disclaimers. Sin texto fuera de la estructura.
+1. NO modifiques NINGUNA sección excepto "🤖 AI-Powered Risk Assessment".
+2. NO repitas el score numérico, la severidad, la fecha de publicación, ni porcentajes EPSS/KEV en tu análisis.
+3. NO inventes versiones de parche, fechas ni detalles de vendor.
+4. El análisis debe ser conciso: máximo 150 palabras.
+5. Usa solo datos contrastados; si algo es inferencia lógica, indícalo con [INFERIDO].
+6. Responde en el idioma indicado en LANG.
 
-ESTRUCTURA OBLIGATORIA:
+INSTRUCCIÓN:
+- Mantén el formato box-drawing Unicode exacto.
+- La sección "🤖 AI-Powered Risk Assessment" debe contener tu propio análisis técnico del impacto y riesgo.
+- Todo lo demás debe quedar EXACTAMENTE igual al texto proporcionado.
 
-╔═══════════════════════╗
-║ {CVE_ID}              ║
-╚═══════════════════════╝
+---
 
-▸ Resumen ejecutivo
-{2-3 oraciones propias}
-
-▸ Análisis de riesgo
-{vector, condiciones e impacto real, máx 120 palabras}
-
-▸ Acción recomendada
-1. {imperativo corto}
-2. {imperativo corto}
-3. {imperativo corto}
-
-▸ Notas
-{una línea breve o "—"}
+{report_body}

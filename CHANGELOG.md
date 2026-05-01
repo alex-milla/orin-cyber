@@ -1,5 +1,21 @@
 # Changelog
 
+## [v0.11.0] — 2026-05-01
+
+### Added
+- **CVE Official Sources + i18n — Re-creación del módulo CVE**:
+  - Nuevo scraper `worker/scrapers/cve_org.py`: consulta CVE Services API (`cveawg.mitre.org`) como **fuente canónica** del registro CVE. Extrae metadatos, descripciones por idioma, productos afectados, métricas CNA, CWEs y referencias.
+  - `worker/scrapers/nvd.py` refactorizado: ahora actúa como **fuente de enriquecimiento secundaria** (`get_cve_enrichment()`). Aporta CVSS, CPE, CWE y referencias adicionales cuando el CNA no las publica.
+  - Estrategia de fusión: descripción de CVE.org tiene prioridad; si NVD aporta CVSS/CPE, se añade; fallback automático a NVD si CVE.org falla.
+  - Prompt `worker/prompts/cve_report.txt` reescrito: el informe se **pre-rellena** con datos oficiales en formato box-drawing Unicode exacto. El LLM solo debe reescribir la sección "🤖 AI-Powered Risk Assessment", eliminando repeticiones y alucinaciones.
+  - Soporte de **idioma** (`es` / `en`): selector en `task_cve.php`, propagado a worker y VirtualWorker. Descripciones preferentes según idioma con fallback a inglés.
+  - Paridad Cloud/Local: `hosting/includes/tasks/cve_search_task.php` ahora también consulta **CVE.org**, **CISA KEV**, **GitHub Exploits** y **EPSS**, igual que el worker Python.
+  - Renderizado HTML mejorado: `worker/utils/formatter.py` y PHP usan `<pre>` con `white-space: pre-wrap` para preservar la estructura box-drawing sin romper los caracteres Unicode.
+  - Exportación Markdown/Word adaptada al idioma de la tarea.
+
+### Changed
+- `worker/tasks/cve_search.py` completamente refactorizado con arquitectura de tres capas: Canónico (CVE.org) → Enriquecimiento (NVD) → Priorización (CISA KEV) + Complementarias (EPSS, GitHub, OSV).
+
 ## [v0.10.44] — 2026-05-01
 
 ### Added

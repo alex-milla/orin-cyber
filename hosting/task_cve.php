@@ -84,6 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'severity' => $severity,
                         'max_results' => 1,
                         'template' => $templateContent,
+                        'language' => $_POST['language'] ?? 'es',
                     ], JSON_UNESCAPED_UNICODE);
                     $tid = Database::insert('tasks', [
                         'task_type' => 'cve_search',
@@ -106,6 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'severity' => $severity,
                     'max_results' => $maxResults,
                     'template' => $templateContent,
+                    'language' => $_POST['language'] ?? 'es',
                 ], JSON_UNESCAPED_UNICODE);
                 $tid = Database::insert('tasks', [
                     'task_type' => 'cve_search',
@@ -312,6 +314,12 @@ require __DIR__ . '/templates/header.php';
                 <?php endforeach; ?>
             </select>
             <?php endif; ?>
+
+            <label for="language" style="margin-top:1rem;display:block;">🌐 Idioma del informe</label>
+            <select id="language" name="language" style="min-width:320px;margin-bottom:.5rem;">
+                <option value="es" selected>🇪🇸 Español</option>
+                <option value="en">🇬🇧 English</option>
+            </select>
 
             <button type="submit" class="mt-2">Buscar vulnerabilidad</button>
             

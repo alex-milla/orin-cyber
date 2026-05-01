@@ -31,12 +31,24 @@ $input = json_decode($task['input_data'] ?? '{}', true) ?: [];
 $cveId = $input['cve_id'] ?? ('task-' . $taskId);
 $body  = trim((string)($task['result_text'] ?? ''));
 
-// Cabecera común en Markdown
-$header  = "# Informe CVE — {$cveId}\n\n";
-$header .= "- **Tarea:** #{$task['id']}\n";
-$header .= "- **Creada:** {$task['created_at']}\n";
-$header .= "- **Completada:** " . ($task['completed_at'] ?: '—') . "\n";
-$header .= "- **Ejecutor:** " . ($task['executed_by'] ?: '—') . "\n\n---\n\n";
+$lang = strtolower($input['language'] ?? 'es');
+if (!in_array($lang, ['es', 'en'], true)) {
+    $lang = 'es';
+}
+
+if ($lang === 'en') {
+    $header  = "# CVE Report — {$cveId}\n\n";
+    $header .= "- **Task:** #{$task['id']}\n";
+    $header .= "- **Created:** {$task['created_at']}\n";
+    $header .= "- **Completed:** " . ($task['completed_at'] ?: '—') . "\n";
+    $header .= "- **Executor:** " . ($task['executed_by'] ?: '—') . "\n\n---\n\n";
+} else {
+    $header  = "# Informe CVE — {$cveId}\n\n";
+    $header .= "- **Tarea:** #{$task['id']}\n";
+    $header .= "- **Creada:** {$task['created_at']}\n";
+    $header .= "- **Completada:** " . ($task['completed_at'] ?: '—') . "\n";
+    $header .= "- **Ejecutor:** " . ($task['executed_by'] ?: '—') . "\n\n---\n\n";
+}
 
 $markdown = $header . $body . "\n";
 $safeName = preg_replace('/[^A-Za-z0-9_\-]/', '_', $cveId);
