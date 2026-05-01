@@ -15,7 +15,6 @@ def markdown_to_html(text: str) -> str:
     text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
     text = re.sub(r"\*(.+?)\*", r"<em>\1</em>", text)
 
-    # Procesar listas
     lines = text.split("\n")
     new_lines = []
     in_list = False
@@ -50,7 +49,6 @@ def markdown_to_html(text: str) -> str:
         new_lines.append(f"</{list_type}>")
     text = "\n".join(new_lines)
 
-    # Párrafos
     paragraphs = []
     current_para = []
     for line in text.splitlines():
@@ -72,7 +70,6 @@ def markdown_to_html(text: str) -> str:
 
     text = "\n".join(paragraphs)
 
-    # Enlaces markdown
     text = re.sub(
         r'\[([^\]]+)\]\(([^)]+)\)',
         r'<a href="\2" target="_blank" rel="noopener">\1</a>',
@@ -104,7 +101,7 @@ def _section(title: str, content: str, icon: str = "") -> str:
 </div>'''
 
 
-def render_cve_report_text(report_text: str, cve_data: dict | None = None) -> str:
+def box_drawing_to_html(report_text: str, cve_data: dict | None = None) -> str:
     """Convierte un informe en texto plano con box-drawing a HTML que preserve el formato.
 
     El texto se envuelve en un bloque <pre> con estilos CSS para mantener la alineación
@@ -123,9 +120,7 @@ def render_cve_report_text(report_text: str, cve_data: dict | None = None) -> st
         html,
     )
 
-    cve_id = cve_data.get("cve_id", "") if cve_data else ""
     severity = cve_data.get("severity", "") if cve_data else ""
-    score = cve_data.get("score") if cve_data else None
 
     # Badge de severidad opcional arriba del reporte
     badge_html = ""
@@ -229,13 +224,3 @@ def render_cve_report_batch(enriched: list) -> str:
 *Modo batch: datos objetivos de CVE.org, NVD, EPSS, CISA KEV y OSV.dev. El análisis detallado del LLM está disponible para búsquedas individuales.*
 </p></div>'''
     return html
-
-
-def wrap_html_document(body_html: str, title: str = "Informe OrinSec") -> str:
-    """Envuelve contenido HTML en un documento mínimo."""
-    return f"""<div class="orin-report">
-  <h1>{title}</h1>
-  {body_html}
-  <hr>
-  <p class="small" style="color:#666;">Generado por OrinSec — IA local asistida</p>
-</div>"""
