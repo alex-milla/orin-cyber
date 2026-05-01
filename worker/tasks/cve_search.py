@@ -76,24 +76,20 @@ class CveSearchTask(BaseTask):
         }
 
     def _build_compact_context(self, entry: dict) -> str:
-        """Construye un bloque de contexto compacto en texto plano para el LLM."""
+        """Construye un bloque de contexto mínimo para el LLM.
+
+        Se omiten score numérico, severidad, EPSS y KEV para evitar que el
+        modelo los repita en el análisis. El HTML wrapper ya muestra esos
+        datos por encima del informe del LLM.
+        """
         cve = entry["cve"]
-        epss = entry.get("epss") or {}
-        kev = entry.get("kev")
-        osv = entry.get("osv") or {}
         lines = [
             f"CVE: {cve.get('cve_id')}",
             f"Descripción: {cve.get('description', 'N/A')[:500]}",
-            f"CVSS: {cve.get('score', 'N/A')} ({cve.get('severity', 'N/A')}) — {cve.get('vector', '')}",
-            f"Publicado: {cve.get('published', '')[:10]}",
-            f"EPSS: {epss.get('score_percent', 'N/A')}% probabilidad explotación",
         ]
-        if kev:
-            lines.append(f"CISA KEV: SÍ — Acción requerida: {kev.get('required_action', '')[:200]}")
-        else:
-            lines.append("CISA KEV: No listado")
-        if osv.get("fixed_in"):
-            lines.append(f"OSV fixed_in: {osv['fixed_in']}")
+        vector = cve.get("vector", "")
+        if vector:
+            lines.append(f"Vector: {vector}")
         return "\n".join(lines)
 
     def execute(self, input_data: dict[str, Any]) -> dict[str, str]:
