@@ -30,23 +30,39 @@ class ExternalClient {
 
         $start = microtime(true);
         $ch = curl_init($url);
+
+        $headers = [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $apiKey,
+        ];
+        // Headers opcionales de OpenRouter (algunos proveedores los rechazan)
+        if (str_contains($provider['base_url'], 'openrouter')) {
+            $headers[] = 'HTTP-Referer: https://orin.cyberintelligence.dev';
+            $headers[] = 'X-Title: OrinSec';
+        }
+
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => (int)$provider['timeout_seconds'],
             CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Authorization: Bearer ' . $apiKey,
-                'HTTP-Referer: https://orin.cyberintelligence.dev',
-                'X-Title: OrinSec',
-            ],
+            CURLOPT_HTTPHEADER => $headers,
         ]);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError = curl_error($ch);
         curl_close($ch);
+
+        // Debug temporal — registra request/response en logs de PHP
+        error_log(sprintf(
+            '[ExternalClient] URL=%s | Model=%s | HTTP=%d | KeyPrefix=%s... | Response=%s',
+            $url,
+            $modelId,
+            $httpCode,
+            substr($apiKey, 0, 7),
+            substr($response, 0, 500)
+        ));
 
         $durationMs = (int)((microtime(true) - $start) * 1000);
 
