@@ -231,7 +231,7 @@ require __DIR__ . '/templates/header.php';
             <span class="qa-label">Blue Team</span>
             <span class="qa-desc">Análisis de incidentes, IOCs y queries KQL</span>
         </a>
-        <a href="chat.php" class="quick-action-btn">
+        <a href="chat.php" class="quick-action-btn" target="_blank" rel="noopener noreferrer">
             <span class="qa-icon">💬</span>
             <span class="qa-label">Chat IA</span>
             <span class="qa-desc">Asistente de ciberseguridad con historial</span>

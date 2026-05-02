@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.12.2] — 2026-05-02
+
+### Changed
+- **Chat simplificado — redirección directa al túnel de Cloudflare**:
+  - `hosting/chat.php` reescrito: ya no carga la UI de chat integrado con JS. Ahora redirige automáticamente a la URL configurada en `local_llm_url` (el túnel de Cloudflare que expone el llama-server del Orin).
+  - Si no hay URL configurada, muestra un mensaje informativo con enlace al Admin para completar la configuración.
+  - El enlace de navegación "💬 Chat" en `header.php` y en el dashboard ahora abre en **nueva pestaña** (`target="_blank"`) porque es una experiencia externa al hosting.
+  - Eliminada la lógica legacy del chat integrado (textarea, polling JS, historial inline) de `chat.php`. El historial de conversaciones sigue disponible en la base de datos pero ya no se expone en la UI.
+
 ## [v0.12.1] — 2026-05-02
 
 ### Fixed

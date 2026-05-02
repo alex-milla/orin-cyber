@@ -32,7 +32,7 @@ if (!isset($pageTitle)) $pageTitle = 'OrinSec';
     <?php if (isLoggedIn()): ?>
     <nav>
         <a href="index.php">📊 Dashboard</a>
-        <a href="chat.php">💬 Chat</a>
+        <a href="chat.php" target="_blank" rel="noopener noreferrer">💬 Chat</a>
         <div class="dropdown" id="tools-dropdown">
             <span class="dropdown-toggle" onclick="event.stopPropagation();document.getElementById('tools-dropdown').classList.toggle('open');">Herramientas <span class="dropdown-arrow">▾</span></span>
             <div class="dropdown-menu">
