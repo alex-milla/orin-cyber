@@ -1,5 +1,21 @@
 # Changelog
 
+## [v0.12.0] — 2026-05-02
+
+### Added
+- **Dashboard intuitivo v2** — Rediseño completo de la pantalla de inicio (`index.php`):
+  - KPI cards superiores con métricas clave: tareas totales/pendientes, alertas sin leer, incidentes abiertos y estado del worker Orin.
+  - Gráfico de barras horizontales (CSS puro) mostrando la distribución de severidad de alertas.
+  - Widget de estado del worker con métricas en tiempo real: CPU, memoria, disco, temperatura y modelo cargado.
+  - Sección de acceso rápido con cards grandes e iconos para Búsqueda CVE, Blue Team, Chat IA, Alertas y Admin.
+  - Panel de últimas alertas con badges de severidad y enlaces directos a la consulta CVE.
+  - Tabla compacta de tareas recientes con pills de estado visuales (icono + color + texto).
+  - Banner de bienvenida con degradado que destaca la identidad de la plataforma.
+
+### Changed
+- `hosting/assets/css/style.css` v6: nuevas clases de diseño para dashboards — grids responsive, KPI cards, mini bar charts, status pills, quick action buttons y worker mini widgets.
+- `hosting/templates/header.php`: el enlace de navegación "Inicio" ahora muestra "📊 Dashboard" para reforzar la nueva identidad de la página principal.
+
 ## [v0.11.0] — 2026-05-01
 
 ### Added

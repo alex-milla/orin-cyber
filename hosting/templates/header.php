@@ -9,7 +9,7 @@ if (!isset($pageTitle)) $pageTitle = 'OrinSec';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="<?php echo htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8'); ?>">
     <title><?php echo htmlspecialchars($pageTitle); ?></title>
-    <link rel="stylesheet" href="assets/css/style.css?v=5">
+    <link rel="stylesheet" href="assets/css/style.css?v=6">
     <script>
     (function() {
         const saved = localStorage.getItem('orinsec-theme') || 'system';
@@ -31,7 +31,7 @@ if (!isset($pageTitle)) $pageTitle = 'OrinSec';
     <h1><a href="index.php" style="text-decoration:none;color:inherit;">🔒 OrinSec</a></h1>
     <?php if (isLoggedIn()): ?>
     <nav>
-        <a href="index.php">Inicio</a>
+        <a href="index.php">📊 Dashboard</a>
         <a href="chat.php">💬 Chat</a>
         <div class="dropdown" id="tools-dropdown">
             <span class="dropdown-toggle" onclick="event.stopPropagation();document.getElementById('tools-dropdown').classList.toggle('open');">Herramientas <span class="dropdown-arrow">▾</span></span>
