@@ -104,9 +104,34 @@ function sanitizeReportHtml(?string $html): string {
    RATE LIMITING (general)
    ================================================================ */
 
-function checkRateLimit(string $key = '', int $limit = 60, int $windowSec = 60): bool {
+function checkRateLimit(int $seconds = 1): void {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'cli';
-    $key = $key ?: 'rate_limit_' . md5($ip);
+    $key = 'rate_limit_' . md5($ip);
+    $now = time();
+    $lockFile = DATA_DIR . '/.' . $key . '.tmp';
+
+    $fp = fopen($lockFile, 'c+');
+    if (!$fp) return;
+    if (!flock($fp, LOCK_EX)) { fclose($fp); return; }
+
+    $content = stream_get_contents($fp);
+    $lastTime = $content !== false && $content !== '' ? (int)$content : 0;
+
+    if (($now - $lastTime) < $seconds) {
+        flock($fp, LOCK_UN);
+        fclose($fp);
+        jsonResponse(['error' => 'Rate limit exceeded'], 429);
+    }
+
+    ftruncate($fp, 0);
+    rewind($fp);
+    fwrite($fp, (string)$now);
+    fflush($fp);
+    flock($fp, LOCK_UN);
+    fclose($fp);
+}
+
+function checkRateLimitAdvanced(string $key, int $limit = 60, int $windowSec = 60): bool {
     $now = time();
     $lockFile = DATA_DIR . '/.' . md5($key) . '_rl.json';
 

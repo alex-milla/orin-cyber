@@ -20,7 +20,7 @@ if (!$keyRow) {
 }
 
 // 2. Rate limiting
-if (!checkRateLimit("enrich_{$apiKey}", limit: 60, windowSec: 60)) {
+if (!checkRateLimitAdvanced("enrich_{$apiKey}", limit: 60, windowSec: 60)) {
     http_response_code(429);
     echo json_encode(['error' => 'Rate limit exceeded']);
     exit;
