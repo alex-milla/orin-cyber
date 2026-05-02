@@ -410,6 +410,24 @@ class Database {
         $db->exec("CREATE INDEX IF NOT EXISTS idx_tasks_pending_priority ON tasks(status, priority, created_at) WHERE status = 'pending'");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_rag_query_created ON rag_query_log(created_at DESC)");
 
+        // ─── RAG Fase 2 — Caché de enriquecimientos ─────────────────────────
+        $db->exec("CREATE TABLE IF NOT EXISTS enrich_cache (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            cache_key       TEXT NOT NULL UNIQUE,
+            response_json   TEXT NOT NULL,
+            created_at      TEXT DEFAULT CURRENT_TIMESTAMP,
+            expires_at      TEXT NOT NULL
+        )");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_enrich_cache_key ON enrich_cache(cache_key)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_enrich_cache_expires ON enrich_cache(expires_at)");
+
+        // ─── RAG Fase 2 — Tabla virtual sqlite-vec (se crea solo si la extensión está cargada) ──
+        try {
+            $db->exec("CREATE VIRTUAL TABLE IF NOT EXISTS incident_embeddings_vec USING vec0(id INTEGER PRIMARY KEY, embedding FLOAT[384])");
+        } catch (PDOException $e) {
+            // sqlite-vec no disponible todavía — se creará manualmente tras instalar la extensión
+        }
+
         // Plantillas de informe personalizables
         $db->exec("CREATE TABLE IF NOT EXISTS report_templates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

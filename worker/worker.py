@@ -26,6 +26,7 @@ from tasks.cve_search import CveSearchTask
 from tasks.alert_scan import AlertScanTask
 from tasks.incident_analysis import IncidentAnalysisTask
 from tasks.azure_sync import AzureSyncTask
+from tasks.rag_enrich import RagEnrichTask
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CONFIG = os.path.join(BASE_DIR, "config.ini")
@@ -45,6 +46,7 @@ TASK_REGISTRY = {
     "alert_scan": AlertScanTask,
     "incident_analysis": IncidentAnalysisTask,
     "azure_sync": AzureSyncTask,
+    "rag_enrich": RagEnrichTask,
 }
 
 

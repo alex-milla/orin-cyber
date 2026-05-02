@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/rag.php';
+require_once __DIR__ . '/../../includes/embedding_client.php';
 
 header('Content-Type: application/json');
 
@@ -50,33 +51,76 @@ if ($method === 'POST') {
     }
 
     $textToEmbed = buildIncidentText($input);
-    $embeddingModel = 'bge-small-en-v1.5';
-    $embeddingDim = 384;
+    $embeddingModel = defined('EMBEDDING_MODEL') ? EMBEDDING_MODEL : 'bge-small-en-v1.5';
+    $embeddingDim = defined('EMBEDDING_DIM') ? EMBEDDING_DIM : 384;
 
+    $db = db();
     try {
-        $id = Database::insert('incident_embeddings', [
-            'incident_id'     => $input['incident_id'] ?? null,
-            'summary'         => $textToEmbed,
-            'verdict'         => $input['verdict'] ?? null,
-            'severity'        => $input['severity'] ?? null,
-            'mitre_tactic'    => $input['mitre_tactic'] ?? null,
-            'mitre_technique' => $input['mitre_technique'] ?? null,
-            'classification'  => $input['classification'] ?? null,
-            'entities_json'   => json_encode($input['entities'] ?? []),
-            'closed_at'       => $input['closed_at'] ?? date('Y-m-d H:i:s'),
-            'closed_by'       => $input['closed_by'] ?? ($_SESSION['username'] ?? 'system'),
-            'embedding_model' => $embeddingModel,
-            'embedding_dim'   => $embeddingDim,
+        $db->beginTransaction();
+
+        // 1. Insertar metadatos
+        $stmt = $db->prepare("
+            INSERT INTO incident_embeddings
+                (incident_id, summary, verdict, severity, mitre_tactic,
+                 mitre_technique, classification, entities_json, closed_at,
+                 closed_by, embedding_model, embedding_dim)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $input['incident_id'] ?? null,
+            $textToEmbed,
+            $input['verdict'] ?? null,
+            $input['severity'] ?? null,
+            $input['mitre_tactic'] ?? null,
+            $input['mitre_technique'] ?? null,
+            $input['classification'] ?? null,
+            json_encode($input['entities'] ?? []),
+            $input['closed_at'] ?? date('Y-m-d H:i:s'),
+            $input['closed_by'] ?? ($_SESSION['username'] ?? 'system'),
+            $embeddingModel,
+            $embeddingDim,
         ]);
+        $embeddingId = (int)$db->lastInsertId();
+
+        // 2. Generar embedding y guardar en tabla virtual sqlite-vec (si está disponible)
+        try {
+            $client = new EmbeddingClient();
+            $embedding = $client->embedOne($textToEmbed);
+            if (!empty($embedding)) {
+                // Verificar si sqlite-vec está disponible
+                $hasVec = false;
+                try {
+                    $db->query("SELECT 1 FROM incident_embeddings_vec LIMIT 1");
+                    $hasVec = true;
+                } catch (Exception $e) {
+                    // sqlite-vec no disponible todavía
+                }
+
+                if ($hasVec) {
+                    $stmtVec = $db->prepare("INSERT INTO incident_embeddings_vec (id, embedding) VALUES (?, ?)");
+                    $stmtVec->execute([$embeddingId, json_encode($embedding)]);
+                    $embeddingDim = count($embedding);
+                }
+            }
+        } catch (Exception $embedErr) {
+            // Log pero no fallar: el texto ya está indexado, el vector se puede regenerar luego
+            error_log("Embedding generation failed for incident {$input['incident_id'] ?? 'new'}: " . $embedErr->getMessage());
+        }
+
+        $db->commit();
+
+        // 3. Invalidar caché de enriquecimientos relacionados
+        invalidateEnrichCacheForEntities($input['entities'] ?? []);
 
         jsonResponse([
             'success' => true,
-            'embedding_id' => $id,
+            'embedding_id' => $embeddingId,
             'incident_id' => $input['incident_id'] ?? null,
             'embedding_model' => $embeddingModel,
             'embedding_dim' => $embeddingDim,
         ]);
     } catch (Exception $e) {
+        if ($db->inTransaction()) $db->rollBack();
         http_response_code(500);
         jsonResponse(['error' => 'Database error: ' . $e->getMessage()], 500);
     }

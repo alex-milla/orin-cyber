@@ -27,3 +27,7 @@ Require all denied
 <Files "rag_feedback.php">
     Require all granted
 </Files>
+
+<Files "enrich.php">
+    Require all granted
+</Files>

@@ -1,5 +1,38 @@
 # Changelog
 
+## [v0.13.0] — 2026-05-03
+
+### Added
+- **RAG de Incidentes Históricos — Fase 2 (Embeddings + sqlite-vec + AI Worker)**:
+  - Scripts de Orin Nano (`scripts/orin/`):
+    - `download-embedding-model.sh`: descarga automática de `bge-small-en-v1.5-q8_0.gguf` desde HuggingFace.
+    - `orinsec-embeddings.service`: servicio systemd para `llama-server --embedding --port 8081`.
+    - `setup-embeddings-service.sh`: instalación automática del servicio systemd.
+    - `setup-cloudflare-tunnel.sh`: configura túnel Cloudflare para `embed-orin.cyberintelligence.dev`.
+    - `setup-sqlite-vec.sh`: instala la extensión `sqlite-vec` en el servidor de hosting.
+    - `setup-rag-phase2.sh`: script maestro que orquesta toda la instalación en la Orin.
+  - Worker Python:
+    - `worker/utils/embeddings.py`: cliente `EmbeddingClient` que habla con el embed-server vía API OpenAI-compatible `/v1/embeddings`.
+    - `worker/tasks/rag_enrich.py`: tarea `rag_enrich` completa con búsqueda de similares, prompt al LLM, respuesta JSON estructurada, fallback por votación, generación de KQL hunting, y soporte para batch.
+    - `worker/utils/api_client.py`: nuevo método `search_similar_incidents()` para que el worker consulte al hosting.
+    - `worker/worker.py`: `RagEnrichTask` registrado en `TASK_REGISTRY`.
+  - Hosting PHP:
+    - `hosting/includes/embedding_client.php`: cliente PHP para el servicio de embeddings con soporte Cloudflare Access headers.
+    - `hosting/api/v1/enrich.php`: endpoint REST completo para Sentinel/KQL con modos `sync`/`async`/`hybrid`, rate limiting, caché, overflow policy y cola con prioridad.
+    - `hosting/api/v1/rag_feedback.php`: actualizado para generar embeddings reales y guardar vectores en `incident_embeddings_vec` (sqlite-vec).
+    - `hosting/api/v1/rag_search.php`: endpoint unificado para búsqueda vectorial (sqlite-vec) o full-text fallback (LIKE).
+    - `hosting/includes/rag.php`: motor completo con `searchSimilarIncidentsVector()`, caché de enriquecimientos (`enrich_cache`), invalidación de caché, y fallback a texto cuando sqlite-vec no está disponible.
+    - `hosting/includes/db.php`: tabla `enrich_cache` y tabla virtual `incident_embeddings_vec` (vec0).
+    - `hosting/includes/config.php`: `LOCAL_EMBED_URL`, `EMBEDDING_MODEL`, `EMBEDDING_DIM`, `RAG_OVERFLOW_POLICY`.
+    - `hosting/includes/functions.php`: `createTask()` con soporte de `priority` y `parent_task_id`.
+    - `hosting/api/v1/tasks.php`: reclamación atómica ordenada por `priority ASC, created_at ASC`.
+    - `hosting/api/v1/.htaccess`: whitelist de `enrich.php`.
+  - **Todo listo para descargar desde GitHub Release** y copiar a la Orin Nano + hosting.
+
+### Changed
+- `searchSimilarIncidents()` ahora intenta búsqueda vectorial (Fase 2) y cae a full-text (Fase 1) si sqlite-vec no está disponible.
+- `rag_feedback.php` genera embeddings reales vía `EmbeddingClient` y persiste vectores cuando sqlite-vec está activo.
+
 ## [v0.12.7] — 2026-05-02
 
 ### Added

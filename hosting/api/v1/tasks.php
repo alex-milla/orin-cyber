@@ -34,12 +34,12 @@ Database::query(
 switch ($action) {
     case 'pending':
         $task = Database::fetchOne(
-            "SELECT id, task_type, input_data, status, created_at, assignment
+            "SELECT id, task_type, input_data, status, created_at, assignment, priority, parent_task_id
              FROM tasks
              WHERE status = 'pending'
                AND (assignment = 'worker' OR assignment IS NULL)
                AND assignment NOT LIKE 'provider:%'
-             ORDER BY created_at ASC LIMIT 1"
+             ORDER BY priority ASC, created_at ASC LIMIT 1"
         );
 
         if (!$task) {

@@ -206,6 +206,26 @@ function deleteTaskById(int $taskId): array {
     return ['ok' => true];
 }
 
+function createTask(array $data): int {
+    $defaults = [
+        'task_type' => $data['type'] ?? 'generic',
+        'input_data' => $data['input_data'] ?? null,
+        'status' => 'pending',
+        'assignment' => $data['assignment'] ?? 'worker',
+        'priority' => $data['priority'] ?? 5,
+        'parent_task_id' => $data['parent_task_id'] ?? null,
+        'created_by' => $data['created_by'] ?? null,
+        'created_at' => date('Y-m-d H:i:s'),
+    ];
+    // Sobrescribir defaults con los datos proporcionados
+    $insertData = array_merge($defaults, array_diff_key($data, ['type' => 1]));
+    if (isset($data['type'])) {
+        $insertData['task_type'] = $data['type'];
+        unset($insertData['type']);
+    }
+    return Database::insert('tasks', $insertData);
+}
+
 function clearBruteForce(string $identifier): void {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'cli';
     $key = 'brute_' . md5($identifier . '_' . $ip);
