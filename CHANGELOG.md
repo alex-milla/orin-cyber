@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.12.3] — 2026-05-02
+
+### Fixed
+- **Enlace de Chat ahora apunta directamente al túnel sin pasar por chat.php**:
+  - `templates/header.php` lee `local_llm_url` desde la BD y, si está configurada, el enlace 💬 Chat abre la URL externa directamente en nueva pestaña.
+  - `index.php` (dashboard): el quick-action de Chat también usa la URL directa cuando está disponible.
+  - Si no hay URL configurada, ambos enlaces fallback a `chat.php` que muestra el mensaje informativo.
+  - Esto elimina la pantalla intermedia y la confusión de "abrir ventana en lugar de pestaña".
+
 ## [v0.12.2] — 2026-05-02
 
 ### Changed

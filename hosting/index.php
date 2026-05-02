@@ -17,6 +17,15 @@ $severityDistribution = [];
 $recentAlerts = [];
 $recentTasks = [];
 
+// URL del chat local (túnel de Cloudflare)
+$chatUrl = 'chat.php';
+try {
+    $chatUrlRow = Database::fetchOne("SELECT value FROM config WHERE key = 'local_llm_url'");
+    if (!empty($chatUrlRow['value'])) {
+        $chatUrl = $chatUrlRow['value'];
+    }
+} catch (Exception $e) {}
+
 try {
     // Totales por estado de tareas
     $rows = Database::fetchAll("SELECT status, COUNT(*) as cnt FROM tasks GROUP BY status");
@@ -231,7 +240,7 @@ require __DIR__ . '/templates/header.php';
             <span class="qa-label">Blue Team</span>
             <span class="qa-desc">Análisis de incidentes, IOCs y queries KQL</span>
         </a>
-        <a href="chat.php" class="quick-action-btn" target="_blank" rel="noopener noreferrer">
+        <a href="<?php echo htmlspecialchars($chatUrl); ?>" class="quick-action-btn" target="_blank" rel="noopener noreferrer">
             <span class="qa-icon">💬</span>
             <span class="qa-label">Chat IA</span>
             <span class="qa-desc">Asistente de ciberseguridad con historial</span>

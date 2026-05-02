@@ -1,6 +1,15 @@
 <?php
 declare(strict_types=1);
 if (!isset($pageTitle)) $pageTitle = 'OrinSec';
+
+// URL del chat local (túnel de Cloudflare) — leída directamente para enlazar sin pasar por chat.php
+$chatUrl = 'chat.php';
+try {
+    $chatUrlRow = Database::fetchOne("SELECT value FROM config WHERE key = 'local_llm_url'");
+    if (!empty($chatUrlRow['value'])) {
+        $chatUrl = $chatUrlRow['value'];
+    }
+} catch (Exception $e) {}
 ?>
 <!DOCTYPE html>
 <html lang="es" data-theme="system">
@@ -32,7 +41,7 @@ if (!isset($pageTitle)) $pageTitle = 'OrinSec';
     <?php if (isLoggedIn()): ?>
     <nav>
         <a href="index.php">📊 Dashboard</a>
-        <a href="chat.php" target="_blank" rel="noopener noreferrer">💬 Chat</a>
+        <a href="<?php echo htmlspecialchars($chatUrl); ?>" target="_blank" rel="noopener noreferrer">💬 Chat</a>
         <div class="dropdown" id="tools-dropdown">
             <span class="dropdown-toggle" onclick="event.stopPropagation();document.getElementById('tools-dropdown').classList.toggle('open');">Herramientas <span class="dropdown-arrow">▾</span></span>
             <div class="dropdown-menu">
