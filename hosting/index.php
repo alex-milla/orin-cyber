@@ -234,6 +234,11 @@ require __DIR__ . '/templates/header.php';
             <span class="qa-label">Blue Team</span>
             <span class="qa-desc">Análisis de incidentes, IOCs y queries KQL</span>
         </a>
+        <a href="ioc_converter.php" class="quick-action-btn">
+            <span class="qa-icon">🔄</span>
+            <span class="qa-label">IOC → STIX</span>
+            <span class="qa-desc">Convierte indicadores de compromiso a formato STIX 2.1</span>
+        </a>
         <a href="<?php echo htmlspecialchars($chatUrl); ?>" class="quick-action-btn" target="_blank" rel="noopener noreferrer">
             <span class="qa-icon">💬</span>
             <span class="qa-label">Chat IA</span>

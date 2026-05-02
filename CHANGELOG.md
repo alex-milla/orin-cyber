@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.12.6] — 2026-05-02
+
+### Added
+- **Nueva herramienta: Convertidor IOC → STIX 2.1**:
+  - `hosting/ioc_converter.php`: interfaz completa con estilo OrinSec para convertir listas de indicadores de compromiso a formato STIX 2.1.
+  - `hosting/includes/ioc_converter_utils.php`: motor de conversión con soporte para txt, list, dat, ioc, csv y json.
+  - `hosting/ioc_download.php`: endpoint seguro para descargar los archivos JSON generados.
+  - Detección automática de tipos de IOC: IPv4, IPv6, dominio, URL, hash, email, cuenta de usuario, clave de registro.
+  - Configuración de metadatos STIX: fuente, actor de amenaza, tags, confianza (1-100), nivel TLP, tipo de indicador y validez en días.
+  - Dos modos de salida: separado por tipo (archivos individuales por categoría) o archivo único combinado.
+  - Resumen visual con gráfico de barras por tipo de indicador detectado.
+  - Integrada en el menú de navegación (Herramientas → IOC → STIX) y en el dashboard de accesos rápidos.
+
 ## [v0.12.5] — 2026-05-02
 
 ### Added
