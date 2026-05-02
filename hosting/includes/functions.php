@@ -190,6 +190,22 @@ function cancelTaskById(int $taskId): array {
     return ['ok' => true];
 }
 
+function deleteTaskById(int $taskId): array {
+    if ($taskId <= 0) {
+        return ['ok' => false, 'error' => 'task_id requerido', 'code' => 400];
+    }
+    // Solo permitir borrar tareas finalizadas (completed, error, cancelled)
+    $task = Database::fetchOne("SELECT status FROM tasks WHERE id = ?", [$taskId]);
+    if (!$task) {
+        return ['ok' => false, 'error' => 'Tarea no encontrada', 'code' => 404];
+    }
+    if (!in_array($task['status'], ['completed', 'error', 'cancelled'], true)) {
+        return ['ok' => false, 'error' => 'No se puede eliminar una tarea en curso. Cancela primero.', 'code' => 409];
+    }
+    Database::query("DELETE FROM tasks WHERE id = ?", [$taskId]);
+    return ['ok' => true];
+}
+
 function clearBruteForce(string $identifier): void {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'cli';
     $key = 'brute_' . md5($identifier . '_' . $ip);

@@ -400,11 +400,51 @@ require __DIR__ . '/templates/header.php';
     <h2>📋 Historial de búsquedas CVE</h2>
     <?php if (empty($cveHistory)): ?>
         <p class="small">No hay búsquedas todavía.</p>
-    <?php else: ?>
-        <input type="search" id="cve-history-filter"
-               placeholder="🔎 Filtrar por CVE ID, producto, ejecutor..."
-               style="width:100%;max-width:480px;margin-bottom:.75rem;">
-        <table id="cve-history-table">
+    <?php else:
+        // Contadores por estado
+        $counts = ['total' => 0, 'pending' => 0, 'processing' => 0, 'completed' => 0, 'error' => 0, 'cancelled' => 0];
+        foreach ($cveHistory as $t) {
+            $counts['total']++;
+            if (isset($counts[$t['status']])) $counts[$t['status']]++;
+        }
+    ?>
+        <!-- KPI mini del historial -->
+        <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap:.5rem; margin-bottom:1rem;">
+            <div class="kpi-card kpi-primary" style="padding:.75rem;" data-filter="all">
+                <div class="kpi-value" style="font-size:1.3rem;"><?php echo $counts['total']; ?></div>
+                <div class="kpi-label">Todas</div>
+            </div>
+            <div class="kpi-card kpi-warning" style="padding:.75rem; cursor:pointer;" data-filter="pending">
+                <div class="kpi-value" style="font-size:1.3rem;"><?php echo $counts['pending']; ?></div>
+                <div class="kpi-label">Pendientes</div>
+            </div>
+            <div class="kpi-card kpi-accent" style="padding:.75rem; cursor:pointer;" data-filter="processing">
+                <div class="kpi-value" style="font-size:1.3rem;"><?php echo $counts['processing']; ?></div>
+                <div class="kpi-label">En curso</div>
+            </div>
+            <div class="kpi-card kpi-success" style="padding:.75rem; cursor:pointer;" data-filter="completed">
+                <div class="kpi-value" style="font-size:1.3rem;"><?php echo $counts['completed']; ?></div>
+                <div class="kpi-label">Completadas</div>
+            </div>
+            <div class="kpi-card kpi-error" style="padding:.75rem; cursor:pointer;" data-filter="error">
+                <div class="kpi-value" style="font-size:1.3rem;"><?php echo $counts['error']; ?></div>
+                <div class="kpi-label">Con error</div>
+            </div>
+            <div class="kpi-card" style="padding:.75rem; cursor:pointer; border-top:3px solid var(--text-muted);" data-filter="cancelled">
+                <div class="kpi-value" style="font-size:1.3rem;"><?php echo $counts['cancelled']; ?></div>
+                <div class="kpi-label">Canceladas</div>
+            </div>
+        </div>
+
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.75rem;">
+            <input type="search" id="cve-history-filter"
+                   placeholder="🔎 Filtrar por CVE ID, producto, ejecutor..."
+                   style="width:100%;max-width:380px;">
+            <button type="button" class="small secondary" id="clear-filters">Limpiar filtros</button>
+        </div>
+
+        <div class="table-wrap" style="overflow-x:auto;">
+        <table id="cve-history-table" class="widget-table">
             <thead>
                 <tr>
                     <th>ID</th>
@@ -413,7 +453,7 @@ require __DIR__ . '/templates/header.php';
                     <th>Score</th>
                     <th>Ejecutor</th>
                     <th>Creado</th>
-                    <th>Acción</th>
+                    <th style="width:1px;white-space:nowrap;">Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -441,29 +481,37 @@ require __DIR__ . '/templates/header.php';
                 } else {
                     $scoreCell = '<span class="small">—</span>';
                 }
+                $isDeletable = in_array($t['status'], ['completed', 'error', 'cancelled'], true);
             ?>
-                <tr>
+                <tr data-status="<?php echo htmlspecialchars($t['status']); ?>">
                     <td>#<?php echo $t['id']; ?></td>
                     <td class="small"><?php echo htmlspecialchars($queryLabel); ?></td>
-                    <td class="status-<?php echo $t['status']; ?>"><?php echo ucfirst(htmlspecialchars($t['status'])); ?></td>
+                    <td>
+                        <span class="status-pill status-<?php echo $t['status']; ?>">
+                            <span class="dot"></span>
+                            <?php echo ucfirst(htmlspecialchars($t['status'])); ?>
+                        </span>
+                    </td>
                     <td><?php echo $scoreCell; ?></td>
                     <td class="small"><?php echo htmlspecialchars($t['executed_by'] ?? '—'); ?></td>
-                    <td class="small"><?php echo htmlspecialchars($t['created_at']); ?></td>
-                    <td>
-                        <?php if ($t['status'] === 'completed' || $t['status'] === 'error' || $t['status'] === 'cancelled'): ?>
-                            <a href="task_result.php?id=<?php echo $t['id']; ?>">Ver</a>
+                    <td class="small"><?php echo htmlspecialchars(date('d/m H:i', strtotime($t['created_at']))); ?></td>
+                    <td style="white-space:nowrap;">
+                        <?php if ($isDeletable): ?>
+                            <a href="task_result.php?id=<?php echo $t['id']; ?>"><button class="small secondary" style="padding:.2rem .5rem;font-size:.75rem;">Ver</button></a>
                             <?php if ($t['status'] === 'completed'): ?>
-                                · <a href="export_cve.php?id=<?php echo $t['id']; ?>&format=md" title="Descargar Markdown">MD</a>
-                                · <a href="export_cve.php?id=<?php echo $t['id']; ?>&format=docx" title="Descargar Word">DOC</a>
+                                <a href="export_cve.php?id=<?php echo $t['id']; ?>&format=md" title="Markdown"><button class="small secondary" style="padding:.2rem .5rem;font-size:.75rem;">MD</button></a>
+                                <a href="export_cve.php?id=<?php echo $t['id']; ?>&format=docx" title="Word"><button class="small secondary" style="padding:.2rem .5rem;font-size:.75rem;">DOC</button></a>
                             <?php endif; ?>
+                            <button type="button" class="small danger" style="padding:.2rem .5rem;font-size:.75rem;" onclick="deleteTask(<?php echo $t['id']; ?>, '<?php echo $_SESSION['csrf_token']; ?>')" title="Eliminar">🗑️</button>
                         <?php else: ?>
-                            <button type="button" class="btn small danger" onclick="cancelTask(<?php echo $t['id']; ?>, '<?php echo $_SESSION['csrf_token']; ?>')">Cancelar</button>
+                            <button type="button" class="small danger" style="padding:.2rem .5rem;font-size:.75rem;" onclick="cancelTask(<?php echo $t['id']; ?>, '<?php echo $_SESSION['csrf_token']; ?>')">Cancelar</button>
                         <?php endif; ?>
                     </td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
         </table>
+        </div>
     <?php endif; ?>
 </div>
 
@@ -498,9 +546,34 @@ function cancelTask(taskId, csrfToken) {
     .catch(err => alert('Error de red: ' + err));
 }
 
+function deleteTask(taskId, csrfToken) {
+    if (!confirm('¿Eliminar permanentemente la tarea #' + taskId + '? Esta acción no se puede deshacer.')) return;
+    const fd = new FormData();
+    fd.append('task_id', taskId);
+    fd.append('csrf_token', csrfToken);
+    fetch('ajax_admin.php?action=delete_task', {method: 'POST', body: fd})
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Eliminar la fila sin recargar
+            const table = document.getElementById('cve-history-table');
+            if (table) {
+                table.querySelectorAll('tbody tr').forEach(tr => {
+                    const idCell = tr.querySelector('td:first-child');
+                    if (idCell && idCell.textContent.trim() === '#' + taskId) {
+                        tr.remove();
+                    }
+                });
+            }
+        } else {
+            alert('Error: ' + (data.error || 'No se pudo eliminar'));
+        }
+    })
+    .catch(err => alert('Error de red: ' + err));
+}
+
 /**
  * Polling de filas pendientes del historial CVE.
- * Refresca estado, ejecutor y botón de acción cuando una tarea termina.
  */
 (function() {
     const table = document.getElementById('cve-history-table');
@@ -511,10 +584,8 @@ function cancelTask(taskId, csrfToken) {
     function pendingTaskIds() {
         const ids = [];
         table.querySelectorAll('tbody tr').forEach(tr => {
-            const statusCell = tr.querySelector('td:nth-child(3)');
-            if (!statusCell) return;
-            const cls = statusCell.className || '';
-            if (cls.includes('status-pending') || cls.includes('status-processing')) {
+            const status = tr.dataset.status || '';
+            if (status === 'pending' || status === 'processing') {
                 const idCell = tr.querySelector('td:first-child');
                 if (idCell) {
                     const m = idCell.textContent.trim().match(/#(\d+)/);
@@ -543,15 +614,17 @@ function cancelTask(taskId, csrfToken) {
             const idCell = r.querySelector('td:first-child');
             if (idCell && idCell.textContent.trim() === '#' + taskId) {
                 const statusCell = r.querySelector('td:nth-child(3)');
-                const execCell = r.querySelector('td:nth-child(4)');
+                const execCell = r.querySelector('td:nth-child(5)');
                 const actionCell = r.querySelector('td:last-child');
+                r.dataset.status = status;
                 if (statusCell) {
-                    statusCell.textContent = status.charAt(0).toUpperCase() + status.slice(1);
-                    statusCell.className = 'status-' + status;
+                    statusCell.innerHTML = '<span class="status-pill status-' + status + '"><span class="dot"></span>' + status.charAt(0).toUpperCase() + status.slice(1) + '</span>';
                 }
                 if (execCell && executedBy) execCell.textContent = executedBy;
                 if (actionCell) {
-                    actionCell.innerHTML = '<a href="task_result.php?id=' + taskId + '"><button class="secondary small">Ver resultado</button></a>';
+                    let html = '<a href="task_result.php?id=' + taskId + '"><button class="small secondary" style="padding:.2rem .5rem;font-size:.75rem;">Ver</button></a>';
+                    html += ' <button type="button" class="small danger" style="padding:.2rem .5rem;font-size:.75rem;" onclick="deleteTask(' + taskId + ', \'' + document.querySelector('meta[name="csrf-token"]')?.content + '\')" title="Eliminar">🗑️</button>';
+                    actionCell.innerHTML = html;
                 }
                 break;
             }
@@ -568,7 +641,48 @@ function cancelTask(taskId, csrfToken) {
     setTimeout(tick, 1500);
 })();
 
-// Filtro client-side del historial CVE
+// Filtro por estado (KPI cards)
+(function() {
+    const cards = document.querySelectorAll('[data-filter]');
+    const table = document.getElementById('cve-history-table');
+    const clearBtn = document.getElementById('clear-filters');
+    if (!table) return;
+
+    let activeFilter = 'all';
+
+    function applyFilter() {
+        table.querySelectorAll('tbody tr').forEach(tr => {
+            const status = tr.dataset.status || '';
+            const visible = activeFilter === 'all' || status === activeFilter;
+            tr.style.display = visible ? '' : 'none';
+        });
+        cards.forEach(c => {
+            const isActive = c.dataset.filter === activeFilter;
+            c.style.opacity = isActive ? '1' : '0.7';
+            c.style.boxShadow = isActive ? 'var(--shadow-lg)' : 'var(--shadow)';
+        });
+    }
+
+    cards.forEach(card => {
+        card.addEventListener('click', () => {
+            activeFilter = card.dataset.filter;
+            applyFilter();
+        });
+    });
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            activeFilter = 'all';
+            document.getElementById('cve-history-filter').value = '';
+            applyFilter();
+            table.querySelectorAll('tbody tr').forEach(tr => { tr.style.display = ''; });
+        });
+    }
+
+    applyFilter();
+})();
+
+// Filtro client-side por texto
 (function() {
     const input = document.getElementById('cve-history-filter');
     const table = document.getElementById('cve-history-table');
@@ -577,6 +691,9 @@ function cancelTask(taskId, csrfToken) {
     input.addEventListener('input', () => {
         const q = input.value.trim().toLowerCase();
         table.querySelectorAll('tbody tr').forEach(tr => {
+            if (tr.style.display === 'none' && q === '') {
+                // Respetar filtro de estado activo
+            }
             const text = tr.textContent.toLowerCase();
             tr.style.display = (q === '' || text.includes(q)) ? '' : 'none';
         });

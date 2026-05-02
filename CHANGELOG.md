@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.12.5] — 2026-05-02
+
+### Added
+- **CVE Search — Historial mejorado con filtros y eliminación**:
+  - KPI cards en la parte superior del historial con contadores por estado: Todas, Pendientes, En curso, Completadas, Con error, Canceladas.
+  - Filtro por estado: al hacer clic en un KPI card se filtran las filas de la tabla.
+  - Botón **🗑️ Eliminar** para tareas finalizadas (completed, error, cancelled). Solo se pueden borrar tareas que ya terminaron; las activas deben cancelarse primero.
+  - Nueva función `deleteTaskById()` en `includes/functions.php` y endpoint `ajax_admin.php?action=delete_task`.
+  - Status pills visuales en el historial con icono + color + texto.
+  - Mejoras visuales: tabla más compacta, botones de acción agrupados, fechas en formato `dd/mm HH:mm`.
+
+### Changed
+- `hosting/task_cve.php`: rediseño del panel de historial manteniendo intactos el formulario de búsqueda, el widget de worker, el polling y las opciones de exportación.
+
 ## [v0.12.4] — 2026-05-02
 
 ### Changed

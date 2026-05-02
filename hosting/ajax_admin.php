@@ -204,6 +204,15 @@ switch ($action) {
         jsonResponse(['success' => true, 'message' => 'Tarea cancelada']);
         break;
 
+    case 'delete_task':
+        $taskId = filter_input(INPUT_POST, 'task_id', FILTER_VALIDATE_INT);
+        $result = deleteTaskById($taskId);
+        if (!$result['ok']) {
+            jsonResponse(['error' => $result['error']], $result['code']);
+        }
+        jsonResponse(['success' => true, 'message' => 'Tarea eliminada']);
+        break;
+
     case 'add_alert_subscription':
         $type = validateInput($_POST['type'] ?? '', 20);
         $value = validateInput($_POST['value'] ?? '', 100);
