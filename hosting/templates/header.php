@@ -43,6 +43,7 @@ $chatUrl = LOCAL_LLM_URL;
                     <a href="task_cve.php">🔍 Búsqueda CVE</a>
                     <a href="blue_team.php">🛡️ Blue Team</a>
                     <a href="ioc_converter.php">🔄 IOC → STIX</a>
+                    <a href="rag_incidents.php">🧠 RAG Incidentes</a>
                 </div>
             </div>
         </div>

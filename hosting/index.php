@@ -249,6 +249,11 @@ require __DIR__ . '/templates/header.php';
             <span class="qa-label">Alertas</span>
             <span class="qa-desc">Gestión de alertas y suscripciones</span>
         </a>
+        <a href="rag_incidents.php" class="quick-action-btn">
+            <span class="qa-icon">🧠</span>
+            <span class="qa-label">RAG</span>
+            <span class="qa-desc">Memoria histórica de incidentes</span>
+        </a>
         <?php if (isAdmin()): ?>
         <a href="admin.php" class="quick-action-btn">
             <span class="qa-icon">⚙️</span>

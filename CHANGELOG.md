@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.12.7] — 2026-05-02
+
+### Added
+- **RAG de Incidentes Históricos — Fase 1 (Base + Frontend)**:
+  - Nuevo módulo `🧠 Memoria Histórica de Incidentes` que permite buscar casos similares a partir de IPs, hashes, dominios o descripciones textuales.
+  - `hosting/includes/rag.php`: motor del RAG con funciones de búsqueda full-text (LIKE), alimentación (feedback), logging de queries, métricas e indexación de incidentes cerrados.
+  - `hosting/rag_incidents.php`: interfaz web completa con KPI cards (indexados, 7d, 30d, consultas), gráficos de barras por veredicto y severidad, buscador con filtro por tipo de entidad (IP, hash, dominio, URL, usuario, texto libre), tarjetas de resultados con similitud visualizada, tabla de incidentes indexados recientes y formulario para alimentar la memoria manualmente.
+  - `hosting/api/v1/rag_search.php`: endpoint REST seguro (`X-API-Key`) para búsqueda vectorial (texto exacto en Fase 1; upgrade a embeddings/sqlite-vec en Fase 2).
+  - `hosting/api/v1/rag_feedback.php`: endpoint REST seguro para alimentar la memoria con incidentes cerrados manualmente.
+  - Tablas en SQLite:
+    - `incident_embeddings`: almacena metadatos de incidentes cerrados listos para enriquecimiento vectorial (Fase 2).
+    - `rag_query_log`: auditoría de consultas realizadas (consulta, timestamp, fuente, resultados, latencia).
+  - Integración en navegación (`Tools` → `🧠 RAG Incidentes`) y quick-actions del dashboard.
+  - **Prerrequisitos documentados para Fase 2** (embeddings + sqlite-vec + worker AI): descargar modelo `bge-small-en-v1.5-q8_0.gguf` al Orin Nano, crear servicio `orinsec-embeddings.service` (puerto 8081), túnel Cloudflare `embed-orin.cyberintelligence.dev`, instalar `sqlite-vec` en hosting, desplegar `embeddings.py` y `rag_enrich.py` en worker y registrar en `TASK_REGISTRY`.
+
 ## [v0.12.6] — 2026-05-02
 
 ### Added

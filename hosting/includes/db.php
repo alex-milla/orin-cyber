@@ -365,6 +365,51 @@ class Database {
         self::_addColumnIfNotExists('tasks', 'cvss_base_score', 'REAL');
         self::_addColumnIfNotExists('tasks', 'cvss_severity', 'TEXT');
 
+        // ─── RAG INCIDENTES HISTÓRICOS (Fase 1 — Base) ──────────────────────
+        self::_addColumnIfNotExists('tasks', 'priority', 'INTEGER DEFAULT 5');
+        self::_addColumnIfNotExists('tasks', 'parent_task_id', 'INTEGER');
+        self::_addColumnIfNotExists('incidents', 'classification', 'TEXT');
+        self::_addColumnIfNotExists('incidents', 'blue_team_classification', 'TEXT');
+        self::_addColumnIfNotExists('incidents', 'entities_json', 'TEXT');
+        self::_addColumnIfNotExists('incidents', 'closed_at', 'TEXT');
+        self::_addColumnIfNotExists('incidents', 'closed_by', 'TEXT');
+
+        $db->exec("CREATE TABLE IF NOT EXISTS incident_embeddings (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            incident_id     TEXT,
+            summary         TEXT NOT NULL,
+            verdict         TEXT,
+            severity        TEXT,
+            mitre_tactic    TEXT,
+            mitre_technique TEXT,
+            classification  TEXT,
+            entities_json   TEXT,
+            closed_at       TEXT NOT NULL,
+            closed_by       TEXT,
+            embedding_model TEXT,
+            embedding_dim   INTEGER,
+            embedding       TEXT,
+            created_at      TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at      TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (incident_id) REFERENCES incidents(incident_id) ON DELETE CASCADE
+        )");
+
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_incident_embeddings_incident ON incident_embeddings(incident_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_incident_embeddings_closed ON incident_embeddings(closed_at DESC)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_incident_embeddings_verdict ON incident_embeddings(verdict)");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS rag_query_log (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            query_text      TEXT NOT NULL,
+            query_type      TEXT DEFAULT 'text',
+            results_count   INTEGER DEFAULT 0,
+            response_time_ms INTEGER,
+            created_at      TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_tasks_pending_priority ON tasks(status, priority, created_at) WHERE status = 'pending'");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_rag_query_created ON rag_query_log(created_at DESC)");
+
         // Plantillas de informe personalizables
         $db->exec("CREATE TABLE IF NOT EXISTS report_templates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

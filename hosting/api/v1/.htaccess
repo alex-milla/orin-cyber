@@ -19,3 +19,11 @@ Require all denied
 <Files "chat_external.php">
     Require all granted
 </Files>
+
+<Files "rag_search.php">
+    Require all granted
+</Files>
+
+<Files "rag_feedback.php">
+    Require all granted
+</Files>
