@@ -21,6 +21,10 @@ if (!defined('API_KEY_HEADER')) {
 define('RATE_LIMIT_SECONDS', 1);
 date_default_timezone_set('Europe/Madrid');
 
+// URL pública del llama-server (Cloudflare Tunnel desde el Orin Nano)
+// Se usa para el chat y otras funciones que requieren conexión directa al modelo local
+define('LOCAL_LLM_URL', 'https://chat-orin.cyberintelligence.dev');
+
 // Clave maestra para cifrado de API keys de proveedores externos
 // Generar una vez con: bin2hex(random_bytes(32))
 // En producción, leer de variable de entorno o archivo fuera del docroot

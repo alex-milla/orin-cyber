@@ -120,14 +120,11 @@ try {
 }
 
 try {
-    $localLlmUrlRow = Database::fetchOne("SELECT value FROM config WHERE key = 'local_llm_url'");
-    $localLlmUrl = $localLlmUrlRow['value'] ?? '';
     $localLlmCfIdRow = Database::fetchOne("SELECT value FROM config WHERE key = 'local_llm_cf_client_id'");
     $localLlmCfId = $localLlmCfIdRow['value'] ?? '';
     $localLlmCfSecretRow = Database::fetchOne("SELECT value FROM config WHERE key = 'local_llm_cf_client_secret'");
     $localLlmCfSecret = $localLlmCfSecretRow['value'] ?? '';
 } catch (Throwable $e) {
-    $localLlmUrl = '';
     $localLlmCfId = '';
     $localLlmCfSecret = '';
 }
@@ -372,15 +369,18 @@ require __DIR__ . '/templates/header.php';
     }
     </script>
 
-    <h3 class="mt-4">🔗 URL del llama-server (Chat Local)</h3>
-    <p class="small">Cuando el hosting y el worker están en máquinas distintas, el chat local debe apuntar a la URL pública del llama-server (ej: Cloudflare Tunnel). Si se deja vacío, se usa <code>http://localhost:8080</code> (misma máquina).</p>
+    <h3 class="mt-4">🔗 Chat Local (Cloudflare Tunnel)</h3>
+    <p class="small">El chat se sirve directamente desde el llama-server del Orin Nano a través del túnel de Cloudflare. La URL está definida en <code>includes/config.php</code>.</p>
+    <p class="small" style="color:var(--text-muted);">
+        URL actual: <code><?php echo htmlspecialchars(LOCAL_LLM_URL); ?></code>
+        · <a href="<?php echo htmlspecialchars(LOCAL_LLM_URL); ?>" target="_blank" rel="noopener noreferrer">Abrir chat →</a>
+    </p>
+
+    <h4 class="mt-3" style="font-size:1rem;color:var(--text-secondary);">Cloudflare Access (Zero Trust)</h4>
+    <p class="small">Si el túnel está protegido con Cloudflare Access, introduce aquí el Client ID y Client Secret del token de servicio. El chat integrado y las llamadas del sistema los usarán automáticamente.</p>
     <form method="POST" action="ajax_admin.php?action=save_local_llm_config" onsubmit="return saveLocalLlmConfig(this);" id="local-llm-config-form">
         <?php echo csrfInput(); ?>
         <div class="flex gap-2 items-end flex-wrap">
-            <div style="min-width:320px;flex:2;">
-                <label class="small">URL del llama-server</label>
-                <input type="url" name="url" value="<?php echo htmlspecialchars($localLlmUrl); ?>" placeholder="https://chat-orin.tu-dominio.com" style="width:100%;">
-            </div>
             <div style="min-width:200px;flex:1;">
                 <label class="small">CF-Access-Client-Id</label>
                 <input type="text" name="cf_client_id" value="<?php echo htmlspecialchars($localLlmCfId); ?>" placeholder="Opcional" style="width:100%;">
@@ -392,11 +392,8 @@ require __DIR__ . '/templates/header.php';
             <button type="submit">💾 Guardar</button>
         </div>
         <p id="local-llm-msg" class="small mt-1"></p>
-        <?php if ($localLlmUrl): ?>
-        <p class="small" style="color:var(--text-muted);">
-            URL configurada: <code><?php echo htmlspecialchars($localLlmUrl); ?></code>
-            <?php if ($localLlmCfId): ?>· Cloudflare Access activo<?php endif; ?>
-        </p>
+        <?php if ($localLlmCfId): ?>
+        <p class="small" style="color:var(--text-muted);">Cloudflare Access activo</p>
         <?php endif; ?>
     </form>
     <script>

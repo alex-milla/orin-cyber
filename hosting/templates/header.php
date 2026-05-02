@@ -2,14 +2,8 @@
 declare(strict_types=1);
 if (!isset($pageTitle)) $pageTitle = 'OrinSec';
 
-// URL del chat local (túnel de Cloudflare) — leída directamente para enlazar sin pasar por chat.php
-$chatUrl = 'chat.php';
-try {
-    $chatUrlRow = Database::fetchOne("SELECT value FROM config WHERE key = 'local_llm_url'");
-    if (!empty($chatUrlRow['value'])) {
-        $chatUrl = $chatUrlRow['value'];
-    }
-} catch (Exception $e) {}
+// URL del chat local (túnel de Cloudflare) — constante definida en config.php
+$chatUrl = LOCAL_LLM_URL;
 ?>
 <!DOCTYPE html>
 <html lang="es" data-theme="system">

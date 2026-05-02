@@ -7,9 +7,8 @@ require_once __DIR__ . '/includes/auth.php';
 
 requireAuth();
 
-// Lee la URL del llama-server configurada en Admin → Workers
-$configRow = Database::fetchOne("SELECT value FROM config WHERE key = 'local_llm_url'");
-$chatUrl = $configRow['value'] ?? '';
+// URL del llama-server (Cloudflare Tunnel desde el Orin Nano)
+$chatUrl = LOCAL_LLM_URL;
 
 if ($chatUrl !== '') {
     header('Location: ' . $chatUrl);

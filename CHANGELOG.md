@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.12.4] — 2026-05-02
+
+### Changed
+- **URL del llama-server ahora es una constante estática** (`LOCAL_LLM_URL` en `includes/config.php`):
+  - Ya no es necesario configurar la URL en la base de datos ni en el panel de admin.
+  - El valor por defecto es `https://chat-orin.cyberintelligence.dev`.
+  - Todos los enlaces (header, dashboard, chat.php, chat_external.php) usan la constante directamente.
+  - El panel de Admin → Workers solo mantiene los campos de **Cloudflare Access** (Client ID / Client Secret) si el túnel está protegido con Zero Trust.
+
 ## [v0.12.3] — 2026-05-02
 
 ### Fixed

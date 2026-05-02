@@ -131,15 +131,9 @@ switch ($action) {
         break;
 
     case 'save_local_llm_config':
-        $url = trim($_POST['url'] ?? '');
         $cfId = trim($_POST['cf_client_id'] ?? '');
         $cfSecret = trim($_POST['cf_client_secret'] ?? '');
 
-        if ($url !== '' && !filter_var($url, FILTER_VALIDATE_URL)) {
-            jsonResponse(['error' => 'La URL no es válida'], 400);
-        }
-
-        Database::query("INSERT OR REPLACE INTO config (key, value) VALUES ('local_llm_url', ?)", [$url]);
         Database::query("INSERT OR REPLACE INTO config (key, value) VALUES ('local_llm_cf_client_id', ?)", [$cfId]);
         Database::query("INSERT OR REPLACE INTO config (key, value) VALUES ('local_llm_cf_client_secret', ?)", [$cfSecret]);
         jsonResponse(['success' => true]);

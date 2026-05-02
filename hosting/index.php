@@ -17,14 +17,8 @@ $severityDistribution = [];
 $recentAlerts = [];
 $recentTasks = [];
 
-// URL del chat local (túnel de Cloudflare)
-$chatUrl = 'chat.php';
-try {
-    $chatUrlRow = Database::fetchOne("SELECT value FROM config WHERE key = 'local_llm_url'");
-    if (!empty($chatUrlRow['value'])) {
-        $chatUrl = $chatUrlRow['value'];
-    }
-} catch (Exception $e) {}
+// URL del chat local (túnel de Cloudflare) — constante definida en config.php
+$chatUrl = LOCAL_LLM_URL;
 
 try {
     // Totales por estado de tareas
