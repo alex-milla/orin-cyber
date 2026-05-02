@@ -11,16 +11,32 @@ require_once __DIR__ . '/../../includes/url_fetcher.php';
 header('Content-Type: application/json');
 
 /**
- * Llama al llama-server local directamente (OpenAI-compatible).
+ * Llama al llama-server (OpenAI-compatible).
+ * Lee la URL desde config('local_llm_url'). Si no existe, fallback a localhost:8080.
+ * Soporta Cloudflare Access via config('local_llm_cf_client_id' + 'local_llm_cf_client_secret').
  */
 function chatLocal(array $messages, string $modelId): array {
-    $url = 'http://localhost:8080/v1/chat/completions';
+    $configUrl = Database::fetchOne("SELECT value FROM config WHERE key = 'local_llm_url'");
+    $url = rtrim($configUrl['value'] ?? 'http://localhost:8080', '/') . '/v1/chat/completions';
+
     $payload = [
         'model' => $modelId,
         'messages' => $messages,
         'temperature' => 0.3,
         'max_tokens' => 2048,
     ];
+
+    $headers = ['Content-Type: application/json'];
+
+    // Cloudflare Access (Zero Trust) service tokens
+    $cfId = Database::fetchOne("SELECT value FROM config WHERE key = 'local_llm_cf_client_id'");
+    $cfSecret = Database::fetchOne("SELECT value FROM config WHERE key = 'local_llm_cf_client_secret'");
+    if (!empty($cfId['value'])) {
+        $headers[] = 'CF-Access-Client-Id: ' . $cfId['value'];
+    }
+    if (!empty($cfSecret['value'])) {
+        $headers[] = 'CF-Access-Client-Secret: ' . $cfSecret['value'];
+    }
 
     $start = microtime(true);
     $ch = curl_init($url);
@@ -29,9 +45,7 @@ function chatLocal(array $messages, string $modelId): array {
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => 300,
         CURLOPT_POSTFIELDS => json_encode($payload),
-        CURLOPT_HTTPHEADER => [
-            'Content-Type: application/json',
-        ],
+        CURLOPT_HTTPHEADER => $headers,
     ]);
 
     $response = curl_exec($ch);

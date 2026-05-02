@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.12.1] — 2026-05-02
+
+### Fixed
+- **Chat local roto tras unificación local/cloud (v0.10.45)**:
+  - `chatLocal()` en `hosting/api/v1/chat_external.php` tenía `http://localhost:8080` hardcodeado. Esto fallaba cuando el hosting PHP y el llama-server están en máquinas distintas (arquitectura estándar de OrinSec).
+  - Ahora `chatLocal()` lee la URL desde `config('local_llm_url')` con fallback a `localhost:8080` para compatibilidad con setups locales.
+  - Añadido soporte para **Cloudflare Access (Zero Trust)** via headers `CF-Access-Client-Id` y `CF-Access-Client-Secret` configurables.
+  - Nuevo panel en **Admin → Workers**: formulario para configurar la URL del llama-server y las credenciales de Cloudflare Access.
+
 ## [v0.12.0] — 2026-05-02
 
 ### Added

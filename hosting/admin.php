@@ -120,6 +120,19 @@ try {
 }
 
 try {
+    $localLlmUrlRow = Database::fetchOne("SELECT value FROM config WHERE key = 'local_llm_url'");
+    $localLlmUrl = $localLlmUrlRow['value'] ?? '';
+    $localLlmCfIdRow = Database::fetchOne("SELECT value FROM config WHERE key = 'local_llm_cf_client_id'");
+    $localLlmCfId = $localLlmCfIdRow['value'] ?? '';
+    $localLlmCfSecretRow = Database::fetchOne("SELECT value FROM config WHERE key = 'local_llm_cf_client_secret'");
+    $localLlmCfSecret = $localLlmCfSecretRow['value'] ?? '';
+} catch (Throwable $e) {
+    $localLlmUrl = '';
+    $localLlmCfId = '';
+    $localLlmCfSecret = '';
+}
+
+try {
     $executorOptions = Database::fetchAll(
         "SELECT 'worker' as value, 'Worker local (Orin)' as label
          UNION ALL
@@ -347,6 +360,55 @@ require __DIR__ . '/templates/header.php';
             if (data.success) {
                 msg.className = 'alert alert-success mt-1';
                 msg.textContent = 'Modelo guardado. El worker lo aplicará en su próximo ciclo (máx. 15s). Si el worker está caído, se aplicará al reiniciar.';
+            } else {
+                msg.className = 'alert alert-error mt-1';
+                msg.textContent = data.error || 'Error';
+            }
+        } catch (err) {
+            msg.className = 'alert alert-error mt-1';
+            msg.textContent = 'Error de red: ' + err.message;
+        }
+        return false;
+    }
+    </script>
+
+    <h3 class="mt-4">🔗 URL del llama-server (Chat Local)</h3>
+    <p class="small">Cuando el hosting y el worker están en máquinas distintas, el chat local debe apuntar a la URL pública del llama-server (ej: Cloudflare Tunnel). Si se deja vacío, se usa <code>http://localhost:8080</code> (misma máquina).</p>
+    <form method="POST" action="ajax_admin.php?action=save_local_llm_config" onsubmit="return saveLocalLlmConfig(this);" id="local-llm-config-form">
+        <?php echo csrfInput(); ?>
+        <div class="flex gap-2 items-end flex-wrap">
+            <div style="min-width:320px;flex:2;">
+                <label class="small">URL del llama-server</label>
+                <input type="url" name="url" value="<?php echo htmlspecialchars($localLlmUrl); ?>" placeholder="https://chat-orin.tu-dominio.com" style="width:100%;">
+            </div>
+            <div style="min-width:200px;flex:1;">
+                <label class="small">CF-Access-Client-Id</label>
+                <input type="text" name="cf_client_id" value="<?php echo htmlspecialchars($localLlmCfId); ?>" placeholder="Opcional" style="width:100%;">
+            </div>
+            <div style="min-width:200px;flex:1;">
+                <label class="small">CF-Access-Client-Secret</label>
+                <input type="password" name="cf_client_secret" value="<?php echo htmlspecialchars($localLlmCfSecret); ?>" placeholder="Opcional" style="width:100%;">
+            </div>
+            <button type="submit">💾 Guardar</button>
+        </div>
+        <p id="local-llm-msg" class="small mt-1"></p>
+        <?php if ($localLlmUrl): ?>
+        <p class="small" style="color:var(--text-muted);">
+            URL configurada: <code><?php echo htmlspecialchars($localLlmUrl); ?></code>
+            <?php if ($localLlmCfId): ?>· Cloudflare Access activo<?php endif; ?>
+        </p>
+        <?php endif; ?>
+    </form>
+    <script>
+    async function saveLocalLlmConfig(form) {
+        const fd = new FormData(form);
+        const msg = document.getElementById('local-llm-msg');
+        try {
+            const resp = await fetch(form.action, {method: 'POST', body: fd});
+            const data = await resp.json();
+            if (data.success) {
+                msg.className = 'alert alert-success mt-1';
+                msg.textContent = 'Configuración guardada.';
             } else {
                 msg.className = 'alert alert-error mt-1';
                 msg.textContent = data.error || 'Error';
