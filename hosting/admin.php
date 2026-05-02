@@ -169,6 +169,7 @@ require __DIR__ . '/templates/header.php';
         <a href="?tab=providers" class="<?php echo $tab==='providers'?'active':''; ?>">Proveedores</a>
         <a href="?tab=config" class="<?php echo $tab==='config'?'active':''; ?>">Configuración</a>
         <a href="?tab=templates" class="<?php echo $tab==='templates'?'active':''; ?>">Plantillas</a>
+        <a href="?tab=rag" class="<?php echo $tab==='rag'?'active':''; ?>">🧠 RAG</a>
     </div>
 
     <?php if ($tab === 'updates'): ?>
@@ -1273,6 +1274,44 @@ require __DIR__ . '/templates/header.php';
             alert('❌ ' + err.message);
         }
     }
+    </script>
+
+    <?php elseif ($tab === 'rag'): ?>
+    <h3>🧠 Métricas del RAG</h3>
+    <div id="rag-stats-container">
+        <p class="small">Cargando métricas...</p>
+    </div>
+    <script>
+    async function loadRagStats() {
+        const container = document.getElementById('rag-stats-container');
+        try {
+            const resp = await fetch('ajax_admin.php?action=rag_stats&csrf_token=' + encodeURIComponent(csrfToken));
+            const data = await resp.json();
+            if (!data.success) { container.innerHTML = '<p class="alert alert-error">' + (data.error || 'Error') + '</p>'; return; }
+            const s = data.stats;
+            let html = '<div class="kpi-grid" style="margin-bottom:1.5rem;">';
+            html += '<div class="kpi-card kpi-primary"><div class="kpi-icon">📚</div><div class="kpi-value">' + (s.total_embeddings || 0).toLocaleString() + '</div><div class="kpi-label">Indexados</div></div>';
+            html += '<div class="kpi-card kpi-success"><div class="kpi-icon">📅</div><div class="kpi-value">' + (s.last_7d || 0) + '</div><div class="kpi-label">Últimos 7 días</div></div>';
+            html += '<div class="kpi-card kpi-accent"><div class="kpi-icon">🔍</div><div class="kpi-value">' + (s.total_queries || 0).toLocaleString() + '</div><div class="kpi-label">Consultas</div></div>';
+            html += '<div class="kpi-card kpi-warning"><div class="kpi-icon">📊</div><div class="kpi-value">' + (s.last_30d || 0) + '</div><div class="kpi-label">Indexados 30 días</div></div>';
+            html += '</div>';
+
+            html += '<h4>Consultas recientes</h4>';
+            if (data.recent_queries && data.recent_queries.length) {
+                html += '<table class="widget-table"><thead><tr><th>Consulta</th><th>Resultados</th><th>Latencia (ms)</th><th>Fecha</th></tr></thead><tbody>';
+                for (const q of data.recent_queries) {
+                    html += '<tr><td class="small">' + (q.query_text ? q.query_text.substring(0, 80) : '—') + '</td><td>' + (q.results_count || 0) + '</td><td>' + (q.latency_ms || '—') + '</td><td class="small">' + (q.created_at || '') + '</td></tr>';
+                }
+                html += '</tbody></table>';
+            } else {
+                html += '<p class="small">Sin consultas registradas.</p>';
+            }
+            container.innerHTML = html;
+        } catch (err) {
+            container.innerHTML = '<p class="alert alert-error">Error cargando métricas: ' + err.message + '</p>';
+        }
+    }
+    loadRagStats();
     </script>
 
     <?php else: ?>

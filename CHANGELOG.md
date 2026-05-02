@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.13.1] — 2026-05-03
+
+### Fixed
+- **BUG-1 (Crítico)**: `search_similar_incidents()` añadido en `worker/utils/api_client.py` — sin este método el worker no podía completar tareas `rag_enrich`.
+- **BUG-2**: `getRateLimitInfo()` reimplementado con contador real de peticiones en ventana deslizante (antes devolvía siempre 60/60).
+- **BUG-3**: `invalidateEnrichCacheForEntities()` ahora parsea JSON y compara coincidencias exactas en campos relevantes, evitando falsos positivos por `LIKE %valor%`.
+- **BUG-4**: Batching activado en `worker/worker.py` — tras reclamar una tarea `rag_enrich`, el worker reclama hasta 4 tareas adicionales del mismo tipo/prioridad y las agrupa en una sola llamada al LLM.
+
+### Added
+- `hosting/dev/backfill_embeddings.php`: script CLI para generar embeddings retroactivos de incidentes cerrados existentes. Soporta `--dry-run` y `--limit=N`.
+- Pestaña "🧠 RAG" en `admin.php` con KPI cards (indexados, 7d, 30d, consultas) y tabla de queries recientes. Endpoint `ajax_admin.php?action=rag_stats`.
+- `docs/sentinel-integration.md`: documentación completa de integración con Microsoft Sentinel (watchlist, KQL queries sync/hybrid, automation rules).
+- `tests/test_rag_smoke.py`: smoke tests mínimos para validar que los componentes críticos del RAG importan correctamente.
+- `install-sqlite-vec.php` actualizado para descargar `vec0.so` directamente desde la release v0.13.0 de GitHub (evita bloqueos de hosting compartido a GitHub releases externos).
+
 ## [v0.13.0] — 2026-05-03
 
 ### Added

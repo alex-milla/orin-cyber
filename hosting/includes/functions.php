@@ -104,31 +104,63 @@ function sanitizeReportHtml(?string $html): string {
    RATE LIMITING (general)
    ================================================================ */
 
-function checkRateLimit(int $seconds = 1): void {
+function checkRateLimit(string $key = '', int $limit = 60, int $windowSec = 60): bool {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'cli';
-    $key = 'rate_limit_' . md5($ip);
+    $key = $key ?: 'rate_limit_' . md5($ip);
     $now = time();
-    $lockFile = DATA_DIR . '/.' . $key . '.tmp';
+    $lockFile = DATA_DIR . '/.' . md5($key) . '_rl.json';
 
     $fp = fopen($lockFile, 'c+');
-    if (!$fp) return;
-    if (!flock($fp, LOCK_EX)) { fclose($fp); return; }
+    if (!$fp) return true; // fail open
+    if (!flock($fp, LOCK_EX)) { fclose($fp); return true; }
 
     $content = stream_get_contents($fp);
-    $lastTime = $content !== false && $content !== '' ? (int)$content : 0;
-
-    if (($now - $lastTime) < $seconds) {
-        flock($fp, LOCK_UN);
-        fclose($fp);
-        jsonResponse(['error' => 'Rate limit exceeded'], 429);
+    $entries = [];
+    if ($content !== false && $content !== '') {
+        $data = json_decode($content, true);
+        if (is_array($data)) {
+            $entries = array_filter($data, fn($t) => ($now - $t) < $windowSec);
+        }
     }
 
+    if (count($entries) >= $limit) {
+        flock($fp, LOCK_UN);
+        fclose($fp);
+        return false;
+    }
+
+    $entries[] = $now;
     ftruncate($fp, 0);
     rewind($fp);
-    fwrite($fp, (string)$now);
+    fwrite($fp, json_encode(array_values($entries)));
     fflush($fp);
     flock($fp, LOCK_UN);
     fclose($fp);
+    return true;
+}
+
+function getRateLimitInfo(string $key, int $limit = 60, int $windowSec = 60): array {
+    $now = time();
+    $lockFile = DATA_DIR . '/.' . md5($key) . '_rl.json';
+    $entries = [];
+    if (file_exists($lockFile)) {
+        $content = file_get_contents($lockFile);
+        if ($content !== false && $content !== '') {
+            $data = json_decode($content, true);
+            if (is_array($data)) {
+                $entries = array_filter($data, fn($t) => ($now - $t) < $windowSec);
+            }
+        }
+    }
+    $used = count($entries);
+    $remaining = max(0, $limit - $used);
+    $oldest = $entries ? min($entries) : 0;
+    $resetAt = $oldest ? date('c', $oldest + $windowSec) : date('c', $now + $windowSec);
+    return [
+        'limit' => $limit,
+        'remaining' => $remaining,
+        'reset_at' => $resetAt,
+    ];
 }
 
 /* ================================================================

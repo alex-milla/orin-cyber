@@ -8,9 +8,8 @@ MODEL_DIR="${1:-/home/orinsec/models}"
 MODEL_NAME="bge-small-en-v1.5-q8_0.gguf"
 HF_REPO="BAAI/bge-small-en-v1.5"
 
-# URL directa de HuggingFace (si existe GGUF preconvertido)
-# Si no existe, se usará llama.cpp para convertir
-GGUF_URL="https://huggingface.co/ChristianAzinn/bge-small-en-v1.5-gguf/resolve/main/bge-small-en-v1.5-q8_0.gguf"
+# URL directa del GGUF preconvertido (oficial ggml-org)
+GGUF_URL="https://huggingface.co/ggml-org/bge-small-en-v1.5-Q8_0-GGUF/resolve/main/bge-small-en-v1.5-q8_0.gguf"
 
 echo "=========================================="
 echo "  OrinSec — Descarga modelo embeddings"

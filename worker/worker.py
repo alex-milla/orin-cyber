@@ -675,6 +675,7 @@ def main(config_path: Optional[str] = None) -> None:
                 task_id = task.get("id")
                 task_type = task.get("task_type")
                 input_data = task.get("input_data", "{}")
+                task_priority = task.get("priority", 5)
 
                 logger.info("Procesando tarea %s (tipo: %s)", task_id, task_type)
 
@@ -690,6 +691,31 @@ def main(config_path: Optional[str] = None) -> None:
                     logger.warning("No se pudo reclamar tarea %s", task_id)
                     continue
 
+                # Batching para rag_enrich: reclamar hasta 4 tareas más del mismo tipo/prioridad
+                batch_tasks = [task]
+                if task_type == "rag_enrich":
+                    for _ in range(4):
+                        try:
+                            extra_tasks = api.get_pending_tasks()
+                            if not extra_tasks:
+                                break
+                            extra = None
+                            for et in extra_tasks:
+                                if (et.get("task_type") == "rag_enrich"
+                                        and et.get("priority", 5) == task_priority
+                                        and et.get("id") != task_id):
+                                    extra = et
+                                    break
+                            if not extra:
+                                break
+                            if api.claim_task(extra.get("id")):
+                                batch_tasks.append(extra)
+                            else:
+                                break
+                        except Exception as exc:
+                            logger.debug("Error reclamando batch: %s", exc)
+                            break
+
                 # Ejecutar
                 task_class = TASK_REGISTRY.get(task_type)
                 if not task_class:
@@ -701,6 +727,15 @@ def main(config_path: Optional[str] = None) -> None:
                     data = json.loads(input_data) if isinstance(input_data, str) else input_data
                     runner = task_class(config_path or DEFAULT_CONFIG)
 
+                    # Si hay batch, agrupar input_data
+                    if len(batch_tasks) > 1 and task_type == "rag_enrich":
+                        batch_inputs = []
+                        for bt in batch_tasks:
+                            bt_data = json.loads(bt.get("input_data", "{}")) if isinstance(bt.get("input_data"), str) else bt.get("input_data", {})
+                            batch_inputs.append(bt_data)
+                        data = {"batch": batch_inputs}
+                        logger.info("Batch rag_enrich: %s tareas agrupadas", len(batch_tasks))
+
                     # Timeout manual simple
                     start = time.time()
                     result = runner.execute(data)
@@ -709,14 +744,18 @@ def main(config_path: Optional[str] = None) -> None:
                     if elapsed > task_timeout:
                         logger.warning("Tarea %s excedió timeout (%ss)", task_id, elapsed)
 
-                    api.send_result(
-                        task_id,
-                        result_html=result.get("result_html", ""),
-                        result_text=result.get("result_text", ""),
-                        cvss_score=result.get("cvss_score"),
-                        severity=result.get("severity"),
-                    )
-                    logger.info("Tarea %s completada en %.1fs", task_id, elapsed)
+                    # Enviar resultado: si es batch, enviar el mismo resultado a todas las tareas del batch
+                    target_tasks = batch_tasks if len(batch_tasks) > 1 and task_type == "rag_enrich" else [task]
+                    for tt in target_tasks:
+                        tid = tt.get("id")
+                        api.send_result(
+                            tid,
+                            result_html=result.get("result_html", ""),
+                            result_text=result.get("result_text", ""),
+                            cvss_score=result.get("cvss_score"),
+                            severity=result.get("severity"),
+                        )
+                        logger.info("Tarea %s completada en %.1fs", tid, elapsed)
 
                 except Exception as exc:
                     logger.exception("Error ejecutando tarea %s", task_id)

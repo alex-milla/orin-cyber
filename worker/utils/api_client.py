@@ -173,3 +173,17 @@ class ApiClient:
         except requests.RequestException as exc:
             logger.debug("Preferred model fetch failed: %s", exc)
         return None
+
+    def search_similar_incidents(self, entity: dict, k: int = 5) -> list:
+        """Pide al hosting incidentes similares via busqueda vectorial o full-text fallback."""
+        try:
+            data = self._request(
+                "POST",
+                "/api/v1/rag_search.php",
+                json={"entity": entity, "k": k},
+            )
+            if data and "similar" in data:
+                return data["similar"]
+        except requests.RequestException as exc:
+            logger.warning("Failed to fetch similar incidents: %s", exc)
+        return []

@@ -296,6 +296,19 @@ switch ($action) {
         jsonResponse(['success' => true, 'templates' => $templates]);
         break;
 
+    case 'rag_stats':
+        require_once __DIR__ . '/includes/rag.php';
+        $stats = getRagStats();
+        $recentQueries = Database::fetchAll(
+            "SELECT query_text, results_count, latency_ms, created_at FROM rag_query_log ORDER BY created_at DESC LIMIT 20"
+        );
+        jsonResponse([
+            'success' => true,
+            'stats' => $stats,
+            'recent_queries' => $recentQueries,
+        ]);
+        break;
+
     default:
         jsonResponse(['error' => 'Acción no válida'], 400);
 }

@@ -280,11 +280,23 @@ function invalidateEnrichCacheForEntities(array $entities): void {
     if (empty($entities)) return;
     try {
         $db = db();
-        foreach ($entities as $ent) {
-            $value = strtolower(trim($ent['value'] ?? ''));
-            if ($value) {
-                $db->prepare("DELETE FROM enrich_cache WHERE response_json LIKE ?")
-                   ->execute(['%' . $value . '%']);
+        $stmt = $db->query("SELECT id, response_json FROM enrich_cache");
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as $row) {
+            $data = json_decode($row['response_json'] ?? '{}', true);
+            $similarCases = $data['similar_cases'] ?? [];
+            foreach ($entities as $ent) {
+                $val = strtolower(trim($ent['value'] ?? ''));
+                if (!$val) continue;
+                foreach ($similarCases as $case) {
+                    $caseSummary = strtolower($case['summary'] ?? '');
+                    $caseVerdict = strtolower($case['verdict'] ?? '');
+                    if (str_contains($caseSummary, $val) || str_contains($caseVerdict, $val)) {
+                        $db->prepare("DELETE FROM enrich_cache WHERE id = ?")
+                           ->execute([$row['id']]);
+                        break 2;
+                    }
+                }
             }
         }
     } catch (Exception $e) {
