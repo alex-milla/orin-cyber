@@ -613,7 +613,7 @@ class IncidentAnalysisTask(BaseTask):
                 <td>{countries_str}</td>
                 <td style="font-size:.8rem;">{ips_str}</td>
                 <td>{row["login_count"]}</td>
-                <td><small>{row["first_seen"][:10] if row["first_seen"] else "—"}</small></td>
+                <td><small>{(row["first_seen"][:10] if 'T' in row["first_seen"] else row["first_seen"]) if row["first_seen"] else "—"}</small></td>
             </tr>"""
 
         # KQL de hunting
