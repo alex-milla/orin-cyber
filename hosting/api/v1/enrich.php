@@ -7,20 +7,15 @@ require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/embedding_client.php';
 require_once __DIR__ . '/../../includes/functions.php';
 require_once __DIR__ . '/../../includes/rag.php';
+require_once __DIR__ . '/auth.php';
 
 header('Content-Type: application/json');
 
 // 1. Autenticación
-$apiKey = $_SERVER['HTTP_X_API_KEY'] ?? '';
-$keyRow = validateApiKey($apiKey);
-if (!$keyRow) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Invalid API key']);
-    exit;
-}
+$keyRow = requireApiKey();
 
 // 2. Rate limiting
-if (!checkRateLimitAdvanced("enrich_{$apiKey}", limit: 60, windowSec: 60)) {
+if (!checkRateLimitAdvanced("enrich_{$keyRow['api_key']}", limit: 60, windowSec: 60)) {
     http_response_code(429);
     echo json_encode(['error' => 'Rate limit exceeded']);
     exit;
@@ -118,5 +113,5 @@ echo json_encode([
     'results' => $results,
     'from_cache' => $fromCache,
     'queued' => $queued,
-    'rate_limit' => getRateLimitInfo("enrich_{$apiKey}"),
+    'rate_limit' => getRateLimitInfo("enrich_{$keyRow['api_key']}"),
 ], JSON_UNESCAPED_UNICODE);
