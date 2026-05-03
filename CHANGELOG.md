@@ -1,6 +1,6 @@
 # Changelog
 
-## [v0.14.1] — 2026-05-03
+## [v0.14.2] — 2026-05-03
 
 ### Added
 - **Flujo CSV Sentinel → Blue Team (usuarios ofuscados)**: soporte completo para importar CSVs exportados desde Microsoft Sentinel con usuarios ofuscados mediante `hash_sha256()`.
