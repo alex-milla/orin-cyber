@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.14.0] — 2026-05-03
+
+### Added
+- **Flujo CSV Sentinel → Blue Team (usuarios ofuscados)**: soporte completo para importar CSVs exportados desde Microsoft Sentinel con usuarios ofuscados mediante `hash_sha256()`.
+  - `hosting/blue_team.php`: detección automática de CSV Sentinel ofuscado (`UserHash`, `UserDomain`, `EntityType`), extracción de entidades por columna (tipo `user_obfuscated` e `ip`), y bloque informativo en el formulario con KQL de ejemplo.
+  - `hosting/includes/db.php`: migración lazy para ampliar el `CHECK` de `entities.entity_type` con `'user_obfuscated'`.
+  - `worker/tasks/incident_analysis.py`: parsing estructurado de filas Sentinel, contexto especializado para el LLM (sin intentar desofuscar usuarios), enriquecimiento OSINT de IPs, generación de KQL hunting, e informe HTML con KPIs, aviso de privacidad y tabla por usuario hash.
+  - `md/orinsec-csv-sentinel-implementacion.md`: documentación completa del flujo, KQL validada y consideraciones de privacidad.
+
 ## [v0.13.1] — 2026-05-03
 
 ### Fixed

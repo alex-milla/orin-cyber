@@ -301,6 +301,99 @@ def _render_incident_html(
     return html
 
 
+def _is_sentinel_obfuscated_csv(rows: list[dict]) -> bool:
+    """Detecta si el CSV tiene la estructura del export Sentinel ofuscado."""
+    if not rows:
+        return False
+    required = {"userhash", "userdomain", "entitytype"}
+    headers_lower = {k.lower() for k in rows[0].keys()}
+    return required.issubset(headers_lower)
+
+
+def _parse_sentinel_obfuscated_rows(rows: list[dict]) -> list[dict]:
+    """
+    Normaliza las filas del CSV ofuscado de Sentinel.
+    Devuelve lista de dicts con claves normalizadas.
+    """
+    normalized = []
+    for row in rows:
+        # Normalizar claves a lowercase
+        r = {k.lower(): v for k, v in row.items()}
+
+        def parse_json_array(val: str) -> list:
+            val = val.strip() if val else ""
+            if not val:
+                return []
+            try:
+                result = json.loads(val)
+                return result if isinstance(result, list) else [val]
+            except Exception:
+                return [x.strip().strip('"\'') for x in val.strip('[]').split(',') if x.strip()]
+
+        normalized.append({
+            "user_hash":    r.get("userhash", ""),
+            "user_domain":  r.get("userdomain", ""),
+            "subject":      r.get("subject", ""),
+            "entity_type":  r.get("entitytype", "user"),
+            "severity":     r.get("severity", "high"),
+            "countries":    parse_json_array(r.get("countries", "")),
+            "cities":       parse_json_array(r.get("cities", "")),
+            "ips":          parse_json_array(r.get("ips", "")),
+            "apps":         parse_json_array(r.get("apps", "")),
+            "first_seen":   r.get("firstseen", ""),
+            "last_seen":    r.get("lastseen", ""),
+            "login_count":  r.get("logincount", "0"),
+        })
+    return normalized
+
+
+def _build_sentinel_obfuscated_context(
+    incident_id: str,
+    title: str,
+    severity: str,
+    normalized_rows: list[dict],
+) -> str:
+    """
+    Construye el prompt para el LLM con datos del CSV Sentinel ofuscado.
+    Los usuarios están identificados por hash, no por nombre.
+    """
+    lines = [
+        f"Incidente: {incident_id}",
+        f"Título: {title}",
+        f"Severidad: {severity}",
+        f"Tipo de análisis: Logins desde países no habituales (fuera de ES)",
+        f"Registros analizados: {len(normalized_rows)}",
+        "",
+        "NOTA IMPORTANTE: Los usuarios están ofuscados por privacidad.",
+        "El campo UserHash es el identificador único del usuario (SHA256 del UPN).",
+        "No intentes deducir el nombre del usuario.",
+        "",
+        "=== REGISTROS ===",
+    ]
+
+    for i, row in enumerate(normalized_rows):
+        lines.append(f"\nUsuario {i+1}:")
+        lines.append(f"  Hash:          {row['user_hash']}")
+        lines.append(f"  Dominio:       {row['user_domain']}")
+        lines.append(f"  Países:        {', '.join(row['countries'])}")
+        lines.append(f"  Ciudades:      {', '.join(row['cities'])}")
+        lines.append(f"  IPs:           {', '.join(row['ips'])}")
+        lines.append(f"  Apps usadas:   {', '.join(row['apps'])}")
+        lines.append(f"  Primer login:  {row['first_seen']}")
+        lines.append(f"  Último login:  {row['last_seen']}")
+        lines.append(f"  Total logins:  {row['login_count']}")
+
+    lines.append("")
+    lines.append("=== ANÁLISIS SOLICITADO ===")
+    lines.append(
+        "Para cada usuario, evalúa si el login desde un país no habitual es sospechoso "
+        "o puede ser legítimo (viaje de trabajo, VPN, Andorra como país fronterizo, etc.). "
+        "Considera el país, las IPs, las apps usadas y la frecuencia."
+    )
+
+    return "\n".join(lines)
+
+
 class IncidentAnalysisTask(BaseTask):
     task_type = "incident_analysis"
 
@@ -330,6 +423,50 @@ class IncidentAnalysisTask(BaseTask):
                 "result_html": "<p>Error: No se pudieron parsear los datos CSV.</p>",
                 "result_text": "Error: No se pudieron parsear los datos CSV.",
             }
+
+        # ── NUEVO: detectar CSV de Sentinel ofuscado ──────────────────────
+        if _is_sentinel_obfuscated_csv(rows):
+            logger.info("CSV detectado como Sentinel ofuscado para incidente %s", incident_id)
+            normalized = _parse_sentinel_obfuscated_rows(rows)
+            context = _build_sentinel_obfuscated_context(incident_id, title, severity, normalized)
+
+            # Extraer IPs para OSINT (las IPs sí están en claro)
+            all_ips = []
+            for r in normalized:
+                all_ips.extend(r["ips"])
+            all_ips = list(set(all_ips))[:10]
+
+            osint_data = {}
+            for ip in all_ips:
+                osint_data[f"ip:{ip}"] = enrich_ioc(ip, "ip", self.config_path)
+
+            if osint_data:
+                context += "\n\n=== OSINT IPs ===\n"
+                for key, data in osint_data.items():
+                    context += f"{key}: {json.dumps(data, ensure_ascii=False)}\n"
+
+            # Llamar al LLM con el contexto estructurado
+            llm_analysis = None
+            try:
+                llm_analysis = self.llm.chat_json(
+                    system_prompt=self.prompt_template,
+                    user_prompt=context,
+                )
+            except Exception as exc:
+                logger.warning("LLM call failed for %s: %s", incident_id, exc)
+
+            # Generar KQL de hunting para cada IP detectada
+            hunting_queries = []
+            for ip in all_ips[:5]:
+                kql = generate_hunting_kql(ip, "ip")
+                hunting_queries.append({"target": ip, "type": "ip", "kql": kql})
+
+            # Generar informe con los datos normalizados
+            return self._build_sentinel_report(
+                incident_id, title, severity,
+                normalized, llm_analysis, hunting_queries, osint_data
+            )
+        # ── FIN NUEVO ────────────────────────────────────────────────────
 
         # Extraer entidades de todos los campos del CSV
         all_values = []
@@ -436,4 +573,153 @@ class IncidentAnalysisTask(BaseTask):
             "blue_team_verdict": verdict,
             "blue_team_mitre_tactic": mitre_tac,
             "blue_team_classification": classification,
+        }
+
+    def _build_sentinel_report(
+        self,
+        incident_id: str,
+        title: str,
+        severity: str,
+        normalized_rows: list[dict],
+        llm_analysis: dict | None,
+        hunting_queries: list[dict],
+        osint_data: dict,
+    ) -> dict[str, str]:
+        """Genera el informe HTML para CSV de Sentinel ofuscado."""
+
+        verdict      = llm_analysis.get("veredicto", "NEEDS REVIEW") if llm_analysis else "NEEDS REVIEW"
+        summary      = llm_analysis.get("resumen", "")               if llm_analysis else ""
+        mitre        = llm_analysis.get("mitre_tecnicas", [])         if llm_analysis else []
+        recomendaciones = llm_analysis.get("recomendaciones", [])     if llm_analysis else []
+
+        # Mapear veredicto a valores esperados por el sistema
+        verdict_map = {
+            "MALICIOSO": "True Positive",
+            "SOSPECHOSO": "Needs Review",
+            "NEEDS REVIEW": "Needs Review",
+            "BENIGNO": "False Positive",
+        }
+        system_verdict = verdict_map.get(verdict.upper(), "Needs Review")
+
+        # Construir tabla de usuarios
+        users_rows_html = ""
+        for row in normalized_rows:
+            countries_str = ", ".join(row["countries"])
+            ips_str       = ", ".join(row["ips"][:3])
+            users_rows_html += f"""
+            <tr>
+                <td><code style="font-size:.75rem;">{row["user_hash"][:20]}…</code><br>
+                    <small style="color:var(--text-muted);">{row["user_domain"]}</small></td>
+                <td>{countries_str}</td>
+                <td style="font-size:.8rem;">{ips_str}</td>
+                <td>{row["login_count"]}</td>
+                <td><small>{row["first_seen"][:10] if row["first_seen"] else "—"}</small></td>
+            </tr>"""
+
+        # KQL de hunting
+        kql_sections = ""
+        for q in hunting_queries:
+            kql_sections += f"""
+            <div style="margin-bottom:1rem;">
+                <strong>IP: {q["target"]}</strong>
+                <pre style="background:var(--surface-2);padding:.75rem;border-radius:var(--radius-sm);
+                            font-size:.8rem;overflow-x:auto;margin:.5rem 0;">{q["kql"]}</pre>
+            </div>"""
+
+        mitre_html = ""
+        for t in (mitre if isinstance(mitre, list) else [mitre]):
+            mitre_html += f'<span class="badge" style="margin:.2rem;">{t}</span>'
+
+        rec_html = ""
+        for r in (recomendaciones if isinstance(recomendaciones, list) else [recomendaciones]):
+            rec_html += f"<li>{r}</li>"
+
+        verdict_color = {
+            "MALICIOSO": "severity-critical",
+            "SOSPECHOSO": "severity-high",
+            "NEEDS REVIEW": "severity-medium",
+            "BENIGNO": "severity-low",
+        }.get(verdict.upper(), "severity-medium")
+
+        html = f"""
+        <div style="font-family:var(--font-mono,monospace);">
+
+        <!-- KPIs -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
+            <div style="background:var(--surface-2);padding:1rem;border-radius:var(--radius);">
+                <div style="font-size:.75rem;color:var(--text-muted);">USUARIOS AFECTADOS</div>
+                <div style="font-size:2rem;font-weight:700;">{len(normalized_rows)}</div>
+            </div>
+            <div style="background:var(--surface-2);padding:1rem;border-radius:var(--radius);">
+                <div style="font-size:.75rem;color:var(--text-muted);">PAÍSES DETECTADOS</div>
+                <div style="font-size:2rem;font-weight:700;">
+                    {len(set(c for r in normalized_rows for c in r["countries"]))}
+                </div>
+            </div>
+            <div style="background:var(--surface-2);padding:1rem;border-radius:var(--radius);">
+                <div style="font-size:.75rem;color:var(--text-muted);">VEREDICTO</div>
+                <div><span class="badge {verdict_color}" style="font-size:1rem;">{verdict}</span></div>
+            </div>
+        </div>
+
+        <!-- Aviso privacidad -->
+        <div style="background:var(--surface-2);border-left:3px solid var(--accent);
+                    padding:.75rem 1rem;border-radius:var(--radius-sm);margin-bottom:1.5rem;
+                    font-size:.85rem;">
+            🔒 <strong>Datos ofuscados:</strong> Los usuarios están identificados por hash SHA256.
+            Para desofuscar un caso específico, ejecuta la query de desofuscación en Sentinel.
+        </div>
+
+        <!-- Resumen LLM -->
+        <h3 style="margin:0 0 .5rem;">Análisis del LLM</h3>
+        <p style="margin-bottom:1rem;">{summary or "Sin análisis disponible."}</p>
+
+        <!-- MITRE -->
+        {f'<div style="margin-bottom:1rem;"><strong>MITRE ATT&amp;CK:</strong><br>{mitre_html}</div>' if mitre_html else ""}
+
+        <!-- Recomendaciones -->
+        {f'<h3>Recomendaciones</h3><ul>{rec_html}</ul>' if rec_html else ""}
+
+        <!-- Tabla de usuarios -->
+        <h3 style="margin:1.5rem 0 .5rem;">Detalle por usuario</h3>
+        <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+                <thead>
+                    <tr style="background:var(--surface-2);">
+                        <th style="padding:.5rem;text-align:left;">Usuario (hash)</th>
+                        <th style="padding:.5rem;text-align:left;">Países</th>
+                        <th style="padding:.5rem;text-align:left;">IPs</th>
+                        <th style="padding:.5rem;text-align:left;">Logins</th>
+                        <th style="padding:.5rem;text-align:left;">Primer login</th>
+                    </tr>
+                </thead>
+                <tbody>{users_rows_html}</tbody>
+            </table>
+        </div>
+
+        <!-- KQL Hunting -->
+        {f'<h3 style="margin:1.5rem 0 .5rem;">KQL Hunting (por IP)</h3>{kql_sections}' if kql_sections else ""}
+
+        </div>"""
+
+        # Texto plano para result_text
+        text_lines = [
+            f"Incidente: {incident_id} — {title}",
+            f"Veredicto: {verdict}",
+            f"Usuarios afectados: {len(normalized_rows)}",
+            f"Resumen: {summary}",
+            "",
+        ]
+        for row in normalized_rows:
+            text_lines.append(
+                f"- hash:{row['user_hash'][:16]}… ({row['user_domain']}) "
+                f"→ {', '.join(row['countries'])} | IPs: {', '.join(row['ips'][:3])}"
+            )
+
+        return {
+            "result_html": html,
+            "result_text": "\n".join(text_lines),
+            "blue_team_verdict": system_verdict,
+            "blue_team_mitre_tactic": None,
+            "blue_team_classification": None,
         }

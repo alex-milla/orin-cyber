@@ -372,6 +372,36 @@ function db(): PDO {
         self::_addColumnIfNotExists('tasks', 'cvss_base_score', 'REAL');
         self::_addColumnIfNotExists('tasks', 'cvss_severity', 'TEXT');
 
+        // ─── Migración: ampliar CHECK de entities para user_obfuscated ─────
+        try {
+            $tableSql = $db->query("SELECT sql FROM sqlite_master WHERE type='table' AND name='entities'")->fetchColumn();
+            if ($tableSql && strpos($tableSql, 'user_obfuscated') === false) {
+                $db->exec("PRAGMA foreign_keys = OFF");
+                $db->exec("BEGIN TRANSACTION");
+                $db->exec("CREATE TABLE entities_new (
+                    entity_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    entity_type TEXT CHECK(entity_type IN ('user','device','ip','application','domain','url','hash','user_obfuscated')),
+                    entity_value TEXT UNIQUE NOT NULL,
+                    first_seen TEXT DEFAULT CURRENT_TIMESTAMP,
+                    last_seen TEXT DEFAULT CURRENT_TIMESTAMP,
+                    total_incidents INTEGER DEFAULT 0,
+                    current_risk_score REAL DEFAULT 0.0,
+                    baseline_profile TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )");
+                $db->exec("INSERT INTO entities_new SELECT * FROM entities");
+                $db->exec("DROP TABLE entities");
+                $db->exec("ALTER TABLE entities_new RENAME TO entities");
+                $db->exec("CREATE INDEX IF NOT EXISTS idx_entities_value ON entities(entity_value)");
+                $db->exec("CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(entity_type)");
+                $db->exec("CREATE INDEX IF NOT EXISTS idx_entities_risk ON entities(current_risk_score DESC)");
+                $db->exec("COMMIT");
+                $db->exec("PRAGMA foreign_keys = ON");
+            }
+        } catch (PDOException $e) {
+            // Ignorar si la tabla no existe o ya tiene el valor
+        }
+
         // ─── RAG INCIDENTES HISTÓRICOS (Fase 1 — Base) ──────────────────────
         self::_addColumnIfNotExists('tasks', 'priority', 'INTEGER DEFAULT 5');
         self::_addColumnIfNotExists('tasks', 'parent_task_id', 'INTEGER');

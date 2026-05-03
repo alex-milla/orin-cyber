@@ -82,12 +82,116 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['incident_csv'])) {
     }
 }
 
+/**
+ * Detecta si un CSV tiene la estructura del export Sentinel ofuscado.
+ * Criterio: tiene cabeceras UserHash, UserDomain, EntityType.
+ */
+function _isSentinelObfuscatedCsv(array $headers): bool {
+    $required = ['UserHash', 'UserDomain', 'EntityType'];
+    $headersLower = array_map('strtolower', $headers);
+    foreach ($required as $col) {
+        if (!in_array(strtolower($col), $headersLower, true)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Parsea un JSON array en formato string de KQL: ["ES","IT"] o ["1.2.3.4"]
+ * Devuelve array de strings limpios.
+ */
+function _parseJsonArrayString(string $raw): array {
+    if (empty($raw)) return [];
+    // Intentar JSON decode
+    $decoded = json_decode($raw, true);
+    if (is_array($decoded)) {
+        return array_filter(array_map('trim', $decoded));
+    }
+    // Fallback: limpiar brackets y dividir por coma
+    $raw = trim($raw, '[]"\'');
+    return array_filter(array_map('trim', explode(',', $raw)));
+}
+
+/**
+ * Procesa CSV de Sentinel ofuscado extrayendo entidades por columna,
+ * no por regex sobre texto plano.
+ */
+function _extractSentinelObfuscatedEntities(string $incidentId, array $rows, array $headers): void {
+    // Normalizar nombres de cabecera a lowercase para búsqueda insensible
+    $headerMap = [];
+    foreach ($headers as $i => $h) {
+        $headerMap[strtolower(trim($h))] = $i;
+    }
+
+    foreach ($rows as $row) {
+        // Mapear columnas
+        $userHash   = trim($row[($headerMap['userhash']   ?? -1)] ?? '');
+        $userDomain = trim($row[($headerMap['userdomain'] ?? -1)] ?? '');
+        $ipsRaw     = trim($row[($headerMap['ips']        ?? -1)] ?? '');
+        $countries  = trim($row[($headerMap['countries']  ?? -1)] ?? '');
+        $cities     = trim($row[($headerMap['cities']     ?? -1)] ?? '');
+        $apps       = trim($row[($headerMap['apps']       ?? -1)] ?? '');
+        $severity   = trim($row[($headerMap['severity']   ?? -1)] ?? 'high');
+        $subject    = trim($row[($headerMap['subject']    ?? -1)] ?? '');
+
+        // 1. Entidad usuario ofuscado (UserHash como identificador)
+        if ($userHash) {
+            $entityValue = $userDomain
+                ? "hash:{$userHash}@{$userDomain}"
+                : "hash:{$userHash}";
+
+            try {
+                Database::query(
+                    "INSERT OR IGNORE INTO entities (entity_type, entity_value) VALUES (?, ?)",
+                    ['user_obfuscated', $entityValue]
+                );
+                Database::query(
+                    "INSERT OR IGNORE INTO incident_entities (incident_id, entity_value, role) VALUES (?, ?, ?)",
+                    [$incidentId, $entityValue, 'victim']
+                );
+            } catch (Exception $e) { /* ignorar duplicados */ }
+        }
+
+        // 2. IPs — extraer del JSON array string: ["1.2.3.4","5.6.7.8"]
+        $ips = _parseJsonArrayString($ipsRaw);
+        foreach ($ips as $ip) {
+            $ip = trim($ip, '"\'');
+            if (!filter_var($ip, FILTER_VALIDATE_IP)) continue;
+            try {
+                Database::query(
+                    "INSERT OR IGNORE INTO entities (entity_type, entity_value) VALUES (?, ?)",
+                    ['ip', $ip]
+                );
+                Database::query(
+                    "INSERT OR IGNORE INTO incident_entities (incident_id, entity_value, role) VALUES (?, ?, ?)",
+                    [$incidentId, $ip, 'related']
+                );
+            } catch (Exception $e) { /* ignorar duplicados */ }
+        }
+    }
+}
+
 // ── Extraer entidades del CSV y guardarlas ──────────────────────────
 function _extractAndStoreEntities(string $incidentId, string $csvData): void {
     $lines = explode("\n", $csvData);
     if (count($lines) < 2) return;
 
     $headers = str_getcsv($lines[0]);
+
+    // ── NUEVO: detectar CSV de Sentinel ofuscado ──────────────────
+    if (_isSentinelObfuscatedCsv($headers)) {
+        $rows = [];
+        for ($i = 1; $i < count($lines); $i++) {
+            $line = trim($lines[$i]);
+            if (empty($line)) continue;
+            $rows[] = str_getcsv($line);
+        }
+        _extractSentinelObfuscatedEntities($incidentId, $rows, $headers);
+        return; // no continuar con la lógica de regex
+    }
+    // ── FIN NUEVO ─────────────────────────────────────────────────
+
     $allText = implode(' ', $lines);
 
     // Regex simples para entidades comunes en CSV de Sentinel
@@ -228,6 +332,47 @@ require_once __DIR__ . '/templates/header.php';
         <div style="margin-top:1rem;">
             <label>Archivo CSV exportado de Sentinel *</label>
             <input type="file" name="incident_csv" accept=".csv,.json" required style="width:100%;padding:.5rem;border:2px dashed var(--border);border-radius:var(--radius-sm);background:var(--surface);">
+            <div style="margin-top:.75rem;padding:.75rem 1rem;background:var(--surface-2);
+                        border-radius:var(--radius-sm);font-size:.83rem;border-left:3px solid var(--accent);">
+                <strong>📥 ¿Cómo exportar desde Sentinel?</strong>
+                <ol style="margin:.5rem 0 0 1.2rem;padding:0;">
+                    <li>Ejecuta la KQL de detección en Log Analytics / Sentinel.</li>
+                    <li>Haz clic en <strong>Export → CSV (all columns)</strong>.</li>
+                    <li>Sube el archivo aquí.</li>
+                </ol>
+                <details style="margin-top:.5rem;">
+                    <summary style="cursor:pointer;color:var(--accent);">Ver KQL de ejemplo (login fuera de ES)</summary>
+                    <pre style="background:var(--surface);padding:.75rem;border-radius:var(--radius-sm);
+                                font-size:.75rem;overflow-x:auto;margin:.5rem 0;">SigninLogs
+| where TimeGenerated > ago(30d)
+| where ResultType == 0
+| extend Country = tostring(LocationDetails.countryOrRegion)
+| extend City    = tostring(LocationDetails.city)
+| where Country != "ES" and isnotempty(Country)
+| summarize
+    Countries  = tostring(make_set(Country, 10)),
+    Cities     = tostring(make_set(City, 10)),
+    IPs        = tostring(make_set(IPAddress, 10)),
+    Apps       = tostring(make_set(AppDisplayName, 10)),
+    FirstSeen  = min(TimeGenerated),
+    LastSeen   = max(TimeGenerated),
+    LoginCount = count()
+    by UserPrincipalName
+| extend
+    Subject    = "Login desde país no habitual (fuera de ES)",
+    EntityType = "user",
+    Severity   = "high",
+    UserHash   = tostring(hash_sha256(UserPrincipalName)),
+    UserDomain = tostring(split(UserPrincipalName, "@")[1])
+| project UserHash, UserDomain, Subject, EntityType, Severity,
+          Countries, Cities, IPs, Apps, FirstSeen, LastSeen, LoginCount
+| order by LoginCount desc</pre>
+                    <p style="margin:.25rem 0 0;color:var(--text-muted);">
+                        ⚠️ Los usuarios se exportan <strong>ofuscados</strong> (hash SHA256).
+                        Para investigar un usuario concreto, usa la query de desofuscación en Sentinel.
+                    </p>
+                </details>
+            </div>
         </div>
         <div style="margin-top:1rem;">
             <button type="submit" class="btn btn-primary">🔍 Analizar Incidente</button>
