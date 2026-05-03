@@ -93,7 +93,20 @@ require __DIR__ . '/templates/header.php';
         </div>
     <?php else: ?>
         <div id="result-content">
-            <?php echo $safeHtml ?: ('<p class="small">' . $l['sin_contenido'] . '</p>'); ?>
+            <?php if ($safeHtml): ?>
+                <?php echo $safeHtml; ?>
+            <?php else: ?>
+                <div class="alert alert-error" style="margin-bottom:1rem;">
+                    <strong>El worker completó la tarea pero no devolvió resultado.</strong><br>
+                    Causas probables:
+                    <ul style="margin:.5rem 0 0 1.2rem;">
+                        <li>El worker de la Orin Nano no tiene el código actualizado (falta el flujo CSV Sentinel).</li>
+                        <li>El worker falló silenciosamente antes de generar el informe.</li>
+                        <li>El modelo LLM no respondió (OOM, llama-server caído).</li>
+                    </ul>
+                    <p style="margin:.5rem 0 0;">Revisa los logs del worker en la Orin Nano y asegúrate de que tiene la última versión del código.</p>
+                </div>
+            <?php endif; ?>
         </div>
         <div class="actions">
             <button onclick="copyText()"><?php echo $l['copiar']; ?></button>

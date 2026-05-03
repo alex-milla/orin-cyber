@@ -16,17 +16,22 @@ $error = '';
 // ── Procesar formulario (CSV o manual) ──────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $incidentId = sanitizeString($_POST['incident_id'] ?? '');
-    $title = sanitizeString($_POST['incident_title'] ?? 'Incidente sin título');
+    $title = sanitizeString($_POST['incident_title'] ?? '');
     $severity = sanitizeString($_POST['incident_severity'] ?? 'Medium');
     $source = sanitizeString($_POST['incident_source'] ?? 'manual');
     $splitByRow = isset($_POST['split_by_row']) && $_POST['split_by_row'] === '1';
 
     $hasFile = isset($_FILES['incident_csv']) && $_FILES['incident_csv']['error'] === UPLOAD_ERR_OK;
 
-    // Si no hay ID manual y no se va a dividir por fila, exigirlo
+    // Generar titulo automatico si esta vacio
+    if (empty($title)) {
+        $title = 'Incidencia Sentinel ' . date('Y-m-d H:i:s');
+    }
+
+    // Si no hay ID manual y no se va a dividir por fila, generar uno automatico
     if (empty($incidentId) && !($hasFile && $splitByRow)) {
-        $error = 'El ID de incidente es obligatorio (salvo si usas "Crear un incidente por cada fila").';
-    } else {
+        $incidentId = 'MANUAL-' . date('YmdHis') . '-' . random_int(1000, 9999);
+    }
         try {
             if ($hasFile) {
                 $file = $_FILES['incident_csv'];
@@ -62,9 +67,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $autoId = 'SENT-' . ($hashPrefix ?: 'row') . '-' . date('YmdHis') . '-' . $createdCount;
 
                             // Insertar incidente individual
+                            $rowTitle = $title . ($createdCount > 0 ? ' #' . ($createdCount + 1) : '');
                             Database::insert('incidents', [
                                 'incident_id' => $autoId,
-                                'title' => $title . ($createdCount > 0 ? ' #' . ($createdCount + 1) : ''),
+                                'title' => $rowTitle,
                                 'severity' => $severity,
                                 'source' => $source,
                                 'raw_data' => $rowCsv,
@@ -391,14 +397,17 @@ require_once __DIR__ . '/templates/header.php';
     </div>
 </div>
 
-<!-- ── Formulario de upload ────────────────────────────────────────── -->
+<!-- ── Formulario: Crear Manual + Subir CSV ────────────────────────── -->
 <div class="card" style="margin-bottom:1.5rem;">
-    <h3>📤 Subir Incidente desde Sentinel</h3>
-    <form method="POST" action="" enctype="multipart/form-data" style="margin-top:1rem;">
+    <h3>📤 Gestión de Incidencias Blue Team</h3>
+
+    <!-- SECCION A: Crear manual -->
+    <form method="POST" action="" style="margin-top:1rem;padding:1rem;background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--border);">
+        <h4 style="margin:0 0 .75rem;font-size:1rem;">➕ Crear incidencia manualmente</h4>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
             <div>
-                <label>ID de Incidente *</label>
-                <input type="text" name="incident_id" placeholder="INC-25234" required style="width:100%;">
+                <label>ID de Incidente</label>
+                <input type="text" name="incident_id" placeholder="INC-25234 (opcional si usas split por filas)" style="width:100%;">
             </div>
             <div>
                 <label>Título</label>
@@ -420,6 +429,36 @@ require_once __DIR__ . '/templates/header.php';
                     <option value="sentinel">Microsoft Sentinel</option>
                 </select>
             </div>
+        </div>
+        <div style="margin-top:1rem;">
+            <button type="submit" class="btn btn-primary">💾 Guardar incidencia manual</button>
+        </div>
+    </form>
+
+    <!-- SECCION B: Subir CSV -->
+    <form method="POST" action="" enctype="multipart/form-data" style="margin-top:1rem;padding:1rem;background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--border);">
+        <h4 style="margin:0 0 .75rem;font-size:1rem;">📁 Subir CSV de Sentinel y analizar</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+            <div>
+                <label>Título base</label>
+                <input type="text" name="incident_title" placeholder="Login desde país no habitual" style="width:100%;">
+            </div>
+            <div>
+                <label>Severidad</label>
+                <select name="incident_severity" style="width:100%;">
+                    <option value="Low">Low</option>
+                    <option value="Medium" selected>Medium</option>
+                    <option value="High" selected>High</option>
+                    <option value="Critical">Critical</option>
+                </select>
+            </div>
+            <div>
+                <label>Fuente</label>
+                <select name="incident_source" style="width:100%;">
+                    <option value="sentinel" selected>Microsoft Sentinel</option>
+                    <option value="manual">Manual / CSV</option>
+                </select>
+            </div>
             <div style="display:flex;align-items:center;gap:.4rem;">
                 <input type="checkbox" id="split_by_row" name="split_by_row" value="1" style="width:auto;">
                 <label for="split_by_row" style="font-weight:normal;font-size:.85rem;cursor:pointer;">
@@ -428,9 +467,8 @@ require_once __DIR__ . '/templates/header.php';
             </div>
         </div>
         <div style="margin-top:1rem;">
-            <label>Archivo CSV exportado de Sentinel</label>
-            <input type="file" name="incident_csv" accept=".csv,.json" style="width:100%;padding:.5rem;border:2px dashed var(--border);border-radius:var(--radius-sm);background:var(--surface);">
-            <p style="margin:.25rem 0 0;color:var(--text-muted);font-size:.8rem;">Opcional para crear manualmente. Obligatorio si quieres analizar con el LLM.</p>
+            <label>Archivo CSV exportado de Sentinel *</label>
+            <input type="file" name="incident_csv" accept=".csv,.json" required style="width:100%;padding:.5rem;border:2px dashed var(--border);border-radius:var(--radius-sm);background:var(--surface-2);">
             <div style="margin-top:.75rem;padding:.75rem 1rem;background:var(--surface-2);
                         border-radius:var(--radius-sm);font-size:.83rem;border-left:3px solid var(--accent);">
                 <strong>📥 ¿Cómo exportar desde Sentinel?</strong>
