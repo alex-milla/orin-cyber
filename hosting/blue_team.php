@@ -13,32 +13,75 @@ $pageTitle = 'Blue Team Intelligence';
 $message = '';
 $error = '';
 
-// ── Procesar upload de CSV ──────────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['incident_csv'])) {
-    $file = $_FILES['incident_csv'];
+// ── Procesar formulario (CSV o manual) ──────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $incidentId = sanitizeString($_POST['incident_id'] ?? '');
     $title = sanitizeString($_POST['incident_title'] ?? 'Incidente sin título');
     $severity = sanitizeString($_POST['incident_severity'] ?? 'Medium');
     $source = sanitizeString($_POST['incident_source'] ?? 'manual');
 
-    if ($file['error'] !== UPLOAD_ERR_OK) {
-        $error = 'Error al subir el archivo: código ' . $file['error'];
-    } elseif (empty($incidentId)) {
+    if (empty($incidentId)) {
         $error = 'El ID de incidente es obligatorio.';
     } else {
-        $csvData = file_get_contents($file['tmp_name']);
-        if ($csvData === false || strlen($csvData) === 0) {
-            $error = 'El archivo está vacío o no se pudo leer.';
-        } else {
-            try {
-                // Insertar o actualizar incidente
-                $existing = Database::fetchOne("SELECT 1 FROM incidents WHERE incident_id = ?", [$incidentId]);
+        $hasFile = isset($_FILES['incident_csv']) && $_FILES['incident_csv']['error'] === UPLOAD_ERR_OK;
+
+        try {
+            $existing = Database::fetchOne("SELECT * FROM incidents WHERE incident_id = ?", [$incidentId]);
+
+            if ($hasFile) {
+                $file = $_FILES['incident_csv'];
+                $csvData = file_get_contents($file['tmp_name']);
+                if ($csvData === false || strlen($csvData) === 0) {
+                    $error = 'El archivo está vacío o no se pudo leer.';
+                } else {
+                    // Para uploads a incidentes existentes (form inline), conservar datos previos si no se enviaron
+                    if ($existing) {
+                        if (empty($title)) $title = $existing['title'] ?? 'Incidente sin título';
+                        if (empty($severity)) $severity = $existing['severity'] ?? 'Medium';
+                        Database::update('incidents', [
+                            'title' => $title,
+                            'severity' => $severity,
+                            'source' => $source,
+                            'raw_data' => $csvData,
+                            'status' => 'open',
+                        ], 'incident_id = ?', [$incidentId]);
+                    } else {
+                        Database::insert('incidents', [
+                            'incident_id' => $incidentId,
+                            'title' => $title,
+                            'severity' => $severity,
+                            'source' => $source,
+                            'raw_data' => $csvData,
+                            'status' => 'open',
+                            'created_time' => date('Y-m-d H:i:s'),
+                        ]);
+                    }
+
+                    _extractAndStoreEntities($incidentId, $csvData);
+
+                    $taskInput = json_encode([
+                        'incident_id' => $incidentId,
+                        'title' => $title,
+                        'severity' => $severity,
+                        'csv_data' => $csvData,
+                    ]);
+                    $taskId = Database::insert('tasks', [
+                        'task_type' => 'incident_analysis',
+                        'input_data' => $taskInput,
+                        'status' => 'pending',
+                    ]);
+                    Database::update('incidents', ['blue_team_task_id' => $taskId], 'incident_id = ?', [$incidentId]);
+
+                    header("Location: task_result.php?id=" . $taskId);
+                    exit;
+                }
+            } else {
+                // Sin archivo: crear o actualizar incidente manualmente
                 if ($existing) {
                     Database::update('incidents', [
                         'title' => $title,
                         'severity' => $severity,
                         'source' => $source,
-                        'raw_data' => $csvData,
                         'status' => 'open',
                     ], 'incident_id = ?', [$incidentId]);
                 } else {
@@ -47,37 +90,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['incident_csv'])) {
                         'title' => $title,
                         'severity' => $severity,
                         'source' => $source,
-                        'raw_data' => $csvData,
                         'status' => 'open',
                         'created_time' => date('Y-m-d H:i:s'),
                     ]);
                 }
-
-                // Extraer entidades básicas del CSV para pre-poblar
-                _extractAndStoreEntities($incidentId, $csvData);
-
-                // Crear tarea de análisis
-                $taskInput = json_encode([
-                    'incident_id' => $incidentId,
-                    'title' => $title,
-                    'severity' => $severity,
-                    'csv_data' => $csvData,
-                ]);
-                $taskId = Database::insert('tasks', [
-                    'task_type' => 'incident_analysis',
-                    'input_data' => $taskInput,
-                    'status' => 'pending',
-                ]);
-
-                // Vincular tarea con incidente
-                Database::update('incidents', ['blue_team_task_id' => $taskId], 'incident_id = ?', [$incidentId]);
-
-                // Redirigir a la página de resultado con polling
-                header("Location: task_result.php?id=" . $taskId);
-                exit;
-            } catch (Exception $e) {
-                $error = 'Error al procesar: ' . $e->getMessage();
+                $message = 'Incidente guardado correctamente.' . ($existing ? ' (actualizado)' : ' (creado)');
             }
+        } catch (Exception $e) {
+            $error = 'Error al procesar: ' . $e->getMessage();
         }
     }
 }
@@ -330,8 +350,9 @@ require_once __DIR__ . '/templates/header.php';
             </div>
         </div>
         <div style="margin-top:1rem;">
-            <label>Archivo CSV exportado de Sentinel *</label>
-            <input type="file" name="incident_csv" accept=".csv,.json" required style="width:100%;padding:.5rem;border:2px dashed var(--border);border-radius:var(--radius-sm);background:var(--surface);">
+            <label>Archivo CSV exportado de Sentinel</label>
+            <input type="file" name="incident_csv" accept=".csv,.json" style="width:100%;padding:.5rem;border:2px dashed var(--border);border-radius:var(--radius-sm);background:var(--surface);">
+            <p style="margin:.25rem 0 0;color:var(--text-muted);font-size:.8rem;">Opcional para crear manualmente. Obligatorio si quieres analizar con el LLM.</p>
             <div style="margin-top:.75rem;padding:.75rem 1rem;background:var(--surface-2);
                         border-radius:var(--radius-sm);font-size:.83rem;border-left:3px solid var(--accent);">
                 <strong>📥 ¿Cómo exportar desde Sentinel?</strong>
@@ -535,11 +556,15 @@ function pollAzureStatus(taskId) {
                         <?php endif; ?>
                     </td>
                     <td style="font-size:.85rem;color:var(--text-muted);"><?php echo htmlspecialchars(substr($inc['created_time'] ?? '', 0, 16)); ?></td>
-                    <td>
+                    <td style="white-space:nowrap;">
                         <?php if ($inc['blue_team_task_id']): ?>
                         <a href="task_result.php?id=<?php echo (int)$inc['blue_team_task_id']; ?>" class="btn btn-sm">Ver</a>
                         <?php else: ?>
-                        <em class="small" style="color:var(--text-muted);">—</em>
+                        <form method="POST" action="" enctype="multipart/form-data" style="display:inline-flex;gap:.3rem;align-items:center;">
+                            <input type="hidden" name="incident_id" value="<?php echo htmlspecialchars($inc['incident_id'], ENT_QUOTES, 'UTF-8'); ?>">
+                            <input type="file" name="incident_csv" accept=".csv" required style="width:90px;font-size:.7rem;padding:.2rem;">
+                            <button type="submit" class="btn btn-sm" title="Subir CSV y analizar">📎</button>
+                        </form>
                         <?php endif; ?>
                     </td>
                 </tr>
