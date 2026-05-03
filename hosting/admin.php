@@ -164,10 +164,12 @@ require __DIR__ . '/templates/header.php';
     <div class="tabs">
         <a href="?tab=updates" class="<?php echo $tab==='updates'?'active':''; ?>">Actualizaciones</a>
         <a href="?tab=workers" class="<?php echo $tab==='workers'?'active':''; ?>">Workers</a>
+        <a href="?tab=models" class="<?php echo $tab==='models'?'active':''; ?>">Modelos</a>
+        <a href="?tab=providers" class="<?php echo $tab==='providers'?'active':''; ?>">Proveedores</a>
+        <a href="?tab=connectivity" class="<?php echo $tab==='connectivity'?'active':''; ?>">Conectividad</a>
+        <a href="?tab=apikeys" class="<?php echo $tab==='apikeys'?'active':''; ?>">API Keys</a>
         <a href="?tab=users" class="<?php echo $tab==='users'?'active':''; ?>">Usuarios</a>
         <a href="?tab=alerts" class="<?php echo $tab==='alerts'?'active':''; ?>">Alertas</a>
-        <a href="?tab=providers" class="<?php echo $tab==='providers'?'active':''; ?>">Proveedores</a>
-        <a href="?tab=config" class="<?php echo $tab==='config'?'active':''; ?>">Configuración</a>
         <a href="?tab=templates" class="<?php echo $tab==='templates'?'active':''; ?>">Plantillas</a>
         <a href="?tab=rag" class="<?php echo $tab==='rag'?'active':''; ?>">🧠 RAG</a>
     </div>
@@ -282,143 +284,6 @@ require __DIR__ . '/templates/header.php';
     <?php endforeach; ?>
     <?php endif; ?>
 
-    <?php if (!empty($virtualWorkers)): ?>
-    <h3 class="mt-4">☁️ Virtual Workers (modelos cloud)</h3>
-    <p class="small">Estos modelos se ejecutan vía API externa y pueden ser seleccionados como ejecutores en las herramientas.</p>
-    <table>
-        <thead><tr>
-            <th>Nombre</th>
-            <th>Estado</th>
-            <th>Proveedor</th>
-            <th>Modelo</th>
-            <th>Context</th>
-            <th>Acciones</th>
-        </tr></thead>
-        <tbody>
-        <?php foreach ($virtualWorkers as $vw): ?>
-        <tr>
-            <td><strong>☁️ <?php echo htmlspecialchars($vw['provider_label']); ?> → <?php echo htmlspecialchars($vw['model_label']); ?></strong></td>
-            <td><span class="status-completed">● Online</span></td>
-            <td><?php echo htmlspecialchars($vw['provider_label']); ?></td>
-            <td class="small mono"><?php echo htmlspecialchars($vw['model_id']); ?></td>
-            <td><?php echo number_format($vw['context_window']); ?></td>
-            <td>
-                <button class="secondary small" onclick="testProvider(<?php echo (int)$vw['provider_id']; ?>)">🧪 Test</button>
-            </td>
-        </tr>
-        <?php endforeach; ?>
-        </tbody>
-    </table>
-    <?php endif; ?>
-
-    <h3 class="mt-4">🤖 Modelo del Chat (llama-server)</h3>
-    <p class="small">Selecciona el modelo con el que arrancará llama-server al inicio del worker. Se guarda en el hosting y se sincroniza automáticamente con el Orin.</p>
-    <form method="POST" action="ajax_admin.php?action=save_preferred_model" onsubmit="return savePreferredModel(this);" id="preferred-model-form">
-        <?php echo csrfInput(); ?>
-        <div class="flex gap-2 items-end flex-wrap">
-            <div style="min-width:280px;flex:1;">
-                <label class="small">Modelo activo</label>
-                <select name="model" id="preferred-model-select" required style="width:100%;">
-                    <option value="">— Selecciona un modelo —</option>
-                    <?php
-                    // Usar modelos del último heartbeat del worker local
-                    $localModels = [];
-                    if (!empty($workers)) {
-                        $localModels = json_decode($workers[0]['available_models'] ?? '[]', true) ?: [];
-                    }
-                    foreach ($localModels as $m):
-                        $display = preg_replace('/\.gguf$/i', '', $m);
-                        $label = resolveModelLabel($m, $modelCatalog);
-                    ?>
-                    <option value="<?php echo htmlspecialchars($m); ?>" <?php echo $preferredModel === $m ? 'selected' : ''; ?>>
-                        <?php echo htmlspecialchars($display); ?> <?php echo $label !== $m ? '(' . htmlspecialchars($label) . ')' : ''; ?>
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <button type="submit">💾 Guardar y cambiar</button>
-        </div>
-        <p id="pref-model-msg" class="small mt-1"></p>
-        <?php if ($preferredModel): ?>
-        <p class="small" style="color:var(--text-muted);">
-            Modelo preferido guardado: <code><?php echo htmlspecialchars($preferredModel); ?></code>
-            <?php if (!empty($workers) && $workers[0]['model_loaded']): ?>
-                · Cargado ahora: <code><?php echo htmlspecialchars(resolveModelLabel($workers[0]['model_loaded'], $modelCatalog)); ?></code>
-            <?php endif; ?>
-        </p>
-        <?php endif; ?>
-    </form>
-    <script>
-    async function savePreferredModel(form) {
-        const fd = new FormData(form);
-        const msg = document.getElementById('pref-model-msg');
-        try {
-            const resp = await fetch(form.action, {method: 'POST', body: fd});
-            const data = await resp.json();
-            if (data.success) {
-                msg.className = 'alert alert-success mt-1';
-                msg.textContent = 'Modelo guardado. El worker lo aplicará en su próximo ciclo (máx. 15s). Si el worker está caído, se aplicará al reiniciar.';
-            } else {
-                msg.className = 'alert alert-error mt-1';
-                msg.textContent = data.error || 'Error';
-            }
-        } catch (err) {
-            msg.className = 'alert alert-error mt-1';
-            msg.textContent = 'Error de red: ' + err.message;
-        }
-        return false;
-    }
-    </script>
-
-    <h3 class="mt-4">🔗 Chat Local (Cloudflare Tunnel)</h3>
-    <p class="small">El chat se sirve directamente desde el llama-server del Orin Nano a través del túnel de Cloudflare. La URL está definida en <code>includes/config.php</code>.</p>
-    <p class="small" style="color:var(--text-muted);">
-        URL actual: <code><?php echo htmlspecialchars(LOCAL_LLM_URL); ?></code>
-        · <a href="<?php echo htmlspecialchars(LOCAL_LLM_URL); ?>" target="_blank" rel="noopener noreferrer">Abrir chat →</a>
-    </p>
-
-    <h4 class="mt-3" style="font-size:1rem;color:var(--text-secondary);">Cloudflare Access (Zero Trust)</h4>
-    <p class="small">Si el túnel está protegido con Cloudflare Access, introduce aquí el Client ID y Client Secret del token de servicio. El chat integrado y las llamadas del sistema los usarán automáticamente.</p>
-    <form method="POST" action="ajax_admin.php?action=save_local_llm_config" onsubmit="return saveLocalLlmConfig(this);" id="local-llm-config-form">
-        <?php echo csrfInput(); ?>
-        <div class="flex gap-2 items-end flex-wrap">
-            <div style="min-width:200px;flex:1;">
-                <label class="small">CF-Access-Client-Id</label>
-                <input type="text" name="cf_client_id" value="<?php echo htmlspecialchars($localLlmCfId); ?>" placeholder="Opcional" style="width:100%;">
-            </div>
-            <div style="min-width:200px;flex:1;">
-                <label class="small">CF-Access-Client-Secret</label>
-                <input type="password" name="cf_client_secret" value="<?php echo htmlspecialchars($localLlmCfSecret); ?>" placeholder="Opcional" style="width:100%;">
-            </div>
-            <button type="submit">💾 Guardar</button>
-        </div>
-        <p id="local-llm-msg" class="small mt-1"></p>
-        <?php if ($localLlmCfId): ?>
-        <p class="small" style="color:var(--text-muted);">Cloudflare Access activo</p>
-        <?php endif; ?>
-    </form>
-    <script>
-    async function saveLocalLlmConfig(form) {
-        const fd = new FormData(form);
-        const msg = document.getElementById('local-llm-msg');
-        try {
-            const resp = await fetch(form.action, {method: 'POST', body: fd});
-            const data = await resp.json();
-            if (data.success) {
-                msg.className = 'alert alert-success mt-1';
-                msg.textContent = 'Configuración guardada.';
-            } else {
-                msg.className = 'alert alert-error mt-1';
-                msg.textContent = data.error || 'Error';
-            }
-        } catch (err) {
-            msg.className = 'alert alert-error mt-1';
-            msg.textContent = 'Error de red: ' + err.message;
-        }
-        return false;
-    }
-    </script>
-
     <h3 class="mt-4">📡 Enviar comando a worker</h3>
     <p class="small">Los comandos se ejecutan en el próximo ciclo de polling del worker.</p>
     <form method="POST" action="ajax_admin.php?action=send_worker_command" onsubmit="return sendWorkerCmd(this);" id="worker-cmd-form">
@@ -516,106 +381,83 @@ require __DIR__ . '/templates/header.php';
     populateModels();
     </script>
 
-    <?php elseif ($tab === 'users'): ?>
-    <h3>Usuarios registrados</h3>
-    <?php if (empty($users)): ?>
-        <p class="small">No hay usuarios registrados.</p>
-    <?php else: ?>
+    <?php elseif ($tab === 'models'): ?>
+    <?php if (!empty($virtualWorkers)): ?>
+    <h3>☁️ Virtual Workers (modelos cloud)</h3>
+    <p class="small">Estos modelos se ejecutan vía API externa y pueden ser seleccionados como ejecutores en las herramientas.</p>
     <table>
         <thead><tr>
-            <th>ID</th>
-            <th>Usuario</th>
-            <th>Admin</th>
-            <th>Registro</th>
+            <th>Nombre</th>
+            <th>Estado</th>
+            <th>Proveedor</th>
+            <th>Modelo</th>
+            <th>Context</th>
+            <th>Acciones</th>
         </tr></thead>
         <tbody>
-        <?php foreach ($users as $u): ?>
+        <?php foreach ($virtualWorkers as $vw): ?>
         <tr>
-            <td><?php echo $u['id']; ?></td>
-            <td><?php echo htmlspecialchars($u['username']); ?></td>
-            <td><?php echo $u['is_admin'] ? 'Sí' : 'No'; ?></td>
-            <td><?php echo htmlspecialchars($u['created_at']); ?></td>
+            <td><strong>☁️ <?php echo htmlspecialchars($vw['provider_label']); ?> → <?php echo htmlspecialchars($vw['model_label']); ?></strong></td>
+            <td><span class="status-completed">● Online</span></td>
+            <td><?php echo htmlspecialchars($vw['provider_label']); ?></td>
+            <td class="small mono"><?php echo htmlspecialchars($vw['model_id']); ?></td>
+            <td><?php echo number_format($vw['context_window']); ?></td>
+            <td>
+                <button class="secondary small" onclick="testProvider(<?php echo (int)$vw['provider_id']; ?>)">🧪 Test</button>
+            </td>
         </tr>
         <?php endforeach; ?>
         </tbody>
     </table>
     <?php endif; ?>
 
-    <h3 class="mt-4">Crear usuario</h3>
-    <form method="POST" action="ajax_admin.php?action=add_user" onsubmit="return addUser(this);">
+    <h3 class="mt-4">🤖 Modelo del Chat (llama-server)</h3>
+    <p class="small">Selecciona el modelo con el que arrancará llama-server al inicio del worker. Se guarda en el hosting y se sincroniza automáticamente con el Orin.</p>
+    <form method="POST" action="ajax_admin.php?action=save_preferred_model" onsubmit="return savePreferredModel(this);" id="preferred-model-form">
         <?php echo csrfInput(); ?>
-        <label>Usuario</label>
-        <input type="text" name="username" required maxlength="64" pattern="[\w\-.@]+" title="Letras, números, guiones, puntos y @">
-        <label>Contraseña</label>
-        <input type="password" name="password" required minlength="8" maxlength="128">
-        <label><input type="checkbox" name="is_admin" value="1"> Administrador</label>
-        <button type="submit" class="mt-2">Crear usuario</button>
-        <p id="user-msg" class="mt-1"></p>
-    </form>
-
-    <?php elseif ($tab === 'alerts'): ?>
-    <h3>🔔 Suscripciones de alertas</h3>
-    <p class="small">El worker ejecuta tareas <code>alert_scan</code> que buscan CVEs recientes y generan alertas según estas suscripciones.</p>
-
-    <?php if (empty($alertSubs)): ?>
-        <p class="small">No hay suscripciones configuradas.</p>
-    <?php else: ?>
-    <table>
-        <thead><tr>
-            <th>Tipo</th>
-            <th>Valor</th>
-            <th>Umbral</th>
-            <th>Activa</th>
-            <th>Creada</th>
-        </tr></thead>
-        <tbody>
-        <?php foreach ($alertSubs as $s): ?>
-        <tr>
-            <td><?php echo htmlspecialchars($s['type']); ?></td>
-            <td><code><?php echo htmlspecialchars($s['value']); ?></code></td>
-            <td><?php echo htmlspecialchars($s['severity_threshold'] ?? 'LOW'); ?></td>
-            <td><?php echo $s['active'] ? 'Sí' : 'No'; ?></td>
-            <td class="small"><?php echo htmlspecialchars($s['created_at']); ?></td>
-        </tr>
-        <?php endforeach; ?>
-        </tbody>
-    </table>
-    <?php endif; ?>
-
-    <h3 class="mt-4">➕ Añadir suscripción</h3>
-    <form method="POST" action="ajax_admin.php?action=add_alert_subscription" onsubmit="return addAlertSub(this);">
-        <?php echo csrfInput(); ?>
-        <label>Tipo</label>
-        <select name="type" required>
-            <option value="product">Producto / Software</option>
-            <option value="vendor">Vendor / Fabricante</option>
-            <option value="keyword">Palabra clave</option>
-            <option value="severity">Severidad mínima</option>
-        </select>
-        <label>Valor</label>
-        <input type="text" name="value" required maxlength="100" placeholder="Ej: apache, log4j, CRITICAL...">
-        <label>Umbral de severidad (para filtro adicional)</label>
-        <select name="severity_threshold">
-            <option value="LOW">LOW</option>
-            <option value="MEDIUM">MEDIUM</option>
-            <option value="HIGH" selected>HIGH</option>
-            <option value="CRITICAL">CRITICAL</option>
-        </select>
-        <button type="submit" class="mt-2">Añadir suscripción</button>
-        <p id="alert-sub-msg" class="small mt-1"></p>
+        <div class="flex gap-2 items-end flex-wrap">
+            <div style="min-width:280px;flex:1;">
+                <label class="small">Modelo activo</label>
+                <select name="model" id="preferred-model-select" required style="width:100%;">
+                    <option value="">— Selecciona un modelo —</option>
+                    <?php
+                    // Usar modelos del último heartbeat del worker local
+                    $localModels = [];
+                    if (!empty($workers)) {
+                        $localModels = json_decode($workers[0]['available_models'] ?? '[]', true) ?: [];
+                    }
+                    foreach ($localModels as $m):
+                        $display = preg_replace('/\.gguf$/i', '', $m);
+                        $label = resolveModelLabel($m, $modelCatalog);
+                    ?>
+                    <option value="<?php echo htmlspecialchars($m); ?>" <?php echo $preferredModel === $m ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($display); ?> <?php echo $label !== $m ? '(' . htmlspecialchars($label) . ')' : ''; ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <button type="submit">💾 Guardar y cambiar</button>
+        </div>
+        <p id="pref-model-msg" class="small mt-1"></p>
+        <?php if ($preferredModel): ?>
+        <p class="small" style="color:var(--text-muted);">
+            Modelo preferido guardado: <code><?php echo htmlspecialchars($preferredModel); ?></code>
+            <?php if (!empty($workers) && $workers[0]['model_loaded']): ?>
+                · Cargado ahora: <code><?php echo htmlspecialchars(resolveModelLabel($workers[0]['model_loaded'], $modelCatalog)); ?></code>
+            <?php endif; ?>
+        </p>
+        <?php endif; ?>
     </form>
     <script>
-    async function addAlertSub(form) {
+    async function savePreferredModel(form) {
         const fd = new FormData(form);
-        const msg = document.getElementById('alert-sub-msg');
+        const msg = document.getElementById('pref-model-msg');
         try {
             const resp = await fetch(form.action, {method: 'POST', body: fd});
             const data = await resp.json();
             if (data.success) {
                 msg.className = 'alert alert-success mt-1';
-                msg.textContent = 'Suscripción añadida.';
-                form.reset();
-                setTimeout(() => location.reload(), 800);
+                msg.textContent = 'Modelo guardado. El worker lo aplicará en su próximo ciclo (máx. 15s). Si el worker está caído, se aplicará al reiniciar.';
             } else {
                 msg.className = 'alert alert-error mt-1';
                 msg.textContent = data.error || 'Error';
@@ -627,6 +469,21 @@ require __DIR__ . '/templates/header.php';
         return false;
     }
     </script>
+
+    <h3 class="mt-4">🖥️ Ejecutor por defecto para tareas</h3>
+    <p class="small">Las tareas CVE (y futuras tareas) se ejecutarán en el worker o modelo seleccionado por defecto.</p>
+    <form method="POST" action="ajax_admin.php?action=save_default_executor" onsubmit="return saveExecutor(this);">
+        <?php echo csrfInput(); ?>
+        <select name="executor" style="min-width: 280px;">
+            <?php foreach ($executorOptions as $opt): ?>
+            <option value="<?php echo htmlspecialchars($opt['value']); ?>" <?php echo $defaultExecutor === $opt['value'] ? 'selected' : ''; ?>>
+                <?php echo htmlspecialchars($opt['label']); ?>
+            </option>
+            <?php endforeach; ?>
+        </select>
+        <button type="submit" class="mt-2">💾 Guardar</button>
+        <p id="exec-msg" class="small mt-1"></p>
+    </form>
 
     <?php elseif ($tab === 'providers'): ?>
     <h3>🌐 Proveedores externos</h3>
@@ -1093,6 +950,238 @@ require __DIR__ . '/templates/header.php';
     });
     </script>
 
+    <?php elseif ($tab === 'connectivity'): ?>
+    <h3>🔗 Chat Local (Cloudflare Tunnel)</h3>
+    <p class="small">El chat se sirve directamente desde el llama-server del Orin Nano a través del túnel de Cloudflare. La URL está definida en <code>includes/config.php</code>.</p>
+    <p class="small" style="color:var(--text-muted);">
+        URL actual: <code><?php echo htmlspecialchars(LOCAL_LLM_URL); ?></code>
+        · <a href="<?php echo htmlspecialchars(LOCAL_LLM_URL); ?>" target="_blank" rel="noopener noreferrer">Abrir chat →</a>
+    </p>
+
+    <h4 class="mt-3" style="font-size:1rem;color:var(--text-secondary);">Cloudflare Access (Zero Trust)</h4>
+    <p class="small">Si el túnel está protegido con Cloudflare Access, introduce aquí el Client ID y Client Secret del token de servicio. El chat integrado y las llamadas del sistema los usarán automáticamente.</p>
+    <form method="POST" action="ajax_admin.php?action=save_local_llm_config" onsubmit="return saveLocalLlmConfig(this);" id="local-llm-config-form">
+        <?php echo csrfInput(); ?>
+        <div class="flex gap-2 items-end flex-wrap">
+            <div style="min-width:200px;flex:1;">
+                <label class="small">CF-Access-Client-Id</label>
+                <input type="text" name="cf_client_id" value="<?php echo htmlspecialchars($localLlmCfId); ?>" placeholder="Opcional" style="width:100%;">
+            </div>
+            <div style="min-width:200px;flex:1;">
+                <label class="small">CF-Access-Client-Secret</label>
+                <input type="password" name="cf_client_secret" value="<?php echo htmlspecialchars($localLlmCfSecret); ?>" placeholder="Opcional" style="width:100%;">
+            </div>
+            <button type="submit">💾 Guardar</button>
+        </div>
+        <p id="local-llm-msg" class="small mt-1"></p>
+        <?php if ($localLlmCfId): ?>
+        <p class="small" style="color:var(--text-muted);">Cloudflare Access activo</p>
+        <?php endif; ?>
+    </form>
+    <script>
+    async function saveLocalLlmConfig(form) {
+        const fd = new FormData(form);
+        const msg = document.getElementById('local-llm-msg');
+        try {
+            const resp = await fetch(form.action, {method: 'POST', body: fd});
+            const data = await resp.json();
+            if (data.success) {
+                msg.className = 'alert alert-success mt-1';
+                msg.textContent = 'Configuración guardada.';
+            } else {
+                msg.className = 'alert alert-error mt-1';
+                msg.textContent = data.error || 'Error';
+            }
+        } catch (err) {
+            msg.className = 'alert alert-error mt-1';
+            msg.textContent = 'Error de red: ' + err.message;
+        }
+        return false;
+    }
+    </script>
+
+    <?php elseif ($tab === 'apikeys'): ?>
+    <h3>🔑 API Keys — Sistemas conectados</h3>
+    <p class="small">Cada worker o sistema externo debe usar su propia API key. Puedes revocar una key sin afectar a los demás.</p>
+
+    <?php if (empty($apiKeys)): ?>
+        <p class="small">No hay API keys.</p>
+    <?php else: ?>
+    <table>
+        <thead><tr>
+            <th>Nombre</th>
+            <th>Key</th>
+            <th>Estado</th>
+            <th>Último uso</th>
+            <th>Acciones</th>
+        </tr></thead>
+        <tbody>
+        <?php foreach ($apiKeys as $k): ?>
+        <tr>
+            <td><?php echo htmlspecialchars($k['name']); ?></td>
+            <td class="mono">
+                <span id="key-<?php echo $k['id']; ?>" class="blur-reveal" title="Clic para revelar" data-full="<?php echo htmlspecialchars($k['api_key'], ENT_QUOTES); ?>" onclick="revealKey(this)"><?php echo htmlspecialchars(substr($k['api_key'], 0, 8) . '...' . substr($k['api_key'], -8)); ?></span>
+                <button class="secondary" style="font-size:0.8rem; padding:0.3rem 0.5rem;" onclick="copyKey('key-<?php echo $k['id']; ?>')">📋</button>
+            </td>
+            <td><?php echo $k['is_active'] ? '<span class="status-completed">Activa</span>' : '<span class="status-error">Revocada</span>'; ?></td>
+            <td class="small"><?php echo $k['last_used'] ? htmlspecialchars($k['last_used']) : 'Nunca'; ?></td>
+            <td>
+                <div class="flex gap-1 flex-wrap">
+                <?php if ($k['is_active']): ?>
+                    <button class="secondary" onclick="revokeKey(<?php echo $k['id']; ?>)">🚫 Revocar</button>
+                <?php else: ?>
+                    <button class="secondary" onclick="activateKey(<?php echo $k['id']; ?>)">✅ Activar</button>
+                <?php endif; ?>
+                    <button class="secondary" onclick="regenKey(<?php echo $k['id']; ?>)">🔄 Regenerar</button>
+                    <button class="secondary" onclick="deleteKey(<?php echo $k['id']; ?>)">🗑️ Eliminar</button>
+                </div>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    <?php endif; ?>
+
+    <h4>Añadir nuevo worker</h4>
+    <form method="POST" action="ajax_admin.php?action=add_api_key" onsubmit="return addKey(this);" class="flex gap-1 items-end">
+        <?php echo csrfInput(); ?>
+        <div class="w-full">
+            <label class="small">Nombre del worker</label>
+            <input type="text" name="name" placeholder="Ej: Orin Nano 2, VPS Frankfurt..." required maxlength="100">
+        </div>
+        <button type="submit">➕ Añadir key</button>
+    </form>
+    <div id="key-result" class="mt-2" style="display:none;">
+        <div class="alert alert-success">
+            <p>Nueva API key generada:</p>
+            <code id="key-new-value" style="font-size:1.1rem; padding:.5rem .75rem; display:inline-block; margin:.5rem 0;"></code>
+            <button onclick="copyToClipboard('key-new-value')">📋 Copiar</button>
+            <p class="small">Guárdala ahora — no se volverá a mostrar.</p>
+        </div>
+    </div>
+    <p id="key-msg" class="small mt-1"></p>
+
+    <?php elseif ($tab === 'users'): ?>
+    <h3>Usuarios registrados</h3>
+    <?php if (empty($users)): ?>
+        <p class="small">No hay usuarios registrados.</p>
+    <?php else: ?>
+    <table>
+        <thead><tr>
+            <th>ID</th>
+            <th>Usuario</th>
+            <th>Admin</th>
+            <th>Registro</th>
+        </tr></thead>
+        <tbody>
+        <?php foreach ($users as $u): ?>
+        <tr>
+            <td><?php echo $u['id']; ?></td>
+            <td><?php echo htmlspecialchars($u['username']); ?></td>
+            <td><?php echo $u['is_admin'] ? 'Sí' : 'No'; ?></td>
+            <td><?php echo htmlspecialchars($u['created_at']); ?></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    <?php endif; ?>
+
+    <h3 class="mt-4">Crear usuario</h3>
+    <form method="POST" action="ajax_admin.php?action=add_user" onsubmit="return addUser(this);">
+        <?php echo csrfInput(); ?>
+        <label>Usuario</label>
+        <input type="text" name="username" required maxlength="64" pattern="[\w\-.@]+" title="Letras, números, guiones, puntos y @">
+        <label>Contraseña</label>
+        <input type="password" name="password" required minlength="8" maxlength="128">
+        <label><input type="checkbox" name="is_admin" value="1"> Administrador</label>
+        <button type="submit" class="mt-2">Crear usuario</button>
+        <p id="user-msg" class="mt-1"></p>
+    </form>
+
+    <h3 class="mt-4">Registro de usuarios</h3>
+    <p>Estado: <strong><?php echo $regEnabled ? 'Abierto' : 'Cerrado'; ?></strong></p>
+    <form method="POST" action="ajax_admin.php?action=toggle_registration" onsubmit="return toggleReg(this);">
+        <?php echo csrfInput(); ?>
+        <button type="submit"><?php echo $regEnabled ? '🔒 Cerrar registro' : '🔓 Abrir registro'; ?></button>
+        <p id="reg-msg" class="mt-1"></p>
+    </form>
+    <p class="small">Si el registro está cerrado, solo los administradores pueden crear cuentas.</p>
+
+    <?php elseif ($tab === 'alerts'): ?>
+    <h3>🔔 Suscripciones de alertas</h3>
+    <p class="small">El worker ejecuta tareas <code>alert_scan</code> que buscan CVEs recientes y generan alertas según estas suscripciones.</p>
+
+    <?php if (empty($alertSubs)): ?>
+        <p class="small">No hay suscripciones configuradas.</p>
+    <?php else: ?>
+    <table>
+        <thead><tr>
+            <th>Tipo</th>
+            <th>Valor</th>
+            <th>Umbral</th>
+            <th>Activa</th>
+            <th>Creada</th>
+        </tr></thead>
+        <tbody>
+        <?php foreach ($alertSubs as $s): ?>
+        <tr>
+            <td><?php echo htmlspecialchars($s['type']); ?></td>
+            <td><code><?php echo htmlspecialchars($s['value']); ?></code></td>
+            <td><?php echo htmlspecialchars($s['severity_threshold'] ?? 'LOW'); ?></td>
+            <td><?php echo $s['active'] ? 'Sí' : 'No'; ?></td>
+            <td class="small"><?php echo htmlspecialchars($s['created_at']); ?></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    <?php endif; ?>
+
+    <h3 class="mt-4">➕ Añadir suscripción</h3>
+    <form method="POST" action="ajax_admin.php?action=add_alert_subscription" onsubmit="return addAlertSub(this);">
+        <?php echo csrfInput(); ?>
+        <label>Tipo</label>
+        <select name="type" required>
+            <option value="product">Producto / Software</option>
+            <option value="vendor">Vendor / Fabricante</option>
+            <option value="keyword">Palabra clave</option>
+            <option value="severity">Severidad mínima</option>
+        </select>
+        <label>Valor</label>
+        <input type="text" name="value" required maxlength="100" placeholder="Ej: apache, log4j, CRITICAL...">
+        <label>Umbral de severidad (para filtro adicional)</label>
+        <select name="severity_threshold">
+            <option value="LOW">LOW</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="HIGH" selected>HIGH</option>
+            <option value="CRITICAL">CRITICAL</option>
+        </select>
+        <button type="submit" class="mt-2">Añadir suscripción</button>
+        <p id="alert-sub-msg" class="small mt-1"></p>
+    </form>
+    <script>
+    async function addAlertSub(form) {
+        const fd = new FormData(form);
+        const msg = document.getElementById('alert-sub-msg');
+        try {
+            const resp = await fetch(form.action, {method: 'POST', body: fd});
+            const data = await resp.json();
+            if (data.success) {
+                msg.className = 'alert alert-success mt-1';
+                msg.textContent = 'Suscripción añadida.';
+                form.reset();
+                setTimeout(() => location.reload(), 800);
+            } else {
+                msg.className = 'alert alert-error mt-1';
+                msg.textContent = data.error || 'Error';
+            }
+        } catch (err) {
+            msg.className = 'alert alert-error mt-1';
+            msg.textContent = 'Error de red: ' + err.message;
+        }
+        return false;
+    }
+    </script>
+
     <?php elseif ($tab === 'templates'): ?>
     <h3>📝 Plantillas de informe</h3>
     <p class="small">Las plantillas definen la estructura y formato del informe CVE generado por el LLM. Se usan como <strong>base</strong> del system prompt; el sistema añade automáticamente reglas de seguridad.</p>
@@ -1315,91 +1404,13 @@ require __DIR__ . '/templates/header.php';
     </script>
 
     <?php else: ?>
-    <h3>Configuración del sistema</h3>
-
-    <h3>🔑 API Keys — Workers conectados</h3>
-    <p class="small">Cada worker o sistema externo debe usar su propia API key. Puedes revocar una key sin afectar a los demás.</p>
-
-    <?php if (empty($apiKeys)): ?>
-        <p class="small">No hay API keys.</p>
-    <?php else: ?>
-    <table>
-        <thead><tr>
-            <th>Nombre</th>
-            <th>Key</th>
-            <th>Estado</th>
-            <th>Último uso</th>
-            <th>Acciones</th>
-        </tr></thead>
-        <tbody>
-        <?php foreach ($apiKeys as $k): ?>
-        <tr>
-            <td><?php echo htmlspecialchars($k['name']); ?></td>
-            <td class="mono">
-                <span id="key-<?php echo $k['id']; ?>" class="blur-reveal" title="Clic para revelar" data-full="<?php echo htmlspecialchars($k['api_key'], ENT_QUOTES); ?>" onclick="revealKey(this)"><?php echo htmlspecialchars(substr($k['api_key'], 0, 8) . '...' . substr($k['api_key'], -8)); ?></span>
-                <button class="secondary" style="font-size:0.8rem; padding:0.3rem 0.5rem;" onclick="copyKey('key-<?php echo $k['id']; ?>')">📋</button>
-            </td>
-            <td><?php echo $k['is_active'] ? '<span class="status-completed">Activa</span>' : '<span class="status-error">Revocada</span>'; ?></td>
-            <td class="small"><?php echo $k['last_used'] ? htmlspecialchars($k['last_used']) : 'Nunca'; ?></td>
-            <td>
-                <div class="flex gap-1 flex-wrap">
-                <?php if ($k['is_active']): ?>
-                    <button class="secondary" onclick="revokeKey(<?php echo $k['id']; ?>)">🚫 Revocar</button>
-                <?php else: ?>
-                    <button class="secondary" onclick="activateKey(<?php echo $k['id']; ?>)">✅ Activar</button>
-                <?php endif; ?>
-                    <button class="secondary" onclick="regenKey(<?php echo $k['id']; ?>)">🔄 Regenerar</button>
-                    <button class="secondary" onclick="deleteKey(<?php echo $k['id']; ?>)">🗑️ Eliminar</button>
-                </div>
-            </td>
-        </tr>
-        <?php endforeach; ?>
-        </tbody>
-    </table>
-    <?php endif; ?>
-
-    <h4>Añadir nuevo worker</h4>
-    <form method="POST" action="ajax_admin.php?action=add_api_key" onsubmit="return addKey(this);" class="flex gap-1 items-end">
-        <?php echo csrfInput(); ?>
-        <div class="w-full">
-            <label class="small">Nombre del worker</label>
-            <input type="text" name="name" placeholder="Ej: Orin Nano 2, VPS Frankfurt..." required maxlength="100">
-        </div>
-        <button type="submit">➕ Añadir key</button>
-    </form>
-    <div id="key-result" class="mt-2" style="display:none;">
-        <div class="alert alert-success">
-            <p>Nueva API key generada:</p>
-            <code id="key-new-value" style="font-size:1.1rem; padding:.5rem .75rem; display:inline-block; margin:.5rem 0;"></code>
-            <button onclick="copyToClipboard('key-new-value')">📋 Copiar</button>
-            <p class="small">Guárdala ahora — no se volverá a mostrar.</p>
-        </div>
-    </div>
-    <p id="key-msg" class="small mt-1"></p>
-    
-    <h3 class="mt-4">🖥️ Ejecutor por defecto para tareas</h3>
-    <p class="small">Las tareas CVE (y futuras tareas) se ejecutarán en el worker o modelo seleccionado por defecto.</p>
-    <form method="POST" action="ajax_admin.php?action=save_default_executor" onsubmit="return saveExecutor(this);">
-        <?php echo csrfInput(); ?>
-        <select name="executor" style="min-width: 280px;">
-            <?php foreach ($executorOptions as $opt): ?>
-            <option value="<?php echo htmlspecialchars($opt['value']); ?>" <?php echo $defaultExecutor === $opt['value'] ? 'selected' : ''; ?>>
-                <?php echo htmlspecialchars($opt['label']); ?>
-            </option>
-            <?php endforeach; ?>
-        </select>
-        <button type="submit" class="mt-2">💾 Guardar</button>
-        <p id="exec-msg" class="small mt-1"></p>
-    </form>
-
-    <h3 class="mt-4">Registro de usuarios</h3>
-    <p>Estado: <strong><?php echo $regEnabled ? 'Abierto' : 'Cerrado'; ?></strong></p>
-    <form method="POST" action="ajax_admin.php?action=toggle_registration" onsubmit="return toggleReg(this);">
-        <?php echo csrfInput(); ?>
-        <button type="submit"><?php echo $regEnabled ? '🔒 Cerrar registro' : '🔓 Abrir registro'; ?></button>
-        <p id="reg-msg" class="mt-1"></p>
-    </form>
-    <p class="small">Si el registro está cerrado, solo los administradores pueden crear cuentas.</p>
+    <h3>Configuración reorganizada</h3>
+    <p class="small">El panel de configuración ha sido reorganizado. Las opciones ahora se encuentran en:</p>
+    <ul>
+        <li><a href="?tab=apikeys">🔑 API Keys</a></li>
+        <li><a href="?tab=models">🤖 Modelos</a> (ejecutor por defecto)</li>
+        <li><a href="?tab=users">👥 Usuarios</a> (registro)</li>
+    </ul>
     <?php endif; ?>
 </div>
 
