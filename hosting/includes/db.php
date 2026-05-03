@@ -13,6 +13,13 @@ class Database {
                 if (!@mkdir(DATA_DIR, 0755, true)) {
                     throw new RuntimeException('No se pudo crear el directorio de datos: ' . DATA_DIR);
                 }
+
+/**
+ * Wrapper global para obtener la conexion PDO activa.
+ */
+function db(): PDO {
+    return Database::getInstance();
+}
             }
             if (!is_writable(DATA_DIR)) {
                 throw new RuntimeException('El directorio de datos no tiene permisos de escritura: ' . DATA_DIR);
@@ -515,4 +522,11 @@ class Database {
         $stmt = self::query($sql, array_merge(array_values($data), $whereParams));
         return $stmt->rowCount();
     }
+}
+
+/**
+ * Wrapper global para obtener la conexion PDO activa.
+ */
+function db(): PDO {
+    return Database::getInstance();
 }
