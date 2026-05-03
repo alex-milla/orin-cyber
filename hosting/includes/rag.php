@@ -349,9 +349,4 @@ function generateRequestId(): string {
     return 'req_' . bin2hex(random_bytes(8));
 }
 
-function getRateLimitInfo(string $key): array {
-    return [
-        'remaining' => 60,
-        'reset_at' => date('c', time() + 60),
-    ];
-}
+
