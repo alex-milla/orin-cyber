@@ -16,7 +16,7 @@ header('Content-Type: application/json');
  * Soporta Cloudflare Access via config('local_llm_cf_client_id' + 'local_llm_cf_client_secret').
  */
 function chatLocal(array $messages, string $modelId): array {
-    $url = rtrim(LOCAL_LLM_URL, '/') . '/v1/chat/completions';
+    $url = rtrim(getLocalLlmUrl(), '/') . '/v1/chat/completions';
 
     $payload = [
         'model' => $modelId,

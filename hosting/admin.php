@@ -130,6 +130,13 @@ try {
 }
 
 try {
+    $localLlmUrlRow = Database::fetchOne("SELECT value FROM config WHERE key = 'local_llm_url'");
+    $localLlmUrl = $localLlmUrlRow['value'] ?? '';
+} catch (Throwable $e) {
+    $localLlmUrl = '';
+}
+
+try {
     $executorOptions = Database::fetchAll(
         "SELECT 'worker' as value, 'Worker local (Orin)' as label
          UNION ALL
@@ -952,11 +959,44 @@ require __DIR__ . '/templates/header.php';
 
     <?php elseif ($tab === 'connectivity'): ?>
     <h3>🔗 Chat Local (Cloudflare Tunnel)</h3>
-    <p class="small">El chat se sirve directamente desde el llama-server del Orin Nano a través del túnel de Cloudflare. La URL está definida en <code>includes/config.php</code>.</p>
-    <p class="small" style="color:var(--text-muted);">
-        URL actual: <code><?php echo htmlspecialchars(LOCAL_LLM_URL); ?></code>
-        · <a href="<?php echo htmlspecialchars(LOCAL_LLM_URL); ?>" target="_blank" rel="noopener noreferrer">Abrir chat →</a>
-    </p>
+    <p class="small">El chat se sirve directamente desde el llama-server del Orin Nano a través del túnel de Cloudflare. La URL puede editarse aquí; si se deja vacía, se usará el valor por defecto definido en <code>includes/config.php</code>.</p>
+
+    <form method="POST" action="ajax_admin.php?action=save_local_llm_url" onsubmit="return saveLocalLlmUrl(this);" id="local-llm-url-form">
+        <?php echo csrfInput(); ?>
+        <div class="flex gap-2 items-end flex-wrap">
+            <div style="min-width:300px;flex:1;">
+                <label class="small">URL del túnel (llama-server)</label>
+                <input type="url" name="local_llm_url" value="<?php echo htmlspecialchars($localLlmUrl ?: LOCAL_LLM_URL); ?>" placeholder="https://chat-orin.cyberintelligence.dev" style="width:100%;" required>
+            </div>
+            <button type="submit">💾 Guardar</button>
+        </div>
+        <p id="local-llm-url-msg" class="small mt-1"></p>
+        <p class="small" style="color:var(--text-muted);">
+            Valor por defecto (fallback): <code><?php echo htmlspecialchars(LOCAL_LLM_URL); ?></code>
+            · <a href="<?php echo htmlspecialchars($localLlmUrl ?: LOCAL_LLM_URL); ?>" target="_blank" rel="noopener noreferrer">Abrir chat →</a>
+        </p>
+    </form>
+    <script>
+    async function saveLocalLlmUrl(form) {
+        const fd = new FormData(form);
+        const msg = document.getElementById('local-llm-url-msg');
+        try {
+            const resp = await fetch(form.action, {method: 'POST', body: fd});
+            const data = await resp.json();
+            if (data.success) {
+                msg.className = 'alert alert-success mt-1';
+                msg.textContent = 'URL guardada.';
+            } else {
+                msg.className = 'alert alert-error mt-1';
+                msg.textContent = data.error || 'Error';
+            }
+        } catch (err) {
+            msg.className = 'alert alert-error mt-1';
+            msg.textContent = 'Error de red: ' + err.message;
+        }
+        return false;
+    }
+    </script>
 
     <h4 class="mt-3" style="font-size:1rem;color:var(--text-secondary);">Cloudflare Access (Zero Trust)</h4>
     <p class="small">Si el túnel está protegido con Cloudflare Access, introduce aquí el Client ID y Client Secret del token de servicio. El chat integrado y las llamadas del sistema los usarán automáticamente.</p>

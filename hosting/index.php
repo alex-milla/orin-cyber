@@ -17,8 +17,8 @@ $severityDistribution = [];
 $recentAlerts = [];
 $recentTasks = [];
 
-// URL del chat local (túnel de Cloudflare) — constante definida en config.php
-$chatUrl = LOCAL_LLM_URL;
+// URL del chat local (túnel de Cloudflare) — lee desde config DB, fallback a constante
+$chatUrl = getLocalLlmUrl();
 
 try {
     // Totales por estado de tareas

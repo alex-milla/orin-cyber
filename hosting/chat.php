@@ -8,7 +8,7 @@ require_once __DIR__ . '/includes/auth.php';
 requireAuth();
 
 // URL del llama-server (Cloudflare Tunnel desde el Orin Nano)
-$chatUrl = LOCAL_LLM_URL;
+$chatUrl = getLocalLlmUrl();
 
 if ($chatUrl !== '') {
     header('Location: ' . $chatUrl);

@@ -23,7 +23,27 @@ date_default_timezone_set('Europe/Madrid');
 
 // URL pública del llama-server (Cloudflare Tunnel desde el Orin Nano)
 // Se usa para el chat y otras funciones que requieren conexión directa al modelo local
+// Puede sobrescribirse desde el panel de administración (pestaña Conectividad)
 define('LOCAL_LLM_URL', 'https://chat-orin.cyberintelligence.dev');
+
+/**
+ * Obtiene la URL del llama-server local.
+ * Primero consulta la base de datos (tabla config, key 'local_llm_url').
+ * Si no existe o falla, usa la constante LOCAL_LLM_URL como fallback.
+ */
+function getLocalLlmUrl(): string {
+    try {
+        if (class_exists('Database', false)) {
+            $row = Database::fetchOne("SELECT value FROM config WHERE key = 'local_llm_url'");
+            if (!empty($row['value'])) {
+                return $row['value'];
+            }
+        }
+    } catch (Throwable $e) {
+        // Fallback silencioso a la constante
+    }
+    return defined('LOCAL_LLM_URL') ? LOCAL_LLM_URL : '';
+}
 
 // URL del servicio de embeddings (mismo Orin, distinto puerto/túnel)
 // Fase 2: cambiar a https://embed-orin.cyberintelligence.dev cuando el túnel esté listo

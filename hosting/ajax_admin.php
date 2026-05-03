@@ -139,6 +139,18 @@ switch ($action) {
         jsonResponse(['success' => true]);
         break;
 
+    case 'save_local_llm_url':
+        $url = trim($_POST['local_llm_url'] ?? '');
+        if ($url !== '' && !filter_var($url, FILTER_VALIDATE_URL)) {
+            jsonResponse(['error' => 'La URL no es válida'], 400);
+        }
+        if ($url !== '' && !str_starts_with($url, 'https://')) {
+            jsonResponse(['error' => 'La URL debe usar HTTPS'], 400);
+        }
+        Database::query("INSERT OR REPLACE INTO config (key, value) VALUES ('local_llm_url', ?)", [$url]);
+        jsonResponse(['success' => true]);
+        break;
+
     case 'save_preferred_model':
         $model = trim($_POST['model'] ?? '');
         if ($model === '') {

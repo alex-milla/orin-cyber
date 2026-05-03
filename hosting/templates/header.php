@@ -2,8 +2,8 @@
 declare(strict_types=1);
 if (!isset($pageTitle)) $pageTitle = 'OrinSec';
 
-// URL del chat local (túnel de Cloudflare) — constante definida en config.php
-$chatUrl = LOCAL_LLM_URL;
+// URL del chat local (túnel de Cloudflare) — lee desde config DB, fallback a constante
+$chatUrl = getLocalLlmUrl();
 ?>
 <!DOCTYPE html>
 <html lang="es" data-theme="system">
