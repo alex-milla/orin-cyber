@@ -116,6 +116,9 @@ require __DIR__ . '/templates/header.php';
             <a href="export_cve.php?id=<?php echo $taskId; ?>&format=docx">
                 <button class="secondary" type="button"><?php echo $l['docx']; ?></button>
             </a>
+            <a href="blue_team.php">
+                <button class="secondary" type="button">🔙 Volver a Blue Team</button>
+            </a>
         </div>
         <textarea id="plain-text" class="visually-hidden"><?php echo htmlspecialchars($task['result_text'] ?? ''); ?></textarea>
     <?php endif; ?>

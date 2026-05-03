@@ -13,7 +13,7 @@ $pageTitle = 'Blue Team Intelligence';
 $message = '';
 $error = '';
 
-// â”€â”€ Procesar formulario (CSV o manual) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Procesar formulario (CSV o manual) ──────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $incidentId = sanitizeString($_POST['incident_id'] ?? '');
     $title = sanitizeString($_POST['incident_title'] ?? '');
@@ -37,12 +37,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $file = $_FILES['incident_csv'];
                 $csvData = file_get_contents($file['tmp_name']);
                 if ($csvData === false || strlen($csvData) === 0) {
-                    $error = 'El archivo estÃ¡ vacÃ­o o no se pudo leer.';
+                    $error = 'El archivo está vacío o no se pudo leer.';
                 } elseif ($splitByRow) {
-                    // â”€â”€ Modo: un incidente por cada fila del CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                    // ── Modo: un incidente por cada fila del CSV ─────────
                     $lines = explode("\n", $csvData);
                     if (count($lines) < 2) {
-                        $error = 'CSV vacÃ­o o sin filas de datos.';
+                        $error = 'CSV vacío o sin filas de datos.';
                     } else {
                         $headers = str_getcsv($lines[0]);
                         $createdCount = 0;
@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $rowCsv = stream_get_contents($handle);
                             fclose($handle);
 
-                            // Generar ID automÃ¡tico basado en UserHash (primera columna) + Ã­ndice
+                            // Generar ID automático basado en UserHash (primera columna) + índice
                             $userHash = trim($row[0] ?? '');
                             $hashPrefix = substr(preg_replace('/[^a-zA-Z0-9]/', '', $userHash), 0, 8);
                             $autoId = 'SENT-' . ($hashPrefix ?: 'row') . '-' . date('YmdHis') . '-' . $createdCount;
@@ -102,14 +102,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             header("Location: task_result.php?id=" . $firstTaskId);
                             exit;
                         } else {
-                            $error = 'No se pudieron crear incidentes: el CSV no contiene filas vÃ¡lidas.';
+                            $error = 'No se pudieron crear incidentes: el CSV no contiene filas válidas.';
                         }
                     }
                 } else {
-                    // â”€â”€ Modo normal: un solo incidente â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                    // ── Modo normal: un solo incidente ──────────────────
                     $existing = Database::fetchOne("SELECT * FROM incidents WHERE incident_id = ?", [$incidentId]);
                     if ($existing) {
-                        if (empty($title)) $title = $existing['title'] ?? 'Incidente sin tÃ­tulo';
+                        if (empty($title)) $title = $existing['title'] ?? 'Incidente sin título';
                         if (empty($severity)) $severity = $existing['severity'] ?? 'Medium';
                         Database::update('incidents', [
                             'title' => $title,
@@ -215,7 +215,7 @@ function _parseJsonArrayString(string $raw): array {
  * no por regex sobre texto plano.
  */
 function _extractSentinelObfuscatedEntities(string $incidentId, array $rows, array $headers): void {
-    // Normalizar nombres de cabecera a lowercase para bÃºsqueda insensible
+    // Normalizar nombres de cabecera a lowercase para búsqueda insensible
     $headerMap = [];
     foreach ($headers as $i => $h) {
         $headerMap[strtolower(trim($h))] = $i;
@@ -250,7 +250,7 @@ function _extractSentinelObfuscatedEntities(string $incidentId, array $rows, arr
             } catch (Exception $e) { /* ignorar duplicados */ }
         }
 
-        // 2. IPs â€” extraer del JSON array string: ["1.2.3.4","5.6.7.8"]
+        // 2. IPs — extraer del JSON array string: ["1.2.3.4","5.6.7.8"]
         $ips = _parseJsonArrayString($ipsRaw);
         foreach ($ips as $ip) {
             $ip = trim($ip, '"\'');
@@ -269,14 +269,14 @@ function _extractSentinelObfuscatedEntities(string $incidentId, array $rows, arr
     }
 }
 
-// â”€â”€ Extraer entidades del CSV y guardarlas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Extraer entidades del CSV y guardarlas ──────────────────────────
 function _extractAndStoreEntities(string $incidentId, string $csvData): void {
     $lines = explode("\n", $csvData);
     if (count($lines) < 2) return;
 
     $headers = str_getcsv($lines[0]);
 
-    // â”€â”€ NUEVO: detectar CSV de Sentinel ofuscado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── NUEVO: detectar CSV de Sentinel ofuscado ──────────────────
     if (_isSentinelObfuscatedCsv($headers)) {
         $rows = [];
         for ($i = 1; $i < count($lines); $i++) {
@@ -285,9 +285,9 @@ function _extractAndStoreEntities(string $incidentId, string $csvData): void {
             $rows[] = str_getcsv($line);
         }
         _extractSentinelObfuscatedEntities($incidentId, $rows, $headers);
-        return; // no continuar con la lÃ³gica de regex
+        return; // no continuar con la lógica de regex
     }
-    // â”€â”€ FIN NUEVO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── FIN NUEVO ─────────────────────────────────────────────────
 
     $allText = implode(' ', $lines);
 
@@ -334,7 +334,7 @@ function _extractAndStoreEntities(string $incidentId, string $csvData): void {
     }
 }
 
-// â”€â”€ Cargar incidentes recientes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Cargar incidentes recientes ─────────────────────────────────────
 $recentIncidents = Database::fetchAll(
     "SELECT * FROM incidents ORDER BY created_time DESC LIMIT 20"
 );
@@ -351,7 +351,7 @@ $iocStats = Database::fetchAll(
     "SELECT ioc_type, status, COUNT(*) as count FROM iocs GROUP BY ioc_type, status"
 );
 
-// â”€â”€ Conteos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Conteos ─────────────────────────────────────────────────────────
 $totalIncidents = Database::fetchOne("SELECT COUNT(*) as c FROM incidents")['c'] ?? 0;
 $totalEntities = Database::fetchOne("SELECT COUNT(*) as c FROM entities")['c'] ?? 0;
 $pendingAnalysis = Database::fetchOne(
@@ -365,8 +365,8 @@ require_once __DIR__ . '/templates/header.php';
 ?>
 
 <div class="page-header">
-    <h2>ðŸ›¡ï¸ Blue Team Intelligence</h2>
-    <p>AnÃ¡lisis de incidentes, tracking de entidades e inteligencia de IOCs.</p>
+    <h2>🛡️ Blue Team Intelligence</h2>
+    <p>Análisis de incidentes, tracking de entidades e inteligencia de IOCs.</p>
 </div>
 
 <?php if ($message): ?>
@@ -376,7 +376,7 @@ require_once __DIR__ . '/templates/header.php';
 <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
 
-<!-- â”€â”€ Tarjetas de resumen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<!-- ── Tarjetas de resumen ─────────────────────────────────────────── -->
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem;">
     <div class="card" style="text-align:center;">
         <div style="font-size:1.8rem;font-weight:700;color:var(--primary);"><?php echo $totalIncidents; ?></div>
@@ -392,25 +392,25 @@ require_once __DIR__ . '/templates/header.php';
     </div>
     <div class="card" style="text-align:center;">
         <div style="font-size:1.8rem;font-weight:700;color:var(--warning);"><?php echo $processingAnalysis; ?></div>
-        <div style="color:var(--text-muted);font-size:.9rem;">En anÃ¡lisis</div>
+        <div style="color:var(--text-muted);font-size:.9rem;">En análisis</div>
     </div>
 </div>
 
-<!-- â”€â”€ Formulario: Crear Manual + Subir CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<!-- ── Formulario: Crear Manual + Subir CSV ────────────────────────── -->
 <div class="card" style="margin-bottom:1.5rem;">
-    <h3>ðŸ“¤ GestiÃ³n de Incidencias Blue Team</h3>
+    <h3>📤 Gestión de Incidencias Blue Team</h3>
 
     <!-- SECCION A: Crear manual -->
     <form method="POST" action="" style="margin-top:1rem;padding:1rem;background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--border);">
-        <h4 style="margin:0 0 .75rem;font-size:1rem;">âž• Crear incidencia manualmente</h4>
+        <h4 style="margin:0 0 .75rem;font-size:1rem;">➕ Crear incidencia manualmente</h4>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
             <div>
                 <label>ID de Incidente</label>
                 <input type="text" name="incident_id" placeholder="INC-25234 (opcional si usas split por filas)" style="width:100%;">
             </div>
             <div>
-                <label>TÃ­tulo</label>
-                <input type="text" name="incident_title" placeholder="Logon anÃ³malo desde IP externa" style="width:100%;">
+                <label>Título</label>
+                <input type="text" name="incident_title" placeholder="Logon anómalo desde IP externa" style="width:100%;">
             </div>
             <div>
                 <label>Severidad</label>
@@ -430,17 +430,17 @@ require_once __DIR__ . '/templates/header.php';
             </div>
         </div>
         <div style="margin-top:1rem;">
-            <button type="submit" class="btn btn-primary">ðŸ’¾ Guardar incidencia manual</button>
+            <button type="submit" class="btn btn-primary">💾 Guardar incidencia manual</button>
         </div>
     </form>
 
     <!-- SECCION B: Subir CSV -->
     <form method="POST" action="" enctype="multipart/form-data" style="margin-top:1rem;padding:1rem;background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--border);">
-        <h4 style="margin:0 0 .75rem;font-size:1rem;">ðŸ“ Subir CSV de Sentinel y analizar</h4>
+        <h4 style="margin:0 0 .75rem;font-size:1rem;">📁 Subir CSV de Sentinel y analizar</h4>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
             <div>
-                <label>TÃ­tulo base</label>
-                <input type="text" name="incident_title" placeholder="Login desde paÃ­s no habitual" style="width:100%;">
+                <label>Título base</label>
+                <input type="text" name="incident_title" placeholder="Login desde país no habitual" style="width:100%;">
             </div>
             <div>
                 <label>Severidad</label>
@@ -470,11 +470,11 @@ require_once __DIR__ . '/templates/header.php';
             <input type="file" name="incident_csv" accept=".csv,.json" required style="width:100%;padding:.5rem;border:2px dashed var(--border);border-radius:var(--radius-sm);background:var(--surface-2);">
             <div style="margin-top:.75rem;padding:.75rem 1rem;background:var(--surface-2);
                         border-radius:var(--radius-sm);font-size:.83rem;border-left:3px solid var(--accent);">
-                <strong>ðŸ“¥ Â¿CÃ³mo exportar desde Sentinel?</strong>
+                <strong>📥 ¿Cómo exportar desde Sentinel?</strong>
                 <ol style="margin:.5rem 0 0 1.2rem;padding:0;">
-                    <li>Ejecuta la KQL de detecciÃ³n en Log Analytics / Sentinel.</li>
-                    <li>Haz clic en <strong>Export â†’ CSV (all columns)</strong>.</li>
-                    <li>Sube el archivo aquÃ­.</li>
+                    <li>Ejecuta la KQL de detección en Log Analytics / Sentinel.</li>
+                    <li>Haz clic en <strong>Export → CSV (all columns)</strong>.</li>
+                    <li>Sube el archivo aquí.</li>
                 </ol>
                 <details style="margin-top:.5rem;">
                     <summary style="cursor:pointer;color:var(--accent);">Ver KQL de ejemplo (login fuera de ES)</summary>
@@ -495,7 +495,7 @@ require_once __DIR__ . '/templates/header.php';
     LoginCount = count()
     by UserPrincipalName
 | extend
-    Subject    = "Login desde paÃ­s no habitual (fuera de ES)",
+    Subject    = "Login desde país no habitual (fuera de ES)",
     EntityType = "user",
     Severity   = "high",
     UserHash   = tostring(hash_sha256(UserPrincipalName)),
@@ -504,21 +504,21 @@ require_once __DIR__ . '/templates/header.php';
           Countries, Cities, IPs, Apps, FirstSeen, LastSeen, LoginCount
 | order by LoginCount desc</pre>
                     <p style="margin:.25rem 0 0;color:var(--text-muted);">
-                        âš ï¸ Los usuarios se exportan <strong>ofuscados</strong> (hash SHA256).
-                        Para investigar un usuario concreto, usa la query de desofuscaciÃ³n en Sentinel.
+                        ⚠️ Los usuarios se exportan <strong>ofuscados</strong> (hash SHA256).
+                        Para investigar un usuario concreto, usa la query de desofuscación en Sentinel.
                     </p>
                 </details>
             </div>
         </div>
         <div style="margin-top:1rem;">
-            <button type="submit" class="btn btn-primary">ðŸ” Analizar Incidente</button>
+            <button type="submit" class="btn btn-primary">🔍 Analizar Incidente</button>
         </div>
     </form>
 </div>
 
-<!-- â”€â”€ Azure Sentinel Sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<!-- ── Azure Sentinel Sync ─────────────────────────────────────────── -->
 <div class="card" style="margin-bottom:1.5rem;">
-    <h3>ðŸŒ©ï¸ Azure Sentinel Sync</h3>
+    <h3>🌩️ Azure Sentinel Sync</h3>
     <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:1rem;">
         Sincroniza incidentes directamente desde Microsoft Sentinel usando Azure CLI device code flow.
         Requiere que hayas ejecutado <code>az login --use-device-code</code> en la Orin previamente.
@@ -530,14 +530,14 @@ require_once __DIR__ . '/templates/header.php';
             <input type="text" id="azure-workspace" placeholder="12345678-1234-1234-1234-123456789abc" style="width:100%;">
         </div>
         <div>
-            <label style="font-size:.8rem;color:var(--text-muted);">DÃ­as atrÃ¡s</label>
+            <label style="font-size:.8rem;color:var(--text-muted);">Días atrás</label>
             <input type="number" id="azure-days" value="7" min="1" max="30" style="width:80px;">
         </div>
         <div style="flex:1;min-width:150px;">
-            <label style="font-size:.8rem;color:var(--text-muted);">NÂº Incidente (opcional)</label>
+            <label style="font-size:.8rem;color:var(--text-muted);">Nº Incidente (opcional)</label>
             <input type="text" id="azure-incident" placeholder="Todos" style="width:100%;">
         </div>
-        <button type="button" class="btn btn-primary" onclick="startAzureSync()">ðŸ”„ Sincronizar</button>
+        <button type="button" class="btn btn-primary" onclick="startAzureSync()">🔄 Sincronizar</button>
     </form>
     <div id="azure-sync-status" style="margin-top:1rem;display:none;">
         <p><span class="spinner"></span> Sincronizando con Sentinel...</p>
@@ -567,7 +567,7 @@ function startAzureSync() {
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            resultDiv.innerHTML = '<div class="alert alert-success">Sync iniciada (tarea #' + data.task_id + '). Recarga la pÃ¡gina en unos segundos para ver los incidentes.</div>';
+            resultDiv.innerHTML = '<div class="alert alert-success">Sync iniciada (tarea #' + data.task_id + '). Recarga la página en unos segundos para ver los incidentes.</div>';
             pollAzureStatus(data.task_id);
         } else {
             statusDiv.style.display = 'none';
@@ -593,7 +593,7 @@ function pollAzureStatus(taskId) {
             if (task.status === 'completed') {
                 clearInterval(interval);
                 statusDiv.style.display = 'none';
-                resultDiv.innerHTML = '<div class="alert alert-success">âœ… Sync completada.</div>' + (task.result_html || '');
+                resultDiv.innerHTML = '<div class="alert alert-success">✅ Sync completada.</div>' + (task.result_html || '');
             } else if (task.status === 'error') {
                 clearInterval(interval);
                 statusDiv.style.display = 'none';
@@ -603,23 +603,23 @@ function pollAzureStatus(taskId) {
         .catch(() => {});
     }, 5000);
 
-    // Timeout despuÃ©s de 5 minutos
+    // Timeout después de 5 minutos
     setTimeout(() => { clearInterval(interval); statusDiv.style.display = 'none'; }, 300000);
 }
 </script>
 
-<!-- â”€â”€ Tabla de incidentes recientes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<!-- ── Tabla de incidentes recientes ───────────────────────────────── -->
 <div class="card" style="margin-bottom:1.5rem;">
-    <h3>ðŸ“‹ Incidentes Recientes</h3>
+    <h3>📋 Incidentes Recientes</h3>
     <?php if (empty($recentIncidents)): ?>
-        <p style="color:var(--text-muted);">No hay incidentes registrados todavÃ­a. Sube tu primer CSV arriba.</p>
+        <p style="color:var(--text-muted);">No hay incidentes registrados todavía. Sube tu primer CSV arriba.</p>
     <?php else: ?>
     <div style="overflow-x:auto;">
         <table class="data-table">
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>TÃ­tulo</th>
+                    <th>Título</th>
                     <th>Severidad</th>
                     <th>Estado</th>
                     <th>Veredicto LLM</th>
@@ -647,9 +647,9 @@ function pollAzureStatus(taskId) {
                     <td>
                         <?php
                         $statusLabel = match($inc['status'] ?? 'open') {
-                            'open' => 'ðŸŸ¡ Abierto',
-                            'closed' => 'ðŸ”´ Cerrado',
-                            'investigating' => 'ðŸ”µ Investigando',
+                            'open' => '🟡 Abierto',
+                            'closed' => '🔴 Cerrado',
+                            'investigating' => '🔵 Investigando',
                             default => $inc['status'],
                         };
                         echo $statusLabel;
@@ -678,7 +678,7 @@ function pollAzureStatus(taskId) {
                         <form method="POST" action="" enctype="multipart/form-data" style="display:inline-flex;gap:.3rem;align-items:center;">
                             <input type="hidden" name="incident_id" value="<?php echo htmlspecialchars($inc['incident_id'], ENT_QUOTES, 'UTF-8'); ?>">
                             <input type="file" name="incident_csv" accept=".csv" required style="width:90px;font-size:.7rem;padding:.2rem;">
-                            <button type="submit" class="btn btn-sm" title="Subir CSV y analizar">ðŸ“Ž</button>
+                            <button type="submit" class="btn btn-sm" title="Subir CSV y analizar">📎</button>
                         </form>
                         <?php endif; ?>
                     </td>
@@ -690,11 +690,11 @@ function pollAzureStatus(taskId) {
     <?php endif; ?>
 </div>
 
-<!-- â”€â”€ Tabla de entidades â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<!-- ── Tabla de entidades ──────────────────────────────────────────── -->
 <div class="card">
-    <h3>ðŸ” Entidades Monitoreadas</h3>
+    <h3>🔍 Entidades Monitoreadas</h3>
     <?php if (empty($recentEntities)): ?>
-        <p style="color:var(--text-muted);">No hay entidades registradas todavÃ­a.</p>
+        <p style="color:var(--text-muted);">No hay entidades registradas todavía.</p>
     <?php else: ?>
     <div style="overflow-x:auto;">
         <table class="data-table">
@@ -735,11 +735,11 @@ function pollAzureStatus(taskId) {
     <?php endif; ?>
 </div>
 
-<!-- â”€â”€ IOC Tracker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<!-- ── IOC Tracker ─────────────────────────────────────────────────── -->
 <div class="card">
-    <h3>ðŸ¦  IOC Tracker</h3>
+    <h3>🦠 IOC Tracker</h3>
 
-    <!-- Formulario aÃ±adir IOC manual -->
+    <!-- Formulario añadir IOC manual -->
     <form id="ioc-add-form" style="margin-bottom:1rem;display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap;">
         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8'); ?>">
         <div style="flex:1;min-width:200px;">
@@ -759,13 +759,13 @@ function pollAzureStatus(taskId) {
             <label style="font-size:.8rem;color:var(--text-muted);">Notas</label>
             <input type="text" id="ioc-notes" placeholder="Contexto o evidencia" style="width:100%;">
         </div>
-        <button type="button" class="btn btn-primary" onclick="addIoc()">âž• AÃ±adir</button>
+        <button type="button" class="btn btn-primary" onclick="addIoc()">➕ Añadir</button>
     </form>
 
-    <!-- Mini estadÃ­sticas -->
+    <!-- Mini estadísticas -->
     <div style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;">
         <?php
-        $statusLabels = ['sospechosa' => 'ðŸŸ¡ Sospechosa', 'confirmada_maliciosa' => 'ðŸ”´ Maliciosa', 'falsa_alarma' => 'ðŸŸ¢ Falsa alarma', 'whitelist' => 'âšª Whitelist'];
+        $statusLabels = ['sospechosa' => '🟡 Sospechosa', 'confirmada_maliciosa' => '🔴 Maliciosa', 'falsa_alarma' => '🟢 Falsa alarma', 'whitelist' => '⚪ Whitelist'];
         $statusCounts = [];
         foreach ($iocStats as $s) {
             $statusCounts[$s['status']] = ($statusCounts[$s['status']] ?? 0) + (int)$s['count'];
@@ -780,7 +780,7 @@ function pollAzureStatus(taskId) {
     </div>
 
     <?php if (empty($recentIOCs)): ?>
-        <p style="color:var(--text-muted);">No hay IOCs registrados. Se extraerÃ¡n automÃ¡ticamente al analizar incidentes, o puedes aÃ±adirlos manualmente arriba.</p>
+        <p style="color:var(--text-muted);">No hay IOCs registrados. Se extraerán automáticamente al analizar incidentes, o puedes añadirlos manualmente arriba.</p>
     <?php else: ?>
     <div style="overflow-x:auto;">
         <table class="data-table">
@@ -791,8 +791,8 @@ function pollAzureStatus(taskId) {
                     <th>Estado</th>
                     <th>VT</th>
                     <th>AbuseIPDB</th>
-                    <th>CampaÃ±a</th>
-                    <th>Ãšltima vez</th>
+                    <th>Campaña</th>
+                    <th>Última vez</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
@@ -815,8 +815,8 @@ function pollAzureStatus(taskId) {
                             <?php echo htmlspecialchars($ioc['status']); ?>
                         </span>
                     </td>
-                    <td style="text-align:center;"><?php echo $ioc['osint_vt_score'] !== null ? $ioc['osint_vt_score'] . '/94' : 'â€”'; ?></td>
-                    <td style="text-align:center;"><?php echo $ioc['osint_abuse_score'] !== null ? $ioc['osint_abuse_score'] . '/100' : 'â€”'; ?></td>
+                    <td style="text-align:center;"><?php echo $ioc['osint_vt_score'] !== null ? $ioc['osint_vt_score'] . '/94' : '—'; ?></td>
+                    <td style="text-align:center;"><?php echo $ioc['osint_abuse_score'] !== null ? $ioc['osint_abuse_score'] . '/100' : '—'; ?></td>
                     <td><?php echo htmlspecialchars($ioc['campaign_tag'] ?? ''); ?></td>
                     <td style="font-size:.85rem;color:var(--text-muted);"><?php echo htmlspecialchars(substr($ioc['last_seen'] ?? '', 0, 16)); ?></td>
                     <td>
