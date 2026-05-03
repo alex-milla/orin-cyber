@@ -19,22 +19,89 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = sanitizeString($_POST['incident_title'] ?? 'Incidente sin título');
     $severity = sanitizeString($_POST['incident_severity'] ?? 'Medium');
     $source = sanitizeString($_POST['incident_source'] ?? 'manual');
+    $splitByRow = isset($_POST['split_by_row']) && $_POST['split_by_row'] === '1';
 
-    if (empty($incidentId)) {
-        $error = 'El ID de incidente es obligatorio.';
+    $hasFile = isset($_FILES['incident_csv']) && $_FILES['incident_csv']['error'] === UPLOAD_ERR_OK;
+
+    // Si no hay ID manual y no se va a dividir por fila, exigirlo
+    if (empty($incidentId) && !($hasFile && $splitByRow)) {
+        $error = 'El ID de incidente es obligatorio (salvo si usas "Crear un incidente por cada fila").';
     } else {
-        $hasFile = isset($_FILES['incident_csv']) && $_FILES['incident_csv']['error'] === UPLOAD_ERR_OK;
-
         try {
-            $existing = Database::fetchOne("SELECT * FROM incidents WHERE incident_id = ?", [$incidentId]);
-
             if ($hasFile) {
                 $file = $_FILES['incident_csv'];
                 $csvData = file_get_contents($file['tmp_name']);
                 if ($csvData === false || strlen($csvData) === 0) {
                     $error = 'El archivo está vacío o no se pudo leer.';
+                } elseif ($splitByRow) {
+                    // ── Modo: un incidente por cada fila del CSV ─────────
+                    $lines = explode("\n", $csvData);
+                    if (count($lines) < 2) {
+                        $error = 'CSV vacío o sin filas de datos.';
+                    } else {
+                        $headers = str_getcsv($lines[0]);
+                        $createdCount = 0;
+                        $firstTaskId = null;
+                        for ($i = 1; $i < count($lines); $i++) {
+                            $line = trim($lines[$i]);
+                            if (empty($line)) continue;
+                            $row = str_getcsv($line);
+                            if (empty(array_filter($row))) continue;
+
+                            // Reconstruir CSV de una sola fila
+                            $handle = fopen('php://memory', 'r+');
+                            fputcsv($handle, $headers);
+                            fputcsv($handle, $row);
+                            rewind($handle);
+                            $rowCsv = stream_get_contents($handle);
+                            fclose($handle);
+
+                            // Generar ID automático basado en UserHash (primera columna) + índice
+                            $userHash = trim($row[0] ?? '');
+                            $hashPrefix = substr(preg_replace('/[^a-zA-Z0-9]/', '', $userHash), 0, 8);
+                            $autoId = 'SENT-' . ($hashPrefix ?: 'row') . '-' . date('YmdHis') . '-' . $createdCount;
+
+                            // Insertar incidente individual
+                            Database::insert('incidents', [
+                                'incident_id' => $autoId,
+                                'title' => $title . ($createdCount > 0 ? ' #' . ($createdCount + 1) : ''),
+                                'severity' => $severity,
+                                'source' => $source,
+                                'raw_data' => $rowCsv,
+                                'status' => 'open',
+                                'created_time' => date('Y-m-d H:i:s'),
+                            ]);
+
+                            _extractAndStoreEntities($autoId, $rowCsv);
+
+                            $taskInput = json_encode([
+                                'incident_id' => $autoId,
+                                'title' => $title,
+                                'severity' => $severity,
+                                'csv_data' => $rowCsv,
+                            ]);
+                            $taskId = Database::insert('tasks', [
+                                'task_type' => 'incident_analysis',
+                                'input_data' => $taskInput,
+                                'status' => 'pending',
+                            ]);
+                            Database::update('incidents', ['blue_team_task_id' => $taskId], 'incident_id = ?', [$autoId]);
+
+                            if ($firstTaskId === null) {
+                                $firstTaskId = $taskId;
+                            }
+                            $createdCount++;
+                        }
+                        if ($createdCount > 0) {
+                            header("Location: task_result.php?id=" . $firstTaskId);
+                            exit;
+                        } else {
+                            $error = 'No se pudieron crear incidentes: el CSV no contiene filas válidas.';
+                        }
+                    }
                 } else {
-                    // Para uploads a incidentes existentes (form inline), conservar datos previos si no se enviaron
+                    // ── Modo normal: un solo incidente ──────────────────
+                    $existing = Database::fetchOne("SELECT * FROM incidents WHERE incident_id = ?", [$incidentId]);
                     if ($existing) {
                         if (empty($title)) $title = $existing['title'] ?? 'Incidente sin título';
                         if (empty($severity)) $severity = $existing['severity'] ?? 'Medium';
@@ -77,24 +144,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } else {
                 // Sin archivo: crear o actualizar incidente manualmente
-                if ($existing) {
-                    Database::update('incidents', [
-                        'title' => $title,
-                        'severity' => $severity,
-                        'source' => $source,
-                        'status' => 'open',
-                    ], 'incident_id = ?', [$incidentId]);
+                if (empty($incidentId)) {
+                    $error = 'El ID de incidente es obligatorio.';
                 } else {
-                    Database::insert('incidents', [
-                        'incident_id' => $incidentId,
-                        'title' => $title,
-                        'severity' => $severity,
-                        'source' => $source,
-                        'status' => 'open',
-                        'created_time' => date('Y-m-d H:i:s'),
-                    ]);
+                    $existing = Database::fetchOne("SELECT * FROM incidents WHERE incident_id = ?", [$incidentId]);
+                    if ($existing) {
+                        Database::update('incidents', [
+                            'title' => $title,
+                            'severity' => $severity,
+                            'source' => $source,
+                            'status' => 'open',
+                        ], 'incident_id = ?', [$incidentId]);
+                    } else {
+                        Database::insert('incidents', [
+                            'incident_id' => $incidentId,
+                            'title' => $title,
+                            'severity' => $severity,
+                            'source' => $source,
+                            'status' => 'open',
+                            'created_time' => date('Y-m-d H:i:s'),
+                        ]);
+                    }
+                    $message = 'Incidente guardado correctamente.' . ($existing ? ' (actualizado)' : ' (creado)');
                 }
-                $message = 'Incidente guardado correctamente.' . ($existing ? ' (actualizado)' : ' (creado)');
             }
         } catch (Exception $e) {
             $error = 'Error al procesar: ' . $e->getMessage();
@@ -347,6 +419,12 @@ require_once __DIR__ . '/templates/header.php';
                     <option value="manual">Manual / CSV</option>
                     <option value="sentinel">Microsoft Sentinel</option>
                 </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:.4rem;">
+                <input type="checkbox" id="split_by_row" name="split_by_row" value="1" style="width:auto;">
+                <label for="split_by_row" style="font-weight:normal;font-size:.85rem;cursor:pointer;">
+                    Crear un incidente por cada fila del CSV
+                </label>
             </div>
         </div>
         <div style="margin-top:1rem;">
